@@ -1,5 +1,5 @@
 {
-  "name": "boutique-olfattiva_V.1",
+  "name": "boutique-olfattiva-app",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,6 +10,7 @@
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "latest",
+    "@tailwindcss/postcss": "latest",
     "postcss": "latest",
     "autoprefixer": "latest",
     "lucide-react": "latest",
