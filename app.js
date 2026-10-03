@@ -1,7 +1,7 @@
 // Constants and Keys
 const SUPABASE_URL = 'https://xmkpldgaawwsafbsjmhz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EZly6tJde5GD3jsGDXVqvg_nXy6qCDs';
-const GEMINI_API_KEY = 'AQ.Ab8RN6Jn25GPCozlmjPsTiA8leIV4MgUDXB7s_feXcqwHbUXKw';
+const GEMINI_API_KEY = '';// Sp
 
 // Fallback data
 const fallbackPerfumes = [
