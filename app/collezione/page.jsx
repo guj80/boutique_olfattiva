@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Sparkles, Camera } from 'lucide-react'
 
 export default function Home() {
   return (
@@ -15,20 +16,20 @@ export default function Home() {
         
         <div className="text-2xl font-serif text-white mb-8">Nessun profumo selezionato</div>
         
-        <button className="bg-[#c5a059] text-black font-bold text-xs uppercase tracking-widest py-4 px-8 rounded-full hover:bg-white transition-all shadow-[0_0_20px_rgba(197,160,89,0.3)]">
+        <Link href="/collezione" className="inline-block bg-[#c5a059] text-black font-bold text-xs uppercase tracking-widest py-4 px-8 rounded-full hover:bg-white transition-all shadow-[0_0_20px_rgba(197,160,89,0.3)]">
           Scegli dalla collezione
-        </button>
+        </Link>
       </section>
 
       <section className="w-full grid grid-cols-2 gap-5 mt-4">
-        <Link href="/collezione" className="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-colors hover:border-[#c5a059] active:scale-95">
-          <span className="text-3xl mb-3">✨</span>
-          <span className="text-xs font-bold tracking-widest uppercase text-gray-300">Collezione</span>
+        <Link href="/collezione" className="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-colors hover:border-[#c5a059] hover:text-[#c5a059] active:scale-95 group">
+          <Sparkles className="w-8 h-8 mb-3 text-gray-300 group-hover:text-[#c5a059] transition-colors" strokeWidth={1} />
+          <span className="text-xs font-bold tracking-widest uppercase text-gray-300 group-hover:text-[#c5a059] transition-colors">Collezione</span>
         </Link>
         
-        <div className="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-colors hover:border-[#c5a059] active:scale-95">
-          <span className="text-3xl mb-3">📷</span>
-          <span className="text-xs font-bold tracking-widest uppercase text-gray-300">Scanner</span>
+        <div className="glass-panel p-6 rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-colors hover:border-[#c5a059] hover:text-[#c5a059] active:scale-95 group">
+          <Camera className="w-8 h-8 mb-3 text-gray-300 group-hover:text-[#c5a059] transition-colors" strokeWidth={1} />
+          <span className="text-xs font-bold tracking-widest uppercase text-gray-300 group-hover:text-[#c5a059] transition-colors">Scanner</span>
         </div>
       </section>
       
