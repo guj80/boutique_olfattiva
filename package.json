@@ -1,5 +1,5 @@
 {
-  "name": "boutique-olfattiva",
+  "name": "boutique-olfattiva_V.1",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
