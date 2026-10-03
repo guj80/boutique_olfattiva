@@ -1,7 +1,7 @@
 // Constants and Keys
 const SUPABASE_URL = 'https://xmkpldgaawwsafbsjmhz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EZly6tJde5GD3jsGDXVqvg_nXy6qCDs';
-const GEMINI_API_KEY = '';// Sp
+// NOTA: La chiave GEMINI_API_KEY è stata rimossa da qui per sicurezza. Il lavoro sporco ora lo fa il server!
 
 // Fallback data
 const fallbackPerfumes = [
@@ -191,50 +191,29 @@ async function takePictureAndAnalyze() {
     }
 }
 
+// --- IL NUOVO PONTE SICURO ---
+// Questa funzione ora non chiama più Google, ma chiama il tuo file api/gemini.js su Vercel
 async function analyzeWithGemini(base64Image) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    
-    const prompt = "Analizza questo flacone di profumo. Restituiscimi un JSON con: brand, nome, famiglia_olfattiva, e prezzo_stimato_euro.";
-    
-    const requestBody = {
-        contents: [
-            {
-                parts: [
-                    { text: prompt },
-                    {
-                        inline_data: {
-                            mime_type: "image/jpeg",
-                            data: base64Image
-                        }
-                    }
-                ]
-            }
-        ],
-        generationConfig: {
-            response_mime_type: "application/json"
-        }
-    };
-
-    const response = await fetch(url, {
+    const response = await fetch('/api/gemini', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({ imageBase64: base64Image })
     });
 
     if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error("Errore di rete o dal server");
+        return null;
     }
 
     const data = await response.json();
     
     try {
         const text = data.candidates[0].content.parts[0].text;
-        // Parse the JSON. We asked for JSON, and used response_mime_type.
         return JSON.parse(text);
     } catch (e) {
-        console.error("Failed to parse Gemini response", e);
+        console.error("Errore di conversione JSON", e);
         return null;
     }
 }
