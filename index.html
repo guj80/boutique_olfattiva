@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Boutique - Diario Olfattivo</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <h1>Boutique</h1>
+        <p>Diario Olfattivo Privato</p>
+    </header>
+
+    <main>
+        <section class="sotd-section">
+            <h2>Scent of the Day</h2>
+            <div id="sotd-display" class="sotd-display">
+                <p id="sotd-text">Non impostato</p>
+                <button id="edit-sotd-btn" class="icon-btn">✎</button>
+            </div>
+            <div id="sotd-edit" class="sotd-edit hidden">
+                <input type="text" id="sotd-input" placeholder="Che profumo indossi oggi?">
+                <button id="save-sotd-btn" class="btn-gold">Salva</button>
+            </div>
+        </section>
+
+        <section class="collection-section">
+            <h2>Vetrina Collezione</h2>
+            <div id="perfume-grid" class="perfume-grid">
+                <!-- Perfume cards will be injected here -->
+            </div>
+        </section>
+    </main>
+
+    <button id="camera-fab" class="fab">📷</button>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal" class="modal hidden">
+        <div class="modal-content">
+            <video id="camera-video" autoplay playsinline></video>
+            <div class="modal-actions">
+                <button id="capture-btn" class="btn-gold">Scatta</button>
+                <button id="close-camera-btn" class="btn-outline">Chiudi</button>
+            </div>
+            <canvas id="camera-canvas" class="hidden"></canvas>
+            <p id="camera-status" class="status-text"></p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
