@@ -16,10 +16,9 @@ export default function HomePage() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase
+     const { data } = await supabase
           .from('profumi')
           .select('*')
-          .eq('stato', 'collezione')
           .order('created_at', { ascending: false });
 
         const { count: rCount } = await supabase
