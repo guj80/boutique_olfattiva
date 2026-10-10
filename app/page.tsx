@@ -173,10 +173,10 @@ export default function HomePage() {
           </Link>
         </section>
 
-        {/* Accesso Rapido Radar Boutique */}
+      {/* Accesso Rapido Radar Boutique */}
         <section className="mt-4 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <Link
-            href="/collezione"
+            href="/collezione?vista=radar"
             className="glass rounded-xl p-4 flex items-center justify-between transition-all hover:border-gold/30 group"
           >
             <div className="flex items-center gap-3">
@@ -191,12 +191,3 @@ export default function HomePage() {
             </span>
           </Link>
         </section>
-      </div>
-
-      {/* Footer minimal */}
-      <footer className="mt-12 text-center text-[10px] tracking-widest text-muted-foreground uppercase">
-        Boutique Olfattiva • Private Archive
-      </footer>
-    </div>
-  );
-}
