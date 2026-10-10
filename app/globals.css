@@ -10,23 +10,23 @@
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 41 39% 57%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 39 45% 75%;
+    --primary-foreground: 0 0% 10%;
     --secondary: 0 0% 12%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 12%;
     --muted-foreground: 0 0% 63%;
-    --accent: 41 39% 57%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 39 45% 75%;
+    --accent-foreground: 0 0% 10%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 15%;
     --input: 0 0% 15%;
-    --ring: 41 39% 57%;
-    --gold: 41 39% 57%;
-    --gold-light: 45 50% 70%;
-    --gold-dark: 38 35% 40%;
-    --chart-1: 41 39% 57%;
+    --ring: 39 45% 75%;
+    --gold: 39 45% 75%;
+    --gold-light: 39 60% 88%;
+    --gold-dark: 39 30% 50%;
+    --chart-1: 39 45% 75%;
     --chart-2: 0 0% 63%;
     --chart-3: 200 30% 50%;
     --chart-4: 30 60% 55%;
@@ -62,23 +62,23 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   }
   .glass-gold {
-    background: rgba(197, 160, 89, 0.05);
+    background: rgba(230, 210, 180, 0.05);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(197, 160, 89, 0.15);
+    border: 1px solid rgba(230, 210, 180, 0.15);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   }
   .text-gold {
-    color: hsl(41 39% 57%);
+    color: hsl(39 45% 75%);
   }
   .text-gold-light {
-    color: hsl(45 50% 70%);
+    color: hsl(39 60% 88%);
   }
   .bg-gold {
-    background: hsl(41 39% 57%);
+    background: hsl(39 45% 75%);
   }
   .border-gold {
-    border-color: hsl(41 39% 57%);
+    border-color: hsl(39 45% 75%);
   }
   .font-serif-luxury {
     font-family: 'Playfair Display', Georgia, serif;
@@ -93,13 +93,13 @@
     letter-spacing: 0.1em;
   }
   .gold-gradient-text {
-    background: linear-gradient(135deg, hsl(45 50% 70%), hsl(41 39% 57%), hsl(38 35% 40%));
+    background: linear-gradient(135deg, hsl(39 60% 88%), hsl(39 45% 75%), hsl(39 30% 50%));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
   .gold-gradient-bg {
-    background: linear-gradient(135deg, hsl(45 50% 70%), hsl(41 39% 57%), hsl(38 35% 40%));
+    background: linear-gradient(135deg, hsl(39 60% 88%), hsl(39 45% 75%), hsl(39 30% 50%));
   }
 }
 
@@ -126,9 +126,9 @@
 .shimmer {
   background: linear-gradient(
     90deg,
-    rgba(197, 160, 89, 0) 0%,
-    rgba(197, 160, 89, 0.15) 50%,
-    rgba(197, 160, 89, 0) 100%
+    rgba(230, 210, 180, 0) 0%,
+    rgba(230, 210, 180, 0.15) 50%,
+    rgba(230, 210, 180, 0) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
@@ -150,8 +150,8 @@
 }
 
 @keyframes pulse-gold {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(197, 160, 89, 0.3); }
-  50% { box-shadow: 0 0 20px 4px rgba(197, 160, 89, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 210, 180, 0.3); }
+  50% { box-shadow: 0 0 20px 4px rgba(230, 210, 180, 0.15); }
 }
 
 .animate-pulse-gold {
