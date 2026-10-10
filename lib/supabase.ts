@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// OPZIONE NUCLEARE: Incolla qui i tuoi dati veri al posto di queste scritte, mantenendo le virgolette
-const supabaseUrl = "INCOLLA_QUI_IL_TUO_URL_SUPABASE";
-const supabaseKey = "INCOLLA_QUI_LA_TUA_CHIAVE_ANON_SUPABASE";
+// Chiavi forzate (Hardcoded) per bypassare Vercel
+const supabaseUrl = "https://xmkpldgaawwsafbsjmhz.supabase.co";
+const supabaseKey = "sb_publishable_EZly6tJde5GD3jsGDXVqvg_nXy6qCDs";
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
