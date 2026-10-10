@@ -1,43 +1,25 @@
-import './globals.css';
-import type { Metadata } from 'next';
-import { Inter, Playfair_Display, JetBrains_Mono } from 'next/font/google';
-import { AuthProvider } from '@/components/auth-provider';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
-  weight: ['400', '500', '600', '700'],
-});
-const jetbrains = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains',
-  weight: ['400', '500'],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Boutique Olfattiva — Diario Olfattivo',
-  description:
-    'Il tuo diario olfattivo personale di lusso. Scansiona, analizza e colleziona i tuoi profumi.',
-  themeColor: '#0a0a0a',
-  openGraph: {
-    title: 'Boutique Olfattiva — Diario Olfattivo',
-    description:
-      'Il tuo diario olfattivo personale di lusso. Scansiona, analizza e colleziona i tuoi profumi.',
-  },
+  title: "Boutique Olfattiva",
+  description: "Il tuo diario olfattivo personale",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="it" className="dark" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${playfair.variable} ${jetbrains.variable} font-sans antialiased`}
-      >
-        <AuthProvider>{children}</AuthProvider>
+    <html lang="it" className="dark">
+      <body className={`${inter.className} bg-zinc-950 text-zinc-50 min-h-screen`}>
+        {children}
+        <Toaster />
       </body>
     </html>
   );
