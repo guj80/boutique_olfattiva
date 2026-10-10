@@ -176,7 +176,7 @@ export default function HomePage() {
         {/* Accesso Rapido Radar Boutique */}
         <section className="mt-4 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <Link
-            href="/radar"
+            href="/collezione"
             className="glass rounded-xl p-4 flex items-center justify-between transition-all hover:border-gold/30 group"
           >
             <div className="flex items-center gap-3">
