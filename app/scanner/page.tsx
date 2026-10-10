@@ -1,311 +1,177 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { Camera, Link as LinkIcon, Loader2, Sparkles, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { supabase, GeminiResult } from '@/lib/supabase';
-import {
-  ArrowLeft,
-  Camera,
-  Loader2,
-  Check,
-  Plus,
-  RotateCcw,
-  Sparkles,
-} from 'lucide-react';
-
-type Status = 'idle' | 'uploading' | 'analyzing' | 'result' | 'saved' | 'error';
 
 export default function ScannerPage() {
-  const [status, setStatus] = useState<Status>('idle');
-  const [preview, setPreview] = useState<string | null>(null);
-  const [result, setResult] = useState<GeminiResult | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'link' | 'foto'>('link');
+  const [urlInput, setUrlInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
-  const handleFile = async (file: File) => {
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target?.result as string;
-      setPreview(dataUrl);
-      setStatus('analyzing');
-      setErrorMsg('');
-
-      const base64 = dataUrl.split(',')[1];
-      const mimeType = file.type;
-
-      try {
-        const res = await fetch('/api/gemini', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64, mimeType }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Errore analisi');
-        }
-
-        const data: GeminiResult = await res.json();
-        setResult(data);
-        setStatus('result');
-      } catch (err) {
-        setErrorMsg(
-          err instanceof Error ? err.message : 'Errore durante l\'analisi.'
-        );
-        setStatus('error');
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSave = async () => {
-    if (!result) return;
-    setStatus('uploading');
+  // Funzione unificata di elaborazione AI (sia per Link che per Foto)
+  const handleAIExtraction = async (tipo: 'link' | 'foto', valore: string | File) => {
+    setIsProcessing(true);
+    setStatusMessage('Analisi della fragranza in corso con AI...');
 
     try {
-      const { error } = await supabase.from('profumi').insert({
-        nome: result.nome,
-        brand: result.brand,
-        famiglia_olfattiva: result.famiglia_olfattiva,
-        prezzo_stimato_euro: result.prezzo_stimato_euro,
+      // 1. Chiamata all'API di estrazione neurale (che creiamo tra un attimo)
+      const res = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, valore: tipo === 'link' ? valore : await fileToBase64(valore as File) })
       });
 
-      if (error) throw error;
-      setStatus('saved');
-    } catch (err) {
-      setErrorMsg(
-        err instanceof Error ? err.message : 'Errore nel salvataggio.'
-      );
-      setStatus('error');
+      const profumoEstratto = await res.json();
+
+      if (!res.ok) throw new Error(profumoEstratto.error || 'Errore durante l\'estrazione');
+
+      setStatusMessage('Salvataggio nella Boutique di Luca...');
+
+      // 2. Salvataggio automatico nel database Supabase (struttura estesa)
+      const { error: dbError } = await supabase.from('profumi').insert([
+        {
+          nome: profumoEstratto.nome,
+          brand: profumoEstratto.brand,
+          famiglia_olfattiva: profumoEstratto.famiglia_olfattiva,
+          note_olfattive: profumoEstratto.note_olfattive,
+          prezzo_stimato_euro: profumoEstratto.prezzo_stimato_euro,
+          url_foto_vetrina: profumoEstratto.url_foto_vetrina || null,
+          stato: 'collezione' // Salvato direttamente in collezione
+        }
+      ]);
+
+      if (dbError) throw dbError;
+
+      // 3. Reindirizzamento alla collezione
+      router.push('/collezione');
+    } catch (error: any) {
+      console.error(error);
+      alert(`Errore: ${error.message || 'Impossibile elaborare il profumo'}`);
+    } finally {
+      setIsProcessing(false);
+      setStatusMessage('');
     }
   };
 
-  const handleReset = () => {
-    setStatus('idle');
-    setPreview(null);
-    setResult(null);
-    setErrorMsg('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  // Utility per convertire l'immagine in Base64 per Gemini Vision
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
   };
 
   return (
-    <div className="min-h-screen px-6 py-10 max-w-2xl mx-auto">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-10">
-        <Link
-          href="/"
-          className="text-muted-foreground hover:text-gold transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
+    <div className="min-h-screen px-6 py-10 max-w-xl mx-auto flex flex-col justify-between">
+      <div>
+        {/* Torna Indietro */}
+        <Link href="/" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-gold mb-8 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Torna alla Home
         </Link>
-        <h1 className="font-serif text-xl font-semibold gold-gradient-text">
-          Scanner
-        </h1>
-        <div className="w-5" />
-      </header>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
-        }}
-      />
+        <header className="text-center mb-8">
+          <p className="tracking-luxury text-xs text-gold uppercase mb-2">Acquisizione Intelligente</p>
+          <h1 className="font-serif text-3xl font-semibold text-foreground">
+            Aggiungi Fragranza
+          </h1>
+        </header>
 
-      {/* IDLE STATE */}
-      {status === 'idle' && (
-        <div className="flex flex-col items-center justify-center animate-fade-in-up">
+        {/* Selettore Modalità (Link o Foto) */}
+        <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-900 rounded-2xl border border-zinc-800 mb-8">
           <button
-            onClick={() => fileInputRef.current?.click()}
-            className="glass-gold rounded-3xl w-full max-w-xs h-72 flex flex-col items-center justify-center gap-4 transition-all active:scale-95 hover:border-gold/30 group"
+            onClick={() => setActiveTab('link')}
+            className={`py-3 rounded-xl text-xs uppercase tracking-wide-luxury font-medium transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'link' ? 'bg-gold/20 text-gold border border-gold/30 shadow-lg' : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            <div className="w-16 h-16 rounded-full glass-gold flex items-center justify-center group-hover:scale-110 transition-transform animate-pulse-gold">
-              <Camera className="w-7 h-7 text-gold" />
-            </div>
-            <div className="text-center">
-              <p className="tracking-wide-luxury text-sm uppercase text-gold font-medium">
-                Scansiona Flacone
-              </p>
-              <p className="text-xs text-muted-foreground mt-2 max-w-[200px]">
-                Inquadra un flacone di profumo per analizzarlo
-              </p>
-            </div>
+            <LinkIcon className="w-4 h-4" /> Da Link Web
+          </button>
+          <button
+            onClick={() => setActiveTab('foto')}
+            className={`py-3 rounded-xl text-xs uppercase tracking-wide-luxury font-medium transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'foto' ? 'bg-gold/20 text-gold border border-gold/30 shadow-lg' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Camera className="w-4 h-4" /> Da Fotocamera
           </button>
         </div>
-      )}
 
-      {/* ANALYZING STATE */}
-      {status === 'analyzing' && preview && (
-        <div className="flex flex-col items-center animate-fade-in-up">
-          <div className="relative w-full max-w-xs">
-            <img
-              src={preview}
-              alt="Anteprima"
-              className="w-full rounded-2xl object-cover opacity-60"
-            />
-            <div className="absolute inset-0 rounded-2xl shimmer pointer-events-none" />
-          </div>
-          <div className="mt-8 flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-gold animate-spin" />
-            <p className="tracking-wide-luxury text-xs uppercase text-gold animate-pulse">
-              L'IA sta analizzando...
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Identificando nome, brand e famiglia olfattiva
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* RESULT STATE */}
-      {status === 'result' && result && preview && (
-        <div className="animate-fade-in-up">
-          {preview && (
-            <img
-              src={preview}
-              alt="Flacone scansionato"
-              className="w-full max-w-xs mx-auto rounded-2xl mb-6 object-cover"
-            />
-          )}
-
-          {result.nome === 'Non riconosciuto' ? (
-            <div className="glass rounded-2xl p-6 text-center mb-6">
-              <p className="font-serif text-lg text-foreground mb-2">
-                Profumo non riconosciuto
-              </p>
-              <p className="text-sm text-muted-foreground">
-                L'IA non è riuscita a identificare il flacone. Riprova con
-                un'immagine più chiara.
-              </p>
+        {/* Pannello 1: Inserimento Link */}
+        {activeTab === 'link' && (
+          <div className="glass rounded-2xl p-6 space-y-4 animate-fade-in-up">
+            <div className="flex items-center gap-2 text-gold mb-2">
+              <Sparkles className="w-4 h-4" />
+              <span className="text-xs uppercase tracking-wide-luxury font-medium">Fragrantica o Sito Ufficiale</span>
             </div>
-          ) : (
-            <div className="glass-gold rounded-2xl p-6 mb-6">
-              <div className="space-y-4">
-                <div>
-                  <p className="tracking-wide-luxury text-[10px] text-gold uppercase mb-1">
-                    Nome
-                  </p>
-                  <p className="font-serif text-2xl font-semibold text-foreground">
-                    {result.nome}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="tracking-wide-luxury text-[10px] text-gold uppercase mb-1">
-                    Brand
-                  </p>
-                  <p className="text-sm text-foreground">{result.brand}</p>
-                </div>
-
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="tracking-wide-luxury text-[10px] text-gold uppercase mb-1">
-                      Famiglia Olfattiva
-                    </p>
-                    <p className="tracking-wide-luxury text-xs text-muted-foreground uppercase">
-                      {result.famiglia_olfattiva}
-                    </p>
-                  </div>
-                  {result.prezzo_stimato_euro &&
-                    result.prezzo_stimato_euro !== 'N/D' && (
-                      <div className="text-right">
-                        <p className="tracking-wide-luxury text-[10px] text-gold uppercase mb-1">
-                          Valore
-                        </p>
-                        <p className="font-mono text-lg text-gold-light">
-                          {result.prezzo_stimato_euro}
-                        </p>
-                      </div>
-                    )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              onClick={handleReset}
-              className="flex-1 py-4 rounded-xl glass text-foreground text-sm tracking-wide-luxury uppercase font-medium transition-transform active:scale-95 flex items-center justify-center gap-2 hover:bg-white/5"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Riprova
-            </button>
-            {result.nome !== 'Non riconosciuto' && (
-              <button
-                onClick={handleSave}
-                className="flex-1 py-4 rounded-xl gold-gradient-bg text-black text-sm tracking-wide-luxury uppercase font-medium transition-transform active:scale-95 hover:opacity-90 flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Aggiungi
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SAVED STATE */}
-      {status === 'saved' && (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
-          <div className="w-20 h-20 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mb-6">
-            <Check className="w-10 h-10 text-green-400" />
-          </div>
-          <h2 className="font-serif text-2xl font-semibold text-foreground mb-2">
-            Salvato!
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mb-8 max-w-xs">
-            Il profumo è stato aggiunto alla tua collezione.
-          </p>
-          <div className="flex gap-3 w-full max-w-xs">
-            <button
-              onClick={handleReset}
-              className="flex-1 py-3 rounded-xl glass text-sm tracking-wide-luxury uppercase font-medium transition-transform active:scale-95"
-            >
-              <Camera className="w-4 h-4 inline mr-2" />
-              Altro
-            </button>
-            <Link
-              href="/collezione"
-              className="flex-1 py-3 rounded-xl gold-gradient-bg text-black text-sm tracking-wide-luxury uppercase font-medium text-center transition-transform active:scale-95"
-            >
-              Collezione
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* ERROR STATE */}
-      {status === 'error' && (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
-          <div className="glass rounded-2xl p-8 text-center max-w-xs">
-            <p className="font-serif text-lg text-red-400 mb-3">
-              Qualcosa è andato storto
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Incolla il link della pagina del profumo. L'intelligenza artificiale leggerà la scheda tecnica ed estarrà automaticamente note, brand e caratteristiche.
             </p>
-            <p className="text-sm text-muted-foreground mb-6">{errorMsg}</p>
+            <input
+              type="url"
+              placeholder="https://www.fragrantica.com/perfume/..."
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-gold transition-colors"
+            />
             <button
-              onClick={handleReset}
-              className="py-3 px-6 rounded-xl gold-gradient-bg text-black text-sm tracking-wide-luxury uppercase font-medium transition-transform active:scale-95"
+              onClick={() => handleAIExtraction('link', urlInput)}
+              disabled={isProcessing || !urlInput.trim()}
+              className="w-full py-4 rounded-xl gold-gradient-bg text-black font-medium text-xs tracking-wide-luxury uppercase transition-transform active:scale-95 hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Riprova
+              {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Estrai e Salva con AI
             </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* UPLOADING (save) STATE */}
-      {status === 'uploading' && (
-        <div className="flex flex-col items-center justify-center min-h-[40vh] animate-fade-in-up">
-          <Loader2 className="w-8 h-8 text-gold animate-spin mb-4" />
-          <p className="tracking-wide-luxury text-xs uppercase text-gold">
-            Salvataggio...
-          </p>
-        </div>
-      )}
+        {/* Pannello 2: Scansione Fotocamera / Foto */}
+        {activeTab === 'foto' && (
+          <div className="glass rounded-2xl p-6 space-y-4 text-center animate-fade-in-up">
+            <div className="flex items-center justify-center gap-2 text-gold mb-2">
+              <Camera className="w-4 h-4" />
+              <span className="text-xs uppercase tracking-wide-luxury font-medium">Visione Neurale Flacone</span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Scatta una foto alla boccetta o carica un'immagine dal tuo dispositivo. L'AI riconoscerà l'essenza all'istante.
+            </p>
+            
+            <label className="border-2 border-dashed border-gold/30 hover:border-gold/60 rounded-2xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors bg-gold/5 group">
+              <Camera className="w-8 h-8 text-gold group-hover:scale-110 transition-transform" />
+              <span className="text-xs text-foreground uppercase tracking-wide-luxury font-medium">Tocca per scattare o caricare</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleAIExtraction('foto', e.target.files[0]);
+                  }
+                }}
+              />
+            </label>
+          </div>
+        )}
+
+        {/* Stato di elaborazione in tempo reale */}
+        {isProcessing && (
+          <div className="mt-8 text-center glass-gold rounded-xl p-4 animate-pulse">
+            <Loader2 className="w-6 h-6 text-gold animate-spin mx-auto mb-2" />
+            <p className="text-xs text-gold uppercase tracking-wide-luxury font-medium">{statusMessage}</p>
+          </div>
+        )}
+      </div>
+
+      <footer className="mt-12 text-center text-[10px] tracking-widest text-muted-foreground uppercase">
+        Boutique Olfattiva • AI Core Engine
+      </footer>
     </div>
   );
 }
