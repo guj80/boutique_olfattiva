@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Se Vercel non legge le chiavi, l'app crasherà con questo messaggio chiaro nel log
+if (!supabaseUrl || !supabaseKey) {
+  console.error("🚨 ALLARME CRITICO: Chiavi Supabase mancanti. Vercel non sta leggendo NEXT_PUBLIC_SUPABASE_URL o ANON_KEY.");
+}
+
+export const supabase = createClient(
+  supabaseUrl || 'https://errore-chiave-mancante.supabase.co', 
+  supabaseKey || 'errore-chiave'
+);
 
 export type StatoProfumo = 'collezione' | 'radar';
 export type MomentoGiornata = 'Mattina' | 'Pomeriggio' | 'Sera';
@@ -17,7 +25,7 @@ export interface Profumo {
   note_olfattive?: string | null;
   prezzo_stimato_euro?: string | null;
   url_foto_vetrina?: string | null;
-  stato: StatoProfumo;
+  stato?: string | null;
   note_pelle?: string | null;
   note_mouche?: string | null;
   voto_longevita?: number | null;
