@@ -1,145 +1,122 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { supabase, Profumo } from '@/lib/supabase';
-import { useAuth } from '@/components/auth-provider';
-import { ArrowLeft, Camera, Loader2, Trash2, FlaskConical } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Search, Loader2, Sparkles, X } from 'lucide-react';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function CollezionePage() {
-  const { user, loading: authLoading } = useAuth();
-  const [profumi, setProfumi] = useState<Profumo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [profumi, setProfumi] = useState<any[]>([]);
+  const [profumiFiltrati, setProfumiFiltrati] = useState<any[]>([]);
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
 
+  // Caricamento iniziale di tutti i profumi
   useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const { data } = await supabase
-        .from('profumi')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      setProfumi((data ?? []) as Profumo[]);
-      setLoading(false);
-    })();
-  }, [user]);
-
-  const handleDelete = async (id: string) => {
-    setDeleteId(id);
-    const { error } = await supabase.from('profumi').delete().eq('id', id);
-    if (!error) {
-      setProfumi((prev) => prev.filter((p) => p.id !== id));
+    async function fetchProfumi() {
+      const { data } = await supabase.from('profumi').select('*').order('created_at', { ascending: false });
+      if (data) {
+        setProfumi(data);
+        setProfumiFiltrati(data);
+      }
+      setIsLoading(false);
     }
-    setDeleteId(null);
+    fetchProfumi();
+  }, []);
+
+  // Funzione per la Ricerca AI
+  const handleAISearch = async () => {
+    if (!query.trim()) return;
+    setIsSearching(true);
+    
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      
+      const { ids } = await res.json();
+      
+      if (ids && Array.isArray(ids)) {
+        // Filtriamo il catalogo tenendo solo gli ID restituiti dall'AI
+        const risultati = profumi.filter(p => ids.includes(p.id));
+        setProfumiFiltrati(risultati);
+      }
+    } catch (error) {
+      console.error("Errore ricerca:", error);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-        <p className="tracking-wide-luxury text-xs uppercase text-muted-foreground mt-4">
-          Caricamento collezione...
-        </p>
-      </div>
-    );
-  }
+  const resetSearch = () => {
+    setQuery('');
+    setProfumiFiltrati(profumi);
+  };
+
+  if (isLoading) return <div className="flex justify-center mt-20"><Loader2 className="animate-spin text-amber-500 w-10 h-10" /></div>;
 
   return (
-    <div className="min-h-screen px-6 py-10 max-w-2xl mx-auto">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-10">
-        <Link
-          href="/"
-          className="text-muted-foreground hover:text-gold transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <h1 className="font-serif text-xl font-semibold gold-gradient-text">
-          Collezione
-        </h1>
-        <Link
-          href="/scanner"
-          className="text-muted-foreground hover:text-gold transition-colors"
-        >
-          <Camera className="w-5 h-5" />
-        </Link>
-      </header>
-
-      {/* Count */}
-      {profumi.length > 0 && (
-        <p className="tracking-wide-luxury text-[10px] text-muted-foreground uppercase mb-6">
-          {profumi.length} {profumi.length === 1 ? 'Profumo' : 'Profumi'}
-        </p>
-      )}
-
-      {/* Empty State */}
-      {profumi.length === 0 && (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
-          <div className="w-20 h-20 rounded-full glass flex items-center justify-center mb-6">
-            <FlaskConical className="w-8 h-8 text-gold/50" />
-          </div>
-          <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
-            Nessun profumo in cassaforte
-          </h2>
-          <p className="text-sm text-muted-foreground text-center mb-8 max-w-xs">
-            La tua collezione è vuota. Scansiona il tuo primo flacone per
-            iniziare il diario olfattivo.
-          </p>
-          <Link
-            href="/scanner"
-            className="py-3 px-8 rounded-xl gold-gradient-bg text-black text-sm tracking-wide-luxury uppercase font-medium transition-transform active:scale-95"
-          >
-            Scansiona
-          </Link>
+    <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-3xl font-serif text-amber-500 mb-8 text-center">La Mia Collezione</h1>
+      
+      {/* Barra di Ricerca AI */}
+      <div className="relative mb-10 flex gap-2">
+        <div className="relative flex-1">
+          <Sparkles className="absolute left-3 top-3 h-5 w-5 text-amber-500" />
+          <Input 
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAISearch()}
+            placeholder="Chiedi all'AI (es. 'Un profumo fresco per l'estate', 'Simile a Erba Pura')..."
+            className="pl-10 bg-zinc-900 border-zinc-800 text-white placeholder:text-zinc-500 w-full"
+          />
+          {query && (
+            <button onClick={resetSearch} className="absolute right-3 top-3 text-zinc-400 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
-      )}
+        <Button 
+          onClick={handleAISearch} 
+          disabled={isSearching || !query}
+          className="bg-amber-600 hover:bg-amber-500 text-white"
+        >
+          {isSearching ? <Loader2 className="animate-spin h-5 w-5" /> : <Search className="h-5 w-5" />}
+        </Button>
+      </div>
 
-      {/* Grid */}
-      {profumi.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {profumi.map((profumo, idx) => (
-            <div
-              key={profumo.id}
-              className="glass rounded-2xl p-5 animate-fade-in-up hover:border-gold/20 transition-colors group"
-              style={{ animationDelay: `${idx * 0.05}s` }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-serif text-lg font-semibold text-foreground truncate">
-                    {profumo.nome}
-                  </h3>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {profumo.brand}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDelete(profumo.id)}
-                  disabled={deleteId === profumo.id}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all p-1 disabled:opacity-50"
-                  aria-label="Elimina"
-                >
-                  {deleteId === profumo.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-
-              {profumo.famiglia_olfattiva && (
-                <p className="tracking-wide-luxury text-[10px] text-gold uppercase mb-3">
-                  {profumo.famiglia_olfattiva}
-                </p>
-              )}
-
-              {profumo.prezzo_stimato_euro &&
-                profumo.prezzo_stimato_euro !== 'N/D' && (
-                  <p className="font-mono text-base text-gold-light">
-                    {profumo.prezzo_stimato_euro}
-                  </p>
+      {/* Griglia Profumi */}
+      {profumiFiltrati.length === 0 ? (
+        <p className="text-center text-zinc-500">Nessun profumo trovato.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {profumiFiltrati.map((profumo) => (
+            <Card key={profumo.id} className="bg-zinc-900 border-zinc-800 overflow-hidden">
+              <div className="flex">
+                {profumo.url_foto_vetrina && (
+                  <img src={profumo.url_foto_vetrina} alt={profumo.nome} className="w-1/3 object-cover" />
                 )}
-            </div>
+                <div className="p-4 flex-1">
+                  <p className="text-xs font-mono text-zinc-400 uppercase tracking-widest">{profumo.brand}</p>
+                  <CardTitle className="text-xl font-serif text-white mt-1 mb-2">{profumo.nome}</CardTitle>
+                  <p className="text-sm text-amber-500 mb-2">{profumo.famiglia_olfattiva}</p>
+                  <p className="text-xs text-zinc-400 line-clamp-2">{profumo.note_olfattive}</p>
+                  <div className="mt-4 flex justify-between items-center text-xs font-semibold">
+                    <span className="text-zinc-300">{profumo.prezzo_stimato_euro}€</span>
+                    <span className="bg-zinc-800 px-2 py-1 rounded text-zinc-300">{profumo.info_fragrantica?.split(' ')[0] || 'N/D'}</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
           ))}
         </div>
       )}
