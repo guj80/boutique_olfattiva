@@ -1,14 +1,159 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-body {
-  background-color: #0a0a0a;
-  color: #eaeaea;
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 41 39% 57%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 41 39% 57%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 41 39% 57%;
+    --gold: 41 39% 57%;
+    --gold-light: 45 50% 70%;
+    --gold-dark: 38 35% 40%;
+    --chart-1: 41 39% 57%;
+    --chart-2: 0 0% 63%;
+    --chart-3: 200 30% 50%;
+    --chart-4: 30 60% 55%;
+    --chart-5: 160 40% 45%;
+    --radius: 0.75rem;
+  }
 }
 
-.glass-panel {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+@layer base {
+  * {
+    @apply border-border;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background: radial-gradient(ellipse at top, hsl(0 0% 8%), hsl(0 0% 3%));
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  .glass-gold {
+    background: rgba(197, 160, 89, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(197, 160, 89, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  .text-gold {
+    color: hsl(41 39% 57%);
+  }
+  .text-gold-light {
+    color: hsl(45 50% 70%);
+  }
+  .bg-gold {
+    background: hsl(41 39% 57%);
+  }
+  .border-gold {
+    border-color: hsl(41 39% 57%);
+  }
+  .font-serif-luxury {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+  .font-mono-luxury {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+  }
+  .tracking-luxury {
+    letter-spacing: 0.2em;
+  }
+  .tracking-wide-luxury {
+    letter-spacing: 0.1em;
+  }
+  .gold-gradient-text {
+    background: linear-gradient(135deg, hsl(45 50% 70%), hsl(41 39% 57%), hsl(38 35% 40%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .gold-gradient-bg {
+    background: linear-gradient(135deg, hsl(45 50% 70%), hsl(41 39% 57%), hsl(38 35% 40%));
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(197, 160, 89, 0) 0%,
+    rgba(197, 160, 89, 0.15) 50%,
+    rgba(197, 160, 89, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(197, 160, 89, 0.3); }
+  50% { box-shadow: 0 0 20px 4px rgba(197, 160, 89, 0.15); }
+}
+
+.animate-pulse-gold {
+  animation: pulse-gold 2s infinite;
 }
