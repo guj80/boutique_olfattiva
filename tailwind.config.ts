@@ -17,10 +17,12 @@ const config: Config = {
           dark: '#C5A059',
         },
         border: 'hsl(0 0% 15%)',
+        muted: 'hsl(0 0% 12%)',
+        'muted-foreground': 'hsl(0 0% 63%)',
       },
       fontFamily: {
-        serif: ['var(--font-playfair)', 'serif'],
-        sans: ['var(--font-inter)', 'sans-serif'],
+        serif: ['var(--font-playfair)', 'Georgia', 'serif'],
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-jetbrains)', 'monospace'],
       }
     },
