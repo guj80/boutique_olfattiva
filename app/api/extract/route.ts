@@ -21,7 +21,15 @@ export async function POST(req: Request) {
       contents = [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64Data } }] }];
     }
 
-    const response = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){process.env.GEMINI_API_KEY}`, {
+    // Costruzione URL indistruttibile senza backticks problematici
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Manca la chiave GEMINI_API_KEY nelle impostazioni di Vercel.");
+    }
+    
+    const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents, generationConfig: { response_mime_type: "application/json", temperature: 0.2 } })
@@ -34,8 +42,6 @@ export async function POST(req: Request) {
     }
 
     let resultText = aiData.candidates[0].content.parts[0].text;
-    
-    // Sanitizzazione assoluta: rimuove eventuali formattazioni markdown (es. ```json ... ```)
     resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
     const extractedData = JSON.parse(resultText);
 
