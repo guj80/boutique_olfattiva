@@ -1,92 +1,61 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuth } from '@/components/auth-provider';
 import { supabase, Profumo } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
-import { Camera, Library, Sparkles, TrendingUp, Clock, Euro } from 'lucide-react';
+import { Camera, Library, Sparkles, TrendingUp, Euro } from 'lucide-react';
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
   const [latest, setLatest] = useState<Profumo | null>(null);
   const [count, setCount] = useState(0);
   const [families, setFamilies] = useState<string[]>([]);
   const [avgPrice, setAvgPrice] = useState<string>('—');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
     (async () => {
-      const { data } = await supabase
-        .from('profumi')
-        .select('*')
-        .order('created_at', { ascending: false });
+      try {
+        const { data } = await supabase
+          .from('profumi')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (data && data.length > 0) {
-        setLatest(data[0] as Profumo);
-        setCount(data.length);
-        const uniqueFamilies = Array.from(
-            new Set(
-              data
-                .map((p: Profumo) => p.famiglia_olfattiva)
-                .filter((f): f is string => f !== null)
-            )
-          );
-        setFamilies(uniqueFamilies);
+        if (data && data.length > 0) {
+          setLatest(data[0] as Profumo);
+          setCount(data.length);
+          const uniqueFamilies = Array.from(
+              new Set(
+                data
+                  .map((p: Profumo) => p.famiglia_olfattiva)
+                  .filter((f): f is string => f !== null)
+              )
+            );
+          setFamilies(uniqueFamilies);
 
-        const prices = data
-          .map((p: Profumo) => {
-            const match = p.prezzo_stimato_euro?.match(/[\d.,]+/);
-            return match ? parseFloat(match[0].replace('.', '').replace(',', '.')) : null;
-          })
-          .filter((v: number | null): v is number => v !== null && v > 0);
+          const prices = data
+            .map((p: Profumo) => {
+              const match = p.prezzo_stimato_euro?.match(/[\d.,]+/);
+              return match ? parseFloat(match[0].replace('.', '').replace(',', '.')) : null;
+            })
+            .filter((v: number | null): v is number => v !== null && v > 0);
 
-        if (prices.length > 0) {
-          const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-          setAvgPrice(`€${Math.round(avg)}`);
+          if (prices.length > 0) {
+            const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+            setAvgPrice(`€${Math.round(avg)}`);
+          }
         }
+      } catch (error) {
+        console.error('Errore nel caricamento:', error);
+      } finally {
+        setIsLoading(false);
       }
     })();
-  }, [user]);
+  }, []);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
-        <div className="text-center max-w-md mx-auto animate-fade-in-up">
-          <div className="mb-8">
-            <h1 className="font-serif text-5xl font-semibold gold-gradient-text mb-3">
-              Boutique
-            </h1>
-            <p className="tracking-luxury text-xs text-muted-foreground uppercase">
-              Diario Olfattivo
-            </p>
-          </div>
-          <p className="text-muted-foreground text-sm leading-relaxed mb-10 max-w-xs mx-auto">
-            Il tuo diario olfattivo personale di lusso. Scansiona, analizza e
-            colleziona i tuoi profumi con l'aiuto dell'intelligenza artificiale.
-          </p>
-          <div className="space-y-3">
-            <Link
-              href="/login"
-              className="block w-full py-4 rounded-xl gold-gradient-bg text-black font-medium text-sm tracking-wide-luxury uppercase text-center transition-transform active:scale-95 hover:opacity-90"
-            >
-              Accedi
-            </Link>
-            <Link
-              href="/signup"
-              className="block w-full py-4 rounded-xl glass text-foreground font-medium text-sm tracking-wide-luxury uppercase text-center transition-transform active:scale-95 hover:bg-white/5"
-            >
-              Crea un Account
-            </Link>
-          </div>
-        </div>
       </div>
     );
   }
@@ -192,18 +161,6 @@ export default function HomePage() {
           </span>
         </Link>
       </section>
-
-      {/* Footer */}
-      <footer className="mt-12 text-center animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-        <button
-          onClick={async () => {
-            await supabase.auth.signOut();
-          }}
-          className="text-[10px] tracking-wide-luxury uppercase text-muted-foreground hover:text-gold transition-colors"
-        >
-          Esci
-        </button>
-      </footer>
     </div>
   );
 }
