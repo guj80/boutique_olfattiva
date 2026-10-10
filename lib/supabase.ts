@@ -1,17 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// OPZIONE NUCLEARE: Incolla qui i tuoi dati veri al posto di queste scritte, mantenendo le virgolette
+const supabaseUrl = "INCOLLA_QUI_IL_TUO_URL_SUPABASE";
+const supabaseKey = "INCOLLA_QUI_LA_TUA_CHIAVE_ANON_SUPABASE";
 
-// Se Vercel non legge le chiavi, l'app crasherà con questo messaggio chiaro nel log
-if (!supabaseUrl || !supabaseKey) {
-  console.error("🚨 ALLARME CRITICO: Chiavi Supabase mancanti. Vercel non sta leggendo NEXT_PUBLIC_SUPABASE_URL o ANON_KEY.");
-}
-
-export const supabase = createClient(
-  supabaseUrl || 'https://errore-chiave-mancante.supabase.co', 
-  supabaseKey || 'errore-chiave'
-);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export type StatoProfumo = 'collezione' | 'radar';
 export type MomentoGiornata = 'Mattina' | 'Pomeriggio' | 'Sera';
