@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { supabase, Profumo } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
-import { Camera, Library, Sparkles, TrendingUp, Euro, Compass, PlusCircle } from 'lucide-react';
+import { Camera, Library, Sparkles, TrendingUp, Euro, Compass } from 'lucide-react';
 
 export default function HomePage() {
   const [latest, setLatest] = useState<Profumo | null>(null);
@@ -16,14 +16,12 @@ export default function HomePage() {
   useEffect(() => {
     (async () => {
       try {
-        // Carichiamo i profumi della collezione principale
         const { data } = await supabase
           .from('profumi')
           .select('*')
           .eq('stato', 'collezione')
           .order('created_at', { ascending: false });
 
-        // Carichiamo quanti profumi abbiamo in radar (test in boutique)
         const { count: rCount } = await supabase
           .from('profumi')
           .select('*', { count: 'exact', head: true })
@@ -39,7 +37,7 @@ export default function HomePage() {
             new Set(
               data
                 .map((p: Profumo) => p.famiglia_olfattiva)
-                .filter((f): f is string => f !== null)
+                .filter((f): f is string => f !== null && f !== undefined)
             )
           );
           setFamilies(uniqueFamilies);
@@ -74,7 +72,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen px-6 py-12 max-w-2xl mx-auto flex flex-col justify-between">
-      {/* Header Personalizzato */}
       <div>
         <header className="text-center mb-10 animate-fade-in-up">
           <p className="tracking-luxury text-xs text-gold uppercase mb-2">Boutique Olfattiva di</p>
@@ -83,7 +80,6 @@ export default function HomePage() {
           </h1>
         </header>
 
-        {/* Scent of the Day (Il profumo del giorno) */}
         <section className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-gold" />
@@ -121,7 +117,6 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* Statistiche della Collezione */}
         {count > 0 && (
           <section className="grid grid-cols-3 gap-3 mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <div className="glass rounded-xl p-4 text-center">
@@ -148,7 +143,6 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* Griglia di Navigazione Principale */}
         <section className="grid grid-cols-2 gap-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
           <Link
             href="/collezione"
@@ -173,7 +167,6 @@ export default function HomePage() {
           </Link>
         </section>
 
-      {/* Accesso Rapido Radar Boutique */}
         <section className="mt-4 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <Link
             href="/collezione?vista=radar"
@@ -191,3 +184,11 @@ export default function HomePage() {
             </span>
           </Link>
         </section>
+      </div>
+
+      <footer className="mt-12 text-center text-[10px] tracking-widest text-muted-foreground uppercase">
+        Boutique Olfattiva • Private Archive
+      </footer>
+    </div>
+  );
+}
