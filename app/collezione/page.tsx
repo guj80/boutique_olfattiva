@@ -388,6 +388,8 @@ function CollezioneContent() {
 
     try {
       const pureFam = normalizeToPureFamily(selectedProfumo.famiglia_olfattiva);
+      const cleanImg = selectedProfumo.url_foto_vetrina?.trim() || null;
+
       const payload = {
         nome: selectedProfumo.nome,
         brand: selectedProfumo.brand,
@@ -400,7 +402,7 @@ function CollezioneContent() {
           selectedProfumo.note_olfattive || getUnifiedNotes(selectedProfumo),
         descrizione_ai: selectedProfumo.descrizione_ai,
         prezzo_stimato_euro: selectedProfumo.prezzo_stimato_euro,
-        url_foto_vetrina: selectedProfumo.url_foto_vetrina || null,
+        url_foto_vetrina: cleanImg,
         stato: selectedProfumo.stato || 'collezione',
         note_mouche: selectedProfumo.note_mouche,
         note_pelle: selectedProfumo.note_pelle,
@@ -492,7 +494,12 @@ function CollezioneContent() {
         .eq('id', deleteTarget.id);
       if (error) throw error;
       setProfumi((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      if (selectedProfumo?.id === deleteTarget.id) {
+        setSelectedProfumo(null);
+      }
       setDeleteTarget(null);
+      setStatusBanner(`Eliminato con successo.`);
+      setTimeout(() => setStatusBanner(null), 3000);
     } catch (err: any) {
       alert(err?.message || 'Errore eliminazione.');
     }
@@ -767,9 +774,8 @@ function CollezioneContent() {
                       <img
                         src={imgUrl}
                         alt={p.nome}
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = 'none';
-                        }}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
                         className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-300"
                       />
                     ) : (
@@ -828,9 +834,8 @@ function CollezioneContent() {
                           <img
                             src={imgUrl}
                             alt={p.nome}
-                            onError={(e) => {
-                              (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
-                            }}
+                            referrerPolicy="no-referrer"
+                            crossOrigin="anonymous"
                             className="w-full h-full object-contain p-1"
                           />
                         </div>
@@ -997,6 +1002,7 @@ function CollezioneContent() {
         )}
       </section>
 
+      {/* MODALE SCHEDA TECNICA CON TASTO ELIMINA DISCRETO */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-[#F7E7CE]/30 my-8 max-h-[92vh] overflow-y-auto">
@@ -1006,9 +1012,8 @@ function CollezioneContent() {
                   <img
                     src={selectedProfumo.url_foto_vetrina}
                     alt={selectedProfumo.nome}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                     className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#F7E7CE]/25 object-contain p-1"
                   />
                 )}
@@ -1180,7 +1185,7 @@ function CollezioneContent() {
 
               <div>
                 <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  URL Immagine
+                  URL Immagine Flacone
                 </label>
                 <input
                   type="text"
@@ -1192,7 +1197,7 @@ function CollezioneContent() {
                     })
                   }
                   placeholder="https://..."
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white font-mono"
                 />
               </div>
 
@@ -1327,27 +1332,41 @@ function CollezioneContent() {
                 })}
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#F7E7CE]/15">
+              <div className="flex items-center justify-between pt-4 border-t border-[#F7E7CE]/15">
+                {/* Tasto Elimina Discreto a Sinistra */}
                 <button
                   type="button"
-                  onClick={() => setSelectedProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase"
+                  onClick={() => setDeleteTarget(selectedProfumo)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 font-mono text-xs transition"
                 >
-                  Annulla
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Elimina Profilo</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={savingDetail}
-                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase shadow-champagne-glow"
-                >
-                  {savingDetail ? '...' : 'Salva'}
-                </button>
+
+                {/* Pulsanti Azione Principali a Destra */}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProfumo(null)}
+                    className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase hover:bg-white/10 transition"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingDetail}
+                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase shadow-champagne-glow hover:opacity-95 transition"
+                  >
+                    {savingDetail ? 'Salvataggio...' : 'Salva Modifiche'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* MODALE INDOSSO */}
       {wearProfumo && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#F7E7CE]/30 space-y-4">
@@ -1441,12 +1460,16 @@ function CollezioneContent() {
         </div>
       )}
 
+      {/* MODALE CONFERMA ELIMINAZIONE */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4">
             <h3 className="font-serif text-xl text-white">
-              Eliminare {deleteTarget.nome}?
+              Eliminare definitivamente {deleteTarget.brand ? `${deleteTarget.brand} - ` : ''}{deleteTarget.nome}?
             </h3>
+            <p className="text-xs text-zinc-400">
+              Questa operazione cancellerà il profumo dal database Supabase.
+            </p>
             <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setDeleteTarget(null)}
@@ -1458,7 +1481,7 @@ function CollezioneContent() {
                 onClick={confirmDelete}
                 className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-semibold"
               >
-                Elimina
+                Conferma Eliminazione
               </button>
             </div>
           </div>
