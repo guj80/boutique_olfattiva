@@ -8,6 +8,7 @@ import {
   ScanLine,
   ChevronRight,
   RefreshCw,
+  FlaskConical,
 } from 'lucide-react';
 import {
   supabase,
@@ -36,6 +37,53 @@ function PerfumeBottleIcon({ className = 'w-5 h-5' }: { className?: string }) {
       <path d="M18 2l2 2-2 2" />
       <rect x="8.5" y="11" width="7" height="6" rx="1" />
     </svg>
+  );
+}
+
+function SmartBottleImage({
+  src,
+  alt,
+  className,
+  iconSize = 'w-5 h-5',
+}: {
+  src?: string | null;
+  alt: string;
+  className?: string;
+  iconSize?: string;
+}) {
+  const cleanSrc = (src || '').trim();
+  const [stage, setStage] = useState<'direct' | 'proxy' | 'failed'>('direct');
+
+  useEffect(() => {
+    setStage('direct');
+  }, [cleanSrc]);
+
+  if (!cleanSrc || stage === 'failed') {
+    return (
+      <div className="flex items-center justify-center text-zinc-600">
+        <FlaskConical className={`${iconSize} stroke-[1.2]`} />
+      </div>
+    );
+  }
+
+  const finalSrc =
+    stage === 'direct'
+      ? cleanSrc
+      : `https://wsrv.nl/?url=${encodeURIComponent(cleanSrc)}&output=webp`;
+
+  return (
+    <img
+      src={finalSrc}
+      alt={alt}
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
+      className={className}
+      onError={() => {
+        if (stage === 'direct') setStage('proxy');
+        else setStage('failed');
+      }}
+    />
   );
 }
 
@@ -111,7 +159,7 @@ export default function BoutiqueHomePage() {
         body: JSON.stringify({ query, profumi: collezione }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Errore Sommelier');
+      if (!res.ok) throw new Error(data.error || 'Errore IA');
 
       const recIds: string[] = data.recommendedIds || [];
       const recProfumi = recIds
@@ -123,7 +171,7 @@ export default function BoutiqueHomePage() {
         recommended: recProfumi.slice(0, 3),
       });
     } catch (err: any) {
-      alert(err?.message || 'Impossibile consultare il Sommelier AI in questo momento.');
+      alert(err?.message || "Impossibile consultare l'IA in questo momento.");
     } finally {
       setAdvisorLoading(false);
     }
@@ -152,8 +200,8 @@ export default function BoutiqueHomePage() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-6xl mx-auto w-full">
-      {/* HEADER CON IL TUO LOGO QUADRATO /logo.jpg E TITOLO PRIVATE OLFACTORY */}
-      <header className="flex items-center gap-4 pb-6 border-b border-[#F7E7CE]/15">
+      {/* HEADER CON LOGO /logo.jpg */}
+      <header className="flex items-center gap-4 pb-6 border-b border-[#F7E7CE]/15 animate-fade-in">
         <img
           src="/logo.jpg"
           alt="Private Olfactory Logo"
@@ -170,45 +218,56 @@ export default function BoutiqueHomePage() {
       </header>
 
       {/* SCENT OF THE DAY */}
-      <section className="mt-6">
+      <section className="mt-6 animate-fade-in">
         <div className="boutique-glass rounded-2xl p-5 sm:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] block">
-                Scent of the Day
-              </span>
-              {ultimoIndosso && ultimoIndosso.profumi ? (
-                <div className="mt-1 flex flex-wrap items-baseline gap-2">
-                  <h2 className="font-serif text-xl sm:text-2xl text-white">
-                    {ultimoIndosso.profumi.nome}
-                  </h2>
-                  <span className="text-sm text-[#C5A059] font-mono">
-                    - {ultimoIndosso.profumi.brand}
-                  </span>
-                  <span className="text-xs text-zinc-500 font-mono">
-                    ({ultimoIndosso.momento_giornata || 'Oggi'}
-                    {ultimoIndosso.contesto_outfit ? ` - ${ultimoIndosso.contesto_outfit}` : ''})
-                  </span>
+            <div className="flex items-center gap-3.5">
+              {ultimoIndosso?.profumi && (
+                <div className="w-12 h-12 rounded-xl bg-[#08080A] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                  <SmartBottleImage
+                    src={ultimoIndosso.profumi.url_foto_vetrina || ultimoIndosso.profumi.immagine_url}
+                    alt={ultimoIndosso.profumi.nome}
+                    className="w-full h-full object-contain p-1"
+                  />
                 </div>
-              ) : (
-                <h2 className="font-serif text-xl sm:text-2xl text-white mt-0.5">
-                  Selezione del Giorno
-                </h2>
               )}
+              <div>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] block">
+                  Scent of the Day
+                </span>
+                {ultimoIndosso && ultimoIndosso.profumi ? (
+                  <div className="mt-1 flex flex-wrap items-baseline gap-2">
+                    <h2 className="font-serif text-xl sm:text-2xl text-white">
+                      {ultimoIndosso.profumi.nome}
+                    </h2>
+                    <span className="text-sm text-[#C5A059] font-mono">
+                      - {ultimoIndosso.profumi.brand}
+                    </span>
+                    <span className="text-xs text-zinc-500 font-mono">
+                      ({ultimoIndosso.momento_giornata || 'Oggi'}
+                      {ultimoIndosso.contesto_outfit ? ` - ${ultimoIndosso.contesto_outfit}` : ''})
+                    </span>
+                  </div>
+                ) : (
+                  <h2 className="font-serif text-xl sm:text-2xl text-white mt-0.5">
+                    Selezione del Giorno
+                  </h2>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setActivePanel(activePanel === 'ai' ? 'none' : 'ai')}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs transition ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs hover:scale-[1.02] active:scale-[0.98] transition-all ${
                   activePanel === 'ai'
-                    ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold'
+                    ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-white font-semibold'
                     : 'bg-[#F7E7CE]/15 text-[#F7E7CE] border border-[#F7E7CE]/25 hover:bg-[#F7E7CE]/25'
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi all'IA</span>
+                <span>Chiedi all&apos;IA</span>
               </button>
 
               <button
@@ -216,9 +275,9 @@ export default function BoutiqueHomePage() {
                 onClick={() =>
                   setActivePanel(activePanel === 'collezione' ? 'none' : 'collezione')
                 }
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs transition ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs hover:scale-[1.02] active:scale-[0.98] transition-all ${
                   activePanel === 'collezione'
-                    ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
+                    ? 'bg-[#F7E7CE] text-white font-semibold'
                     : 'bg-[#08080A] text-zinc-300 border border-[#F7E7CE]/20 hover:text-white'
                 }`}
               >
@@ -229,9 +288,9 @@ export default function BoutiqueHomePage() {
               <button
                 type="button"
                 onClick={() => setActivePanel(activePanel === 'decant' ? 'none' : 'decant')}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs transition ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs hover:scale-[1.02] active:scale-[0.98] transition-all ${
                   activePanel === 'decant'
-                    ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
+                    ? 'bg-[#F7E7CE] text-white font-semibold'
                     : 'bg-[#08080A] text-zinc-300 border border-[#F7E7CE]/20 hover:text-white'
                 }`}
               >
@@ -242,7 +301,7 @@ export default function BoutiqueHomePage() {
           </div>
 
           {activePanel === 'ai' && (
-            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 space-y-4">
+            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 space-y-4 animate-slide-up">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1">
@@ -302,7 +361,7 @@ export default function BoutiqueHomePage() {
                   type="button"
                   onClick={askQuickSommelier}
                   disabled={advisorLoading || collezione.length === 0}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold hover:bg-[#C5A059] transition disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F7E7CE] text-white font-mono text-xs font-semibold hover:scale-[1.02] transition-all disabled:opacity-50"
                 >
                   {advisorLoading ? (
                     <>
@@ -310,13 +369,13 @@ export default function BoutiqueHomePage() {
                       <span>Elaborazione...</span>
                     </>
                   ) : (
-                    <span>Elabora Proposta</span>
+                    <span>Chiedi all&apos;IA</span>
                   )}
                 </button>
               </div>
 
               {advisorResult && (
-                <div className="p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/40 space-y-3">
+                <div className="p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/40 space-y-3 animate-fade-in">
                   <p className="text-xs text-[#F7E7CE] leading-relaxed">
                     {advisorResult.advice}
                   </p>
@@ -327,16 +386,26 @@ export default function BoutiqueHomePage() {
                           key={p.id}
                           className="p-3 rounded-xl boutique-glass flex flex-col justify-between gap-2"
                         >
-                          <div>
-                            <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                              {p.brand}
-                            </p>
-                            <p className="font-serif text-base text-white font-medium">
-                              {p.nome}
-                            </p>
-                            <p className="text-[11px] text-zinc-400 line-clamp-1 mt-0.5">
-                              {getUnifiedNotes(p) || p.famiglia_olfattiva}
-                            </p>
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-10 h-10 rounded-lg bg-[#08080A] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                              <SmartBottleImage
+                                src={p.url_foto_vetrina || p.immagine_url}
+                                alt={p.nome}
+                                iconSize="w-4 h-4"
+                                className="w-full h-full object-contain p-0.5"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059] truncate">
+                                {p.brand}
+                              </p>
+                              <p className="font-serif text-base text-white font-medium truncate">
+                                {p.nome}
+                              </p>
+                              <p className="text-[11px] text-zinc-400 line-clamp-1 mt-0.5">
+                                {getUnifiedNotes(p) || p.famiglia_olfattiva}
+                              </p>
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -355,7 +424,7 @@ export default function BoutiqueHomePage() {
           )}
 
           {activePanel === 'collezione' && (
-            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end animate-slide-up">
               <div className="sm:col-span-2">
                 <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                   Flacone dalla Collezione ({collezione.length})
@@ -392,7 +461,7 @@ export default function BoutiqueHomePage() {
                 type="button"
                 onClick={() => handleQuickWearSave(selectedQuickProfumoId)}
                 disabled={savingQuickWear || !selectedQuickProfumoId}
-                className="px-4 py-2 rounded-xl bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold hover:bg-[#C5A059] transition"
+                className="px-4 py-2 rounded-xl bg-[#F7E7CE] text-white font-mono text-xs font-semibold transition"
               >
                 {savingQuickWear ? 'Salvataggio...' : 'Conferma Indosso'}
               </button>
@@ -400,7 +469,7 @@ export default function BoutiqueHomePage() {
           )}
 
           {activePanel === 'decant' && (
-            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-slide-up">
               {radar.length > 0 ? (
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                   <div className="sm:col-span-2">
@@ -424,7 +493,7 @@ export default function BoutiqueHomePage() {
                     onClick={() =>
                       handleQuickWearSave(selectedQuickProfumoId || radar[0]?.id)
                     }
-                    className="px-4 py-2 rounded-xl bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold"
+                    className="px-4 py-2 rounded-xl bg-[#F7E7CE] text-white font-mono text-xs font-semibold"
                   >
                     Indossa Decant Oggi
                   </button>
@@ -451,7 +520,7 @@ export default function BoutiqueHomePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
             href="/collezione"
-            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group"
+            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group hover:scale-[1.015] transition-all duration-300 animate-fade-in"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -477,7 +546,7 @@ export default function BoutiqueHomePage() {
 
           <Link
             href="/scanner"
-            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group"
+            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group hover:scale-[1.015] transition-all duration-300 animate-fade-in"
           >
             <div className="flex items-center justify-between">
               <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
@@ -486,7 +555,7 @@ export default function BoutiqueHomePage() {
               <ScanLine className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
             </div>
             <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
-              AI Scanner e Estrattore
+              IA Scanner e Estrattore
             </h3>
             <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
               <span>AVVIA ACQUISIZIONE</span>
@@ -497,7 +566,7 @@ export default function BoutiqueHomePage() {
 
         <Link
           href="/collezione?vista=radar"
-          className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-[#C5A059]/30 block"
+          className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-[#C5A059]/30 block hover:scale-[1.01] transition-all duration-300 animate-fade-in"
         >
           <div>
             <div className="flex items-center gap-2">
