@@ -25,6 +25,54 @@ body {
 }
 
 /* =========================================================
+   ANIMAZIONI FLUIDE DA VERA APP (FADE, SCALE, SLIDE)
+   ========================================================= */
+@keyframes boutiqueFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes boutiqueScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes boutiqueSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: boutiqueFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-scale-up {
+  animation: boutiqueScaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-up {
+  animation: boutiqueSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* =========================================================
    PANNELLI E CARD: VETRO NERO OSSIDIANA CON FILO LUMINOSO
    ========================================================= */
 .boutique-glass {
@@ -47,9 +95,11 @@ body {
 }
 
 /* =========================================================
-   TASTI SERI "DARK OBSIDIAN & NEON EDGE" (DA SECONDA VERSIONE APPROVATA)
+   TASTI SERI "DARK OBSIDIAN & NEON EDGE"
+   Intercetta sia i vecchi bottoni Champagne sia i nuovi gradienti
    ========================================================= */
 .bg-gradient-to-r.from-\[\#F7E7CE\].to-\[\#C5A059\],
+.bg-gradient-to-r.from-\[\#FF2A95\].via-\[\#7B2CBF\].to-\[\#1FE866\],
 .bg-\[\#F7E7CE\] {
   background: linear-gradient(145deg, #161421 0%, #0A0A10 100%) padding-box,
               linear-gradient(135deg, #FF2A95 0%, #7B2CBF 52%, #1FE866 100%) border-box !important;
@@ -60,9 +110,10 @@ body {
 }
 
 .bg-gradient-to-r.from-\[\#F7E7CE\].to-\[\#C5A059\]:hover,
+.bg-gradient-to-r.from-\[\#FF2A95\].via-\[\#7B2CBF\].to-\[\#1FE866\]:hover,
 .bg-\[\#F7E7CE\]:hover {
-  box-shadow: 0 6px 22px -3px rgba(255, 42, 149, 0.35),
-              0 0 12px -4px rgba(31, 232, 102, 0.18) !important;
+  box-shadow: 0 6px 22px -3px rgba(255, 42, 149, 0.38),
+              0 0 12px -4px rgba(31, 232, 102, 0.22) !important;
   opacity: 1 !important;
 }
 
@@ -74,18 +125,14 @@ body {
 /* =========================================================
    GERARCHIA COLORI TESTI, BADGE E MICRO-ACCENTI
    ========================================================= */
-
-/* Etichette Brand, Titoli Sezione, Testata -> Rosa Magenta Elettrico */
 .text-\[\#C5A059\] {
   color: #FF4DA6 !important;
 }
 
-/* Testi ex-Champagne -> Bianco Perla */
 .text-\[\#F7E7CE\] {
   color: #F4F0FA !important;
 }
 
-/* Pillole Prezzi e Contatori -> Verde Smeraldo Sobrio */
 .bg-\[\#C5A059\]\/20,
 .bg-\[\#C5A059\]\/15 {
   background-color: rgba(31, 232, 102, 0.08) !important;
@@ -93,7 +140,6 @@ body {
   color: #1FE866 !important;
 }
 
-/* Badge Famiglia Olfattiva Pura e Tab Attive -> Rubino/Viola Vellutato (Dalla seconda versione) */
 .bg-\[\#F7E7CE\]\/10,
 .bg-\[\#F7E7CE\]\/15,
 .bg-\[\#F7E7CE\]\/20 {
@@ -102,7 +148,6 @@ body {
   color: #FF70B8 !important;
 }
 
-/* Bordi divisori sottili */
 .border-\[\#F7E7CE\]\/10,
 .border-\[\#F7E7CE\]\/15,
 .border-\[\#F7E7CE\]\/20,
@@ -117,7 +162,6 @@ body {
   border-color: rgba(255, 42, 149, 0.28) !important;
 }
 
-/* Input e Select al tocco */
 input:focus,
 select:focus,
 textarea:focus {
