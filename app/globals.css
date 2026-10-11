@@ -1,85 +1,127 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  /* Tema Champagne & Obsidian Forzato (Zero Arancione) */
-  --background: 240 11% 4%;           /* #08080A */
-  --foreground: 0 0% 98%;             /* #FAFAFA */
-  --card: 240 12% 6%;                 /* #0D0D11 */
-  --card-foreground: 0 0% 98%;
-  --popover: 240 12% 6%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 37 73% 89%;              /* #F7E7CE Champagne */
-  --primary-foreground: 240 11% 4%;   /* #08080A */
-  --secondary: 240 9% 11%;
-  --secondary-foreground: 37 73% 89%;
-  --muted: 240 8% 12%;
-  --muted-foreground: 240 5% 62%;
-  --accent: 39 48% 56%;               /* #C5A059 Antique Gold */
-  --accent-foreground: 240 11% 4%;
-  --destructive: 0 62% 45%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 37 40% 22%;
-  --input: 240 9% 13%;
-  --ring: 39 48% 56%;
-  --radius: 0.75rem;
-}
-
-* {
-  border-color: rgba(247, 231, 206, 0.12);
+  --bg-obsidian: #040406;
+  --neon-magenta: #FF2A95;
+  --neon-pink-light: #FF5CAD;
+  --neon-emerald: #1FE866;
+  --neon-violet: #7B2CBF;
 }
 
 html,
 body {
-  background-color: #08080A;
-  color: #FFFFFF;
-  font-family: var(--font-sans);
+  background-color: #040406 !important;
+  color: #F8F6F2 !important;
+  /* TEXTURE CARTA NERA STROPICCIATA D'ARCHIVIO CON PIEGHE A CROCE */
+  background-image:
+    radial-gradient(circle at 85% 10%, rgba(255, 42, 149, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 12% 18%, rgba(31, 232, 102, 0.03) 0%, transparent 35%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900' viewBox='0 0 900 900'%3E%3Cdefs%3E%3Cfilter id='paper-grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch' result='fineGrain'/%3E%3CfeColorMatrix in='fineGrain' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.045 0'/%3E%3C/filter%3E%3Cfilter id='fold-wear'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.04 0.15' numOctaves='3' seed='19' result='wearNoise'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='wearNoise' scale='3.8' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='900' height='900' fill='%23040406'/%3E%3Crect width='900' height='900' filter='url(%23paper-grain)'/%3E%3Cg filter='url(%23fold-wear)' fill='none'%3E%3Cline x1='450' y1='0' x2='446' y2='900' stroke='rgba(255,255,255,0.06)' stroke-width='0.95' stroke-dasharray='120 15 70 20 180 6'/%3E%3Cline x1='451' y1='0' x2='447' y2='900' stroke='rgba(0,0,0,0.55)' stroke-width='1.5'/%3E%3Cline x1='0' y1='448' x2='900' y2='452' stroke='rgba(255,255,255,0.05)' stroke-width='0.9' stroke-dasharray='150 14 80 8 200 12'/%3E%3Cline x1='0' y1='449' x2='900' y2='453' stroke='rgba(0,0,0,0.5)' stroke-width='1.3'/%3E%3Cpath d='M150 780 L152 870' stroke='rgba(255,255,255,0.08)' stroke-width='0.7'/%3E%3Cpath d='M810 420 L808 510' stroke='rgba(255,255,255,0.06)' stroke-width='0.6'/%3E%3Cpath d='M48 80 L51 130' stroke='rgba(255,255,255,0.06)' stroke-width='0.5'/%3E%3C/g%3E%3C/svg%3E") !important;
+  background-attachment: fixed !important;
+  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  selection-background-color: #C5A059;
-  selection-color: #08080A;
 }
 
-::selection {
-  background: rgba(197, 160, 89, 0.35);
-  color: #F7E7CE;
-}
-
-/* Scrollbar elegante in stile Boutique */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #08080A;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(197, 160, 89, 0.3);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(247, 231, 206, 0.6);
-}
-
-/* Utility di Glassmorphism Champagne */
+/* =========================================================
+   PANNELLI E CARD: VETRO NERO OSSIDIANA CON FILO LUMINOSO
+   ========================================================= */
 .boutique-glass {
-  background: rgba(15, 15, 20, 0.72);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(247, 231, 206, 0.15);
+  background: linear-gradient(150deg, rgba(14, 14, 21, 0.94), rgba(7, 7, 10, 0.97)) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.90),
+              inset 0 1px 0 0 rgba(255, 42, 149, 0.14) !important;
 }
 
 .boutique-glass-hover {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
+
 .boutique-glass-hover:hover {
-  border-color: rgba(247, 231, 206, 0.38);
-  box-shadow: 0 12px 35px -10px rgba(197, 160, 89, 0.22);
+  border-color: rgba(255, 42, 149, 0.42) !important;
+  box-shadow: 0 14px 34px -8px rgba(255, 42, 149, 0.15),
+              0 0 15px -5px rgba(31, 232, 102, 0.10) !important;
+}
+
+/* =========================================================
+   TASTI SERI "DARK OBSIDIAN & NEON EDGE" (DA SECONDA VERSIONE APPROVATA)
+   ========================================================= */
+.bg-gradient-to-r.from-\[\#F7E7CE\].to-\[\#C5A059\],
+.bg-\[\#F7E7CE\] {
+  background: linear-gradient(145deg, #161421 0%, #0A0A10 100%) padding-box,
+              linear-gradient(135deg, #FF2A95 0%, #7B2CBF 52%, #1FE866 100%) border-box !important;
+  border: 1px solid transparent !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 18px -4px rgba(255, 42, 149, 0.24),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.bg-gradient-to-r.from-\[\#F7E7CE\].to-\[\#C5A059\]:hover,
+.bg-\[\#F7E7CE\]:hover {
+  box-shadow: 0 6px 22px -3px rgba(255, 42, 149, 0.35),
+              0 0 12px -4px rgba(31, 232, 102, 0.18) !important;
+  opacity: 1 !important;
+}
+
+.shadow-champagne-glow {
+  box-shadow: 0 4px 20px -4px rgba(255, 42, 149, 0.25),
+              0 0 12px -4px rgba(31, 232, 102, 0.15) !important;
+}
+
+/* =========================================================
+   GERARCHIA COLORI TESTI, BADGE E MICRO-ACCENTI
+   ========================================================= */
+
+/* Etichette Brand, Titoli Sezione, Testata -> Rosa Magenta Elettrico */
+.text-\[\#C5A059\] {
+  color: #FF4DA6 !important;
+}
+
+/* Testi ex-Champagne -> Bianco Perla */
+.text-\[\#F7E7CE\] {
+  color: #F4F0FA !important;
+}
+
+/* Pillole Prezzi e Contatori -> Verde Smeraldo Sobrio */
+.bg-\[\#C5A059\]\/20,
+.bg-\[\#C5A059\]\/15 {
+  background-color: rgba(31, 232, 102, 0.08) !important;
+  border-color: rgba(31, 232, 102, 0.25) !important;
+  color: #1FE866 !important;
+}
+
+/* Badge Famiglia Olfattiva Pura e Tab Attive -> Rubino/Viola Vellutato (Dalla seconda versione) */
+.bg-\[\#F7E7CE\]\/10,
+.bg-\[\#F7E7CE\]\/15,
+.bg-\[\#F7E7CE\]\/20 {
+  background: linear-gradient(135deg, rgba(255, 42, 149, 0.14) 0%, rgba(123, 44, 191, 0.12) 100%) !important;
+  border-color: rgba(255, 42, 149, 0.38) !important;
+  color: #FF70B8 !important;
+}
+
+/* Bordi divisori sottili */
+.border-\[\#F7E7CE\]\/10,
+.border-\[\#F7E7CE\]\/15,
+.border-\[\#F7E7CE\]\/20,
+.border-\[\#F7E7CE\]\/25,
+.border-\[\#F7E7CE\]\/30 {
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+.border-\[\#C5A059\]\/25,
+.border-\[\#C5A059\]\/30,
+.border-\[\#C5A059\]\/40 {
+  border-color: rgba(255, 42, 149, 0.28) !important;
+}
+
+/* Input e Select al tocco */
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #FF2A95 !important;
+  box-shadow: 0 0 0 1px rgba(255, 42, 149, 0.20) !important;
+  outline: none !important;
 }
