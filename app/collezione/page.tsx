@@ -633,7 +633,7 @@ function CollezioneContent() {
                   handleAskSommelier();
                 }
               }}
-              placeholder="Cerca profumo, brand, nota o chiedi a AI..."
+              placeholder="Cerca profumo, brand, nota o Chiedi all’IA..."
               className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#F7E7CE]"
             />
             {searchQuery && (
@@ -662,7 +662,7 @@ function CollezioneContent() {
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi a AI</span>
+                <span>Chiedi all’IA</span>
               </>
             )}
           </button>
