@@ -3,6 +3,39 @@ import { callGeminiWithFallback, extractJsonFromAiText, GeminiPart } from '@/lib
 
 export const dynamic = 'force-dynamic';
 
+export const PURE_FAMILIES = [
+  'Agrumata',
+  'Aromatica',
+  'Marina',
+  'Floreale',
+  'Fruttata',
+  'Verde',
+  'Speziata',
+  'Legnosa',
+  'Ambrata',
+  'Gourmand',
+  'Cuoiata',
+  'Muschiata',
+] as const;
+
+function normalizeFamilyServer(raw?: string | null): string {
+  const s = (raw || '').toLowerCase().trim();
+  if (!s) return 'Legnosa';
+  if (s.includes('marin') || s.includes('acquat') || s.includes('ozon')) return 'Marina';
+  if (s.includes('gourmand') || s.includes('vanigl') || s.includes('dolce')) return 'Gourmand';
+  if (s.includes('cuoi') || s.includes('leather') || s.includes('tabacc')) return 'Cuoiata';
+  if (s.includes('musch') || s.includes('pulit') || s.includes('talc') || s.includes('mineral')) return 'Muschiata';
+  if (s.includes('speziat')) return 'Speziata';
+  if (s.includes('verd') || s.includes('green')) return 'Verde';
+  if (s.includes('fruttat')) return 'Fruttata';
+  if (s.includes('agrum') || s.includes('esperid')) return 'Agrumata';
+  if (s.includes('ambrat') || s.includes('oriental') || s.includes('incens') || s.includes('resin')) return 'Ambrata';
+  if (s.includes('floreal') || s.includes('fiorit')) return 'Floreale';
+  if (s.includes('aromatic') || s.includes('fouger') || s.includes('fougèr')) return 'Aromatica';
+  if (s.includes('legnos') || s.includes('bois') || s.includes('chypre') || s.includes('oud')) return 'Legnosa';
+  return 'Legnosa';
+}
+
 function parseUrlSlugInfo(rawUrl: string): string {
   try {
     const u = new URL(rawUrl);
@@ -93,11 +126,11 @@ async function fetchWebMetadataWithBypass(url: string): Promise<{
       }
     }
   } catch {
-    // Continua col Grounding Google
+    // Continua
   }
 
   return {
-    textSnippet: `La pagina web diretta ha protezione anti-bot. Usa la Ricerca Google (Google Search Grounding) per verificare la piramide olfattiva UFFICIALE esatta di questo profumo.`,
+    textSnippet: `Riporta esclusivamente la piramide olfattiva UFFICIALE esatta di questo profumo.`,
     ogImage: foundOgImage,
   };
 }
@@ -115,13 +148,12 @@ export async function POST(req: Request) {
       const slugInfo = parseUrlSlugInfo(url.trim());
       const webData = await fetchWebMetadataWithBypass(url.trim());
       discoveredImage = webData.ogImage;
-      contextSource = `MODALITÀ: Estrazione da Link Ufficiale/Web.\nURL: ${url}\n${slugInfo}\n${webData.textSnippet}`;
+      contextSource = `MODALITA: Estrazione da Link Ufficiale/Web.\nURL: ${url}\n${slugInfo}\n${webData.textSnippet}`;
     } else if (brand || nome || queryName) {
       const target = queryName || `${brand || ''} ${nome || ''}`.trim();
-      contextSource = `MODALITÀ: Verifica e Correzione da Catalogo Ufficiale / Google per: "${target}".
-ATTENZIONE CRITICA: Se il nome "${target}" contiene un refuso o errore di battitura nel database (es. "Artisano" di "Botanicae" che in realtà nel catalogo reale di Botanicae si chiama "Tremonte"), CORREGGI il campo "nome" e "brand" con il vero nome ufficiale del profumo esistente e riporta le sue VERE note olfattive ufficiali senza MAI inventare nulla!`;
+      contextSource = `MODALITA: Verifica da Catalogo Ufficiale per: "${target}". Se il nome contiene un refuso, correggi il campo "nome" e "brand" con il vero nome ufficiale.`;
     } else if (imageBase64) {
-      contextSource = `MODALITÀ: Analisi Visiva Flacone / Campioncino. Leggi con attenzione brand e nome dall'immagine allegata, cerca la piramide olfattiva ufficiale reale e restituisci i dati verificati.`;
+      contextSource = `MODALITA: Analisi Visiva Flacone / Campioncino. Leggi brand e nome dall'immagine allegata e restituisci la piramide olfattiva ufficiale.`;
     } else {
       return NextResponse.json(
         { error: 'Fornisci un URL, una foto o il nome del profumo.' },
@@ -129,27 +161,27 @@ ATTENZIONE CRITICA: Se il nome "${target}" contiene un refuso o errore di battit
       );
     }
 
-    const systemPrompt = `Sei un rigoroso catalogatore tecnico di profumeria artistica e selettiva.
-VIETATO INVENTARE O ALLUCINARE NOTE OLFATTIVE.
+    const systemPrompt = `Sei un catalogatore tecnico di profumeria artistica.
+VIETATO INVENTARE NOTE OLFATTIVE.
 
 ${contextSource}
 
-Istruzioni Tassative:
-1. Verifica la piramide olfattiva reale (Note di Testa, Note di Cuore, Note di Fondo) dal testo della pagina fornito oppure tramite la ricerca web ufficiale del brand.
-2. Se il nome del profumo fornito dall'utente aveva un errore di battitura (es. "Artisano" anziché "Tremonte"), restituisci nel campo "nome" il NOME UFFICIALE CORRETTO.
-3. Se conosci o trovi l'URL diretto di un'immagine pubblica del flacone (e non è già presente in url_foto_vetrina), inseriscilo in "url_foto_vetrina", altrimenti lascia quello trovato.
+REGOLA TASSATIVA PER "famiglia_olfattiva":
+Devi scegliere ESCLUSIVAMENTE UNA SOLA PARola tra queste 12 Famiglie Olfattive Pure Ufficiali:
+"Agrumata", "Aromatica", "Marina", "Floreale", "Fruttata", "Verde", "Speziata", "Legnosa", "Ambrata", "Gourmand", "Cuoiata", "Muschiata".
+(Vietato usare doppie parole come "Agrumato Aromatico" o "Ambrato Floreale": scegli solo la famiglia pura dominante!).
 
-Restituisci ESCLUSIVAMENTE un oggetto JSON valido (nessun testo fuori dal JSON):
+Restituisci ESCLUSIVAMENTE un oggetto JSON valido:
 {
-  "nome": "Nome ufficiale esatto e corretto del profumo (senza brand)",
+  "nome": "Nome ufficiale esatto del profumo (senza brand)",
   "brand": "Nome ufficiale del Brand",
   "concentrazione": "Es. Extrait de Parfum, Eau de Parfum, Eau de Toilette",
-  "famiglia_olfattiva": "Es. Agrumato Marino, Ambrato Legnoso, Speziato Orientale",
-  "note_testa": "Note di testa ufficiali separate da virgola (in italiano)",
-  "note_cuore": "Note di cuore ufficiali separate da virgola (in italiano)",
-  "note_fondo": "Note di fondo ufficiali separate da virgola (in italiano)",
+  "famiglia_olfattiva": "Una sola tra: Agrumata, Aromatica, Marina, Floreale, Fruttata, Verde, Speziata, Legnosa, Ambrata, Gourmand, Cuoiata, Muschiata",
+  "note_testa": "Note di testa ufficiali separate da virgola",
+  "note_cuore": "Note di cuore ufficiali separate da virgola",
+  "note_fondo": "Note di fondo ufficiali separate da virgola",
   "note_olfattive": "Elenco completo delle note separate da virgola",
-  "descrizione_ai": "Sintesi tecnica sobria del carattere olfattivo (max 2 frasi)",
+  "descrizione_ai": "Sintesi tecnica sobria del profilo olfattivo (max 2 frasi)",
   "prezzo_stimato_euro": "Prezzo di listino in Euro nel formato €XXX",
   "formato_ml": 100,
   "stagione_ideale": "Es. Primavera / Estate, oppure Autunno / Inverno",
@@ -172,14 +204,16 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido (nessun testo fuori dal JSON):
       });
     }
 
-    // Attiviamo useGoogleSearch (se non c'è un'immagine Base64) per interrogare Google in tempo reale!
     const { text, modelUsed } = await callGeminiWithFallback(parts, {
       temperature: 0.1,
       jsonMode: true,
-      useGoogleSearch: !imageBase64,
     });
 
     const parsed = extractJsonFromAiText<Record<string, any>>(text);
+
+    const pureFamily = PURE_FAMILIES.includes(parsed.famiglia_olfattiva)
+      ? parsed.famiglia_olfattiva
+      : normalizeFamilyServer(parsed.famiglia_olfattiva);
 
     const unifiedNotes =
       parsed.note_olfattive ||
@@ -191,7 +225,7 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido (nessun testo fuori dal JSON):
       nome: parsed.nome || nome || 'Fragranza',
       brand: parsed.brand || brand || 'Brand',
       concentrazione: parsed.concentrazione || 'Eau de Parfum',
-      famiglia_olfattiva: parsed.famiglia_olfattiva || '',
+      famiglia_olfattiva: pureFamily,
       note_testa: parsed.note_testa || '',
       note_cuore: parsed.note_cuore || '',
       note_fondo: parsed.note_fondo || '',
@@ -210,7 +244,7 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido (nessun testo fuori dal JSON):
     });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error?.message || 'Errore durante l\'estrazione.' },
+      { error: error?.message || 'Errore durante estrazione.' },
       { status: 500 }
     );
   }
