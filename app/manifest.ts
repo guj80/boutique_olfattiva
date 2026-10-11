@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Boutique Olfattiva',
-    short_name: 'Boutique',
+    name: 'Private Olfactory',
+    short_name: 'Olfactory',
     description: 'Private Olfactory Archive',
     start_url: '/',
     display: 'standalone',
@@ -13,7 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         src: '/icon',
         sizes: '512x512',
-        type: 'image/png',
+        type: 'image/jpeg',
+        purpose: 'any',
       },
     ],
   };
