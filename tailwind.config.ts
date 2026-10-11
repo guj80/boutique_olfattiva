@@ -9,24 +9,22 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      fontFamily: {
-        serif: ['var(--font-playfair)', 'Georgia', 'serif'],
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-jetbrains)', 'monospace'],
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic':
-          'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-        'gold-gradient':
-          'linear-gradient(135deg, hsl(45 50% 70%), hsl(41 39% 57%), hsl(38 35% 40%))',
-      },
-      borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
-      },
       colors: {
+        obsidian: {
+          DEFAULT: '#08080A',
+          light: '#111116',
+          card: '#0D0D11',
+        },
+        champagne: {
+          DEFAULT: '#F7E7CE',
+          muted: '#D8C3A5',
+          dark: '#C5A059',
+        },
+        gold: {
+          DEFAULT: '#C5A059',
+          light: '#F7E7CE',
+          dim: '#8A6D3B',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -60,35 +58,28 @@ const config: Config = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
-        gold: {
-          DEFAULT: 'hsl(41 39% 57%)',
-          light: 'hsl(45 50% 70%)',
-          dark: 'hsl(38 35% 40%)',
-        },
-        chart: {
-          '1': 'hsl(var(--chart-1))',
-          '2': 'hsl(var(--chart-2))',
-          '3': 'hsl(var(--chart-3))',
-          '4': 'hsl(var(--chart-4))',
-          '5': 'hsl(var(--chart-5))',
-        },
       },
-      keyframes: {
-        'accordion-down': {
-          from: { height: '0' },
-          to: { height: 'var(--radix-accordion-content-height)' },
-        },
-        'accordion-up': {
-          from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: '0' },
-        },
+      fontFamily: {
+        serif: ['var(--font-serif)', 'Playfair Display', 'Cormorant Garamond', 'Georgia', 'serif'],
+        sans: ['var(--font-sans)', 'Inter', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
       },
-      animation: {
-        'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out',
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
+      backgroundImage: {
+        'champagne-gradient': 'linear-gradient(135deg, #F7E7CE 0%, #C5A059 100%)',
+        'obsidian-radial': 'radial-gradient(circle at top, rgba(197, 160, 89, 0.12) 0%, rgba(8, 8, 10, 0) 70%)',
+      },
+      boxShadow: {
+        'champagne-glow': '0 0 25px -5px rgba(247, 231, 206, 0.15)',
+        'champagne-intense': '0 0 35px -5px rgba(197, 160, 89, 0.35)',
       },
     },
   },
   plugins: [require('tailwindcss-animate')],
 };
+
 export default config;
