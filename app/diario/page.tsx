@@ -1,311 +1,164 @@
-'use client';
+export interface GeminiPart {
+  text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
+}
 
-import React, { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  Sparkles,
-  Trash2,
-  Plus,
-  X,
-  Wine,
-} from 'lucide-react';
-import {
-  supabase,
-  Indosso,
-  Momento,
-  Profumo,
-  isCollezioneProfumo,
-} from '@/lib/supabase';
+// Modelli attuali (Ottobre 2026) ordinati per priorità
+const FALLBACK_2026_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-flash-latest',
+  'gemini-flash-lite-latest',
+  'gemini-3-pro-preview',
+  'gemini-3.1-pro-preview',
+  'gemini-pro-latest',
+];
 
-export default function DiarioOlfattivoPage() {
-  const [indossi, setIndossi] = useState<Indosso[]>([]);
-  const [profumi, setProfumi] = useState<Profumo[]>([]);
-  const [loading, setLoading] = useState(true);
+export async function callGeminiWithFallback(
+  parts: GeminiPart[],
+  options?: { temperature?: number; jsonMode?: boolean }
+): Promise<{ text: string; modelUsed: string }> {
+  const apiKey = (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+    ''
+  ).trim();
 
-  // Modale nuovo indosso dal Diario
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [selectedProfumoId, setSelectedProfumoId] = useState('');
-  const [momento, setMomento] = useState<Momento>('Sera');
-  const [contesto, setContesto] = useState('');
-  const [noteGiorno, setNoteGiorno] = useState('');
-  const [saving, setSaving] = useState(false);
+  if (!apiKey) {
+    throw new Error(
+      'Chiave API Gemini mancante! Configura GEMINI_API_KEY nelle Environment Variables di Vercel.'
+    );
+  }
 
-  const fetchDiario = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: profumiData } = await supabase
-        .from('profumi')
-        .select('*')
-        .order('nome', { ascending: true });
+  const temperature = options?.temperature ?? 0.25;
+  const errors: string[] = [];
 
-      const allProfumi = (profumiData || []) as Profumo[];
-      const colProfumi = allProfumi.filter(isCollezioneProfumo);
-      setProfumi(colProfumi);
-      if (colProfumi.length > 0 && !selectedProfumoId) {
-        setSelectedProfumoId(colProfumi[0].id);
-      }
+  // 1. AUTODISCOVERY DIRETTA: Chiediamo a Google quali modelli sono REALMENTE attivi sulla tua API Key
+  let candidateModels: string[] = [];
 
-      const { data: indossiData } = await supabase
-        .from('indossi')
-        .select('*')
-        .order('created_at', { ascending: false });
+  try {
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    const listRes = await fetch(listUrl, { cache: 'no-store' });
 
-      const mapped = ((indossiData || []) as Indosso[]).map((ind) => ({
-        ...ind,
-        profumi: allProfumi.find((p) => p.id === ind.profumo_id) || null,
-      }));
-      setIndossi(mapped);
-    } catch (err) {
-      console.error('Errore caricamento diario:', err);
-    } finally {
-      setLoading(false);
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      const allModels: any[] = listData?.models || [];
+
+      const validFromGoogle = allModels
+        .filter((m) => {
+          const name = String(m?.name || '').toLowerCase();
+          const methods: string[] = m?.supportedGenerationMethods || [];
+          // Deve supportare generateContent
+          if (!methods.includes('generateContent')) return false;
+          // Escludiamo modelli non testuali o deprecati per i nuovi utenti
+          if (
+            name.includes('embedding') ||
+            name.includes('aqa') ||
+            name.includes('imagen') ||
+            name.includes('veo') ||
+            name.includes('tts') ||
+            name.includes('audio') ||
+            name.includes('robotics') ||
+            name.includes('computer-use') ||
+            name.includes('learnlm') ||
+            name.includes('gemma') ||
+            name.includes('image-generation') ||
+            name.includes('1.5') ||
+            name.includes('2.0') ||
+            name.includes('2.5-pro')
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .map((m) => String(m.name).replace(/^models\//, ''));
+
+      // Mettiamo in cima i modelli "flash" (più veloci e sempre abilitati sul piano gratuito)
+      validFromGoogle.sort((a, b) => {
+        const aFlash = a.includes('flash') ? 0 : 1;
+        const bFlash = b.includes('flash') ? 0 : 1;
+        return aFlash - bFlash;
+      });
+
+      candidateModels = validFromGoogle;
+    } else {
+      const errTxt = await listRes.text();
+      errors.push(`ListModels (${listRes.status}): ${errTxt.slice(0, 120)}`);
     }
-  }, [selectedProfumoId]);
+  } catch (e: any) {
+    errors.push(`ListModels exception: ${e?.message}`);
+  }
 
-  useEffect(() => {
-    fetchDiario();
-  }, [fetchDiario]);
+  // Uniamo i modelli scoperti dal tuo account con la lista 2026 senza duplicati
+  const finalQueue = Array.from(new Set([...candidateModels, ...FALLBACK_2026_MODELS]));
 
-  async function handleAddIndosso(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedProfumoId) return;
-    setSaving(true);
+  // 2. Proviamo in sequenza TUTTI i modelli validi finché uno non risponde 200 OK
+  for (const model of finalQueue) {
     try {
-      const { error } = await supabase.from('indossi').insert([
-        {
-          profumo_id: selectedProfumoId,
-          momento_giornata: momento,
-          contesto_outfit: contesto || null,
-          note_giorno: noteGiorno || null,
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      // Payload pulito e universale (senza campi sperimentali che causano 400 Bad Request)
+      const payload = {
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          temperature,
         },
-      ]);
-      if (error) throw error;
-      setShowNewModal(false);
-      setContesto('');
-      setNoteGiorno('');
-      await fetchDiario();
+      };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text =
+          data?.candidates?.[0]?.content?.parts
+            ?.map((p: { text?: string }) => p.text || '')
+            .join('') || '';
+
+        if (text && text.trim().length > 0) {
+          return { text, modelUsed: model };
+        } else {
+          errors.push(`${model}: risposta vuota`);
+        }
+      } else {
+        const errBody = await res.text();
+        errors.push(`${model} (${res.status}): ${errBody.slice(0, 100)}`);
+      }
     } catch (err: any) {
-      alert(err?.message || 'Errore salvataggio indosso.');
-    } finally {
-      setSaving(false);
+      errors.push(`${model}: ${err?.message || 'Network error'}`);
     }
   }
 
-  async function handleDeleteIndosso(id: string) {
-    try {
-      await supabase.from('indossi').delete().eq('id', id);
-      setIndossi((prev) => prev.filter((i) => i.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  return (
-    <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-5xl mx-auto w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] hover:border-[#F7E7CE]/40 transition"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-[#C5A059]">
-              Scent Tracker &amp; Cronologia
-            </p>
-            <h1 className="font-serif text-2xl sm:text-3xl text-white">
-              Diario Olfattivo di Luca ({indossi.length})
-            </h1>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold text-xs font-mono uppercase tracking-wider shadow-champagne-glow"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Registra Indosso</span>
-        </button>
-      </div>
-
-      <section className="mt-8 space-y-4">
-        {loading ? (
-          <div className="p-12 text-center font-mono text-sm text-[#F7E7CE]">
-            Caricamento del Diario Olfattivo...
-          </div>
-        ) : indossi.length === 0 ? (
-          <div className="boutique-glass rounded-2xl p-12 text-center space-y-3">
-            <Calendar className="w-8 h-8 text-[#C5A059] mx-auto" />
-            <h2 className="font-serif text-2xl text-white">
-              Nessun indosso ancora registrato
-            </h2>
-            <p className="text-sm text-zinc-400 max-w-md mx-auto">
-              Clicca su &ldquo;Registra Indosso&rdquo; qui sopra o sul pulsante &ldquo;⌚ Indossa&rdquo; dentro la tua Collezione per tenere traccia delle tue fragranze del giorno.
-            </p>
-          </div>
-        ) : (
-          indossi.map((item) => {
-            const p = item.profumi;
-            const mom = item.momento_giornata || item.momento || 'Giornata';
-            const note = item.note_giorno || item.note || '';
-            const dateStr = item.data_indosso || item.created_at || '';
-
-            return (
-              <div
-                key={item.id}
-                className="boutique-glass boutique-glass-hover rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#C5A059]/20 text-[#F7E7CE] border border-[#F7E7CE]/25">
-                      {mom}
-                    </span>
-                    {dateStr && (
-                      <span className="font-mono text-xs text-zinc-400">
-                        {new Date(dateStr).toLocaleDateString('it-IT', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
-                      </span>
-                    )}
-                    {item.contesto_outfit && (
-                      <span className="text-xs text-[#C5A059] font-mono">
-                        • {item.contesto_outfit}
-                      </span>
-                    )}
-                  </div>
-
-                  <h3 className="font-serif text-xl sm:text-2xl text-white">
-                    {p ? p.nome : 'Fragranza del Vault'}{' '}
-                    {p?.brand && (
-                      <span className="text-[#C5A059] text-lg font-normal">
-                        — {p.brand}
-                      </span>
-                    )}
-                  </h3>
-
-                  {note && (
-                    <p className="text-sm text-zinc-300 italic">&ldquo;{note}&rdquo;</p>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => handleDeleteIndosso(item.id)}
-                  className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition self-end sm:self-center"
-                  title="Elimina voce dal diario"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            );
-          })
-        )}
-      </section>
-
-      {showNewModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#F7E7CE]/30 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-serif text-2xl text-white">Nuovo Indosso</h3>
-              <button
-                onClick={() => setShowNewModal(false)}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddIndosso} className="space-y-4">
-              <div>
-                <label className="block font-mono text-xs uppercase text-[#C5A059] mb-1">
-                  Seleziona Profumo dalla Collezione
-                </label>
-                <select
-                  value={selectedProfumoId}
-                  onChange={(e) => setSelectedProfumoId(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2.5 text-sm text-white"
-                >
-                  {profumi.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.brand} — {p.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-mono text-xs uppercase text-[#C5A059] mb-1">
-                  Momento della Giornata
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const).map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      onClick={() => setMomento(m)}
-                      className={`py-2 rounded-xl font-mono text-xs border transition ${
-                        momento === m
-                          ? 'bg-[#F7E7CE] text-[#08080A] border-[#F7E7CE] font-semibold'
-                          : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-mono text-xs uppercase text-[#C5A059] mb-1">
-                  Contesto / Outfit
-                </label>
-                <input
-                  type="text"
-                  value={contesto}
-                  onChange={(e) => setContesto(e.target.value)}
-                  placeholder="Es. Cena, Ufficio, Evento serale..."
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-xs uppercase text-[#C5A059] mb-1">
-                  Note del Giorno
-                </label>
-                <textarea
-                  rows={3}
-                  value={noteGiorno}
-                  onChange={(e) => setNoteGiorno(e.target.value)}
-                  placeholder="Evoluzione sulla pelle oggi, spruzzi, complimenti..."
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-3 text-sm text-white"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowNewModal(false)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-sm"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold text-sm"
-                >
-                  {saving ? 'Salvataggio...' : 'Salva nel Diario'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </main>
+  throw new Error(
+    `Nessun modello Gemini ha risposto. Modelli testati [${finalQueue.join(', ')}]. Dettagli: ${errors
+      .slice(0, 4)
+      .join(' | ')}`
   );
+}
+
+export function extractJsonFromAiText<T = any>(rawText: string): T {
+  const cleaned = rawText
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)) as T;
+    }
+    throw new Error('Risposta AI non in formato JSON valido.');
+  }
 }
