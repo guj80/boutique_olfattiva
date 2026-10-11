@@ -43,7 +43,6 @@ export default function BoutiqueHomePage() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [ultimoIndosso, setUltimoIndosso] = useState<Indosso | null>(null);
   const [loading, setLoading] = useState(true);
-  const [logoSrc, setLogoSrc] = useState('/logo.png');
 
   const [activePanel, setActivePanel] = useState<'none' | 'ai' | 'collezione' | 'decant'>('none');
 
@@ -153,14 +152,11 @@ export default function BoutiqueHomePage() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-6xl mx-auto w-full">
-      {/* HEADER CON IL TUO VERO LOGO QUADRATO E TITOLO PRIVATE OLFACTORY */}
+      {/* HEADER CON IL TUO LOGO QUADRATO /logo.jpg E TITOLO PRIVATE OLFACTORY */}
       <header className="flex items-center gap-4 pb-6 border-b border-[#F7E7CE]/15">
         <img
-          src={logoSrc}
+          src="/logo.jpg"
           alt="Private Olfactory Logo"
-          onError={() => {
-            if (logoSrc === '/logo.png') setLogoSrc('/logo.jpg');
-          }}
           className="w-14 h-14 rounded-2xl object-cover border border-[#C5A059]/40 shadow-sm shrink-0"
         />
         <div>
