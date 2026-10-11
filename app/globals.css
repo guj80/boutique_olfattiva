@@ -1,159 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 41 39% 57%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 63%;
-    --accent: 41 39% 57%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 41 39% 57%;
-    --gold: 41 39% 57%;
-    --gold-light: 45 50% 70%;
-    --gold-dark: 38 35% 40%;
-    --chart-1: 41 39% 57%;
-    --chart-2: 0 0% 63%;
-    --chart-3: 200 30% 50%;
-    --chart-4: 30 60% 55%;
-    --chart-5: 160 40% 45%;
-    --radius: 0.75rem;
-  }
+:root {
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Tema Champagne & Obsidian Forzato (Zero Arancione) */
+  --background: 240 11% 4%;           /* #08080A */
+  --foreground: 0 0% 98%;             /* #FAFAFA */
+  --card: 240 12% 6%;                 /* #0D0D11 */
+  --card-foreground: 0 0% 98%;
+  --popover: 240 12% 6%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 37 73% 89%;              /* #F7E7CE Champagne */
+  --primary-foreground: 240 11% 4%;   /* #08080A */
+  --secondary: 240 9% 11%;
+  --secondary-foreground: 37 73% 89%;
+  --muted: 240 8% 12%;
+  --muted-foreground: 240 5% 62%;
+  --accent: 39 48% 56%;               /* #C5A059 Antique Gold */
+  --accent-foreground: 240 11% 4%;
+  --destructive: 0 62% 45%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 37 40% 22%;
+  --input: 240 9% 13%;
+  --ring: 39 48% 56%;
+  --radius: 0.75rem;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  * {
-    -webkit-tap-highlight-color: transparent;
-  }
-  html {
-    color-scheme: dark;
-  }
-  body {
-    @apply bg-background text-foreground;
-    background: radial-gradient(ellipse at top, hsl(0 0% 8%), hsl(0 0% 3%));
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-  }
+* {
+  border-color: rgba(247, 231, 206, 0.12);
 }
 
-@layer components {
-  .glass {
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  }
-  .glass-gold {
-    background: rgba(197, 160, 89, 0.05);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(197, 160, 89, 0.15);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  }
-  .text-gold {
-    color: hsl(41 39% 57%);
-  }
-  .text-gold-light {
-    color: hsl(45 50% 70%);
-  }
-  .bg-gold {
-    background: hsl(41 39% 57%);
-  }
-  .border-gold {
-    border-color: hsl(41 39% 57%);
-  }
-  .font-serif-luxury {
-    font-family: 'Playfair Display', Georgia, serif;
-  }
-  .font-mono-luxury {
-    font-family: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
-  }
-  .tracking-luxury {
-    letter-spacing: 0.2em;
-  }
-  .tracking-wide-luxury {
-    letter-spacing: 0.1em;
-  }
-  .gold-gradient-text {
-    background: linear-gradient(135deg, hsl(45 50% 70%), hsl(41 39% 57%), hsl(38 35% 40%));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .gold-gradient-bg {
-    background: linear-gradient(135deg, hsl(45 50% 70%), hsl(41 39% 57%), hsl(38 35% 40%));
-  }
+html,
+body {
+  background-color: #08080A;
+  color: #FFFFFF;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  selection-background-color: #C5A059;
+  selection-color: #08080A;
 }
 
-@layer utilities {
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-  .no-select {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    user-select: none;
-  }
+::selection {
+  background: rgba(197, 160, 89, 0.35);
+  color: #F7E7CE;
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+/* Scrollbar elegante in stile Boutique */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #08080A;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(197, 160, 89, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(247, 231, 206, 0.6);
 }
 
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(197, 160, 89, 0) 0%,
-    rgba(197, 160, 89, 0.15) 50%,
-    rgba(197, 160, 89, 0) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite;
+/* Utility di Glassmorphism Champagne */
+.boutique-glass {
+  background: rgba(15, 15, 20, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(247, 231, 206, 0.15);
 }
 
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.boutique-glass-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out forwards;
-}
-
-@keyframes pulse-gold {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(197, 160, 89, 0.3); }
-  50% { box-shadow: 0 0 20px 4px rgba(197, 160, 89, 0.15); }
-}
-
-.animate-pulse-gold {
-  animation: pulse-gold 2s infinite;
+.boutique-glass-hover:hover {
+  border-color: rgba(247, 231, 206, 0.38);
+  box-shadow: 0 12px 35px -10px rgba(197, 160, 89, 0.22);
 }
