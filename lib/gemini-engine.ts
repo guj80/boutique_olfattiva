@@ -15,6 +15,7 @@ export interface GeminiCallOptions {
   jsonMode?: boolean;
   systemInstruction?: string;
   timeoutMs?: number;
+  useGoogleSearch?: boolean;
 }
 
 const FALLBACK_2026_MODELS = [
@@ -152,9 +153,10 @@ export async function callGeminiWithFallback(
     );
   }
 
-  const temperature = options?.temperature ?? 0.2;
+  const temperature = options?.temperature ?? 0.1;
   const jsonMode = options?.jsonMode ?? false;
-  const timeoutPerModelMs = options?.timeoutMs ?? 8000;
+  const useGoogleSearch = options?.useGoogleSearch ?? false;
+  const timeoutPerModelMs = options?.timeoutMs ?? 9000;
   const errors: string[] = [];
 
   const discoveredModels = await getActiveModelsForKey(apiKey, errors);
@@ -171,8 +173,18 @@ export async function callGeminiWithFallback(
     { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
   ];
 
+  // Costruiamo le configurazioni da tentare: se useGoogleSearch è attivo, proviamo prima col Grounding Google!
+  const attemptModes: Array<{ search: boolean; strictJson: boolean }> = [];
+  if (useGoogleSearch) {
+    attemptModes.push({ search: true, strictJson: false });
+  }
+  if (jsonMode) {
+    attemptModes.push({ search: false, strictJson: true });
+  }
+  attemptModes.push({ search: false, strictJson: false });
+
   for (const model of finalQueue) {
-    for (const useStrictJsonConfig of jsonMode ? [true, false] : [false]) {
+    for (const mode of attemptModes) {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutPerModelMs);
@@ -180,7 +192,7 @@ export async function callGeminiWithFallback(
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         const generationConfig: Record<string, any> = { temperature };
-        if (useStrictJsonConfig) {
+        if (mode.strictJson) {
           generationConfig.responseMimeType = 'application/json';
         }
 
@@ -189,6 +201,10 @@ export async function callGeminiWithFallback(
           generationConfig,
           safetySettings,
         };
+
+        if (mode.search) {
+          payload.tools = [{ google_search: {} }];
+        }
 
         if (options?.systemInstruction) {
           payload.systemInstruction = {
@@ -220,7 +236,7 @@ export async function callGeminiWithFallback(
               candidate?.finishReason ||
               data?.promptFeedback?.blockReason ||
               'UNKNOWN';
-            errors.push(`${model}: risposta vuota (Motivo: ${blockReason})`);
+            errors.push(`${model}: risposta vuota (${blockReason})`);
             break;
           }
         } else {
@@ -232,7 +248,8 @@ export async function callGeminiWithFallback(
             );
           }
 
-          if (res.status === 400 && useStrictJsonConfig) {
+          // Se il modello non supporta google_search o responseMimeType (400), passa subito al tentativo successivo sullo stesso modello
+          if (res.status === 400 && (mode.search || mode.strictJson)) {
             continue;
           }
 
