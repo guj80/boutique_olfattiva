@@ -2,8 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Boutique Olfattiva di Luca — Private Olfactory Archive & AI Sommelier',
-  description: 'Private Olfactory Vault, Dual-Test Radar (Mouche vs Pelle) & AI Sommelier per profumeria artistica e di nicchia.',
+  title: 'Boutique Olfattiva di Luca — Private Olfactory Archive',
+  description: 'Private Olfactory Vault & AI Sommelier.',
 };
 
 export default function RootLayout({
