@@ -67,6 +67,63 @@ function normalizeToPureFamily(raw?: string | null): string {
   return 'Legnosa';
 }
 
+/**
+ * COMPONENTE CORAZZato ANTI-CORS & ANTI-HOTLINK (3 LIVELLI)
+ * 1. Tenta il caricamento diretto con referrerPolicy="no-referrer" (SENZA crossOrigin che innesca blocchi CORS).
+ * 2. Se il server originale blocca comunque (es. Cloudflare/Fragrantica), passa automaticamente
+ *    attraverso il tunnel proxy CDN globale wsrv.nl che aggira ogni blocco su mobile e PC.
+ * 3. Se l'URL è proprio inesistente (404), mostra l'icona del flacone elegante.
+ */
+function SmartBottleImage({
+  src,
+  alt,
+  className,
+  iconSize = 'w-10 h-10',
+}: {
+  src?: string | null;
+  alt: string;
+  className?: string;
+  iconSize?: string;
+}) {
+  const cleanSrc = (src || '').trim();
+  const [stage, setStage] = useState<'direct' | 'proxy' | 'failed'>('direct');
+
+  useEffect(() => {
+    setStage('direct');
+  }, [cleanSrc]);
+
+  if (!cleanSrc || stage === 'failed') {
+    return (
+      <div className="flex flex-col items-center justify-center text-zinc-600 group-hover:text-[#C5A059] transition duration-300">
+        <FlaskConical className={`${iconSize} stroke-[1.2]`} />
+      </div>
+    );
+  }
+
+  const finalSrc =
+    stage === 'direct'
+      ? cleanSrc
+      : `https://wsrv.nl/?url=${encodeURIComponent(cleanSrc)}&output=webp`;
+
+  return (
+    <img
+      src={finalSrc}
+      alt={alt}
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
+      className={className}
+      onError={() => {
+        if (stage === 'direct') {
+          setStage('proxy');
+        } else {
+          setStage('failed');
+        }
+      }}
+    />
+  );
+}
+
 function CollezioneContent() {
   const searchParams = useSearchParams();
   const initialVista = searchParams.get('vista') === 'radar' ? 'radar' : 'collezione';
@@ -324,7 +381,7 @@ function CollezioneContent() {
       setProfumi((prev) =>
         prev.map((item) => (item.id === p.id ? { ...item, ...updatePayload } : item))
       );
-      setStatusBanner(`Aggiornato: ${updatePayload.brand} - ${updatePayload.nome}`);
+      setStatusBanner(`Aggiornato: ${updatePayload.brand} -${updatePayload.nome}`);
       setTimeout(() => setStatusBanner(null), 3500);
     } catch (err: any) {
       alert(err?.message || 'Errore verifica AI.');
@@ -427,7 +484,7 @@ function CollezioneContent() {
         )
       );
       setSelectedProfumo(null);
-      setStatusBanner(`Salvato: ${payload.brand} - ${payload.nome}`);
+      setStatusBanner(`Salvato: ${payload.brand} -${payload.nome}`);
       setTimeout(() => setStatusBanner(null), 3000);
     } catch (err: any) {
       alert(`Errore salvataggio: ${err?.message}`);
@@ -507,11 +564,11 @@ function CollezioneContent() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-7xl mx-auto w-full">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15 animate-fade-in">
         <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] hover:border-[#F7E7CE]/40 transition"
+            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] hover:border-[#F7E7CE]/40 hover:scale-105 active:scale-95 transition-all duration-200"
             title="Home"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -536,13 +593,13 @@ function CollezioneContent() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20">
+          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-white/10">
             <button
               type="button"
               onClick={() => changeLayoutMode('dettagli')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 layoutMode === 'dettagli'
-                  ? 'bg-[#F7E7CE]/20 text-[#F7E7CE] border border-[#F7E7CE]/30 font-medium'
+                  ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/30 font-medium'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -552,9 +609,9 @@ function CollezioneContent() {
             <button
               type="button"
               onClick={() => changeLayoutMode('vetrina')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 layoutMode === 'vetrina'
-                  ? 'bg-[#F7E7CE]/20 text-[#F7E7CE] border border-[#F7E7CE]/30 font-medium'
+                  ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/30 font-medium'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -563,7 +620,7 @@ function CollezioneContent() {
             </button>
           </div>
 
-          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20">
+          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-white/10">
             <button
               type="button"
               onClick={() => {
@@ -571,9 +628,9 @@ function CollezioneContent() {
                 setSelectedFamily('Tutte');
                 resetAiFilter();
               }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 vista === 'collezione'
-                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold'
+                  ? 'bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-semibold'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -587,9 +644,9 @@ function CollezioneContent() {
                 setSelectedFamily('Tutte');
                 resetAiFilter();
               }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 vista === 'radar'
-                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold'
+                  ? 'bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-semibold'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -600,7 +657,7 @@ function CollezioneContent() {
 
           <Link
             href="/scanner"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold text-xs font-mono uppercase tracking-wider shadow-champagne-glow hover:opacity-95 transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-semibold text-xs font-mono uppercase tracking-wider shadow-champagne-glow hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
           >
             <ScanLine className="w-3.5 h-3.5" />
             <span>+ Aggiungi</span>
@@ -609,15 +666,15 @@ function CollezioneContent() {
       </div>
 
       {statusBanner && (
-        <div className="mt-5 p-3 rounded-xl bg-[#C5A059]/20 border border-[#F7E7CE]/40 text-[#F7E7CE] flex items-center justify-between text-xs font-mono">
+        <div className="mt-5 p-3 rounded-xl bg-[#C5A059]/20 border border-[#F7E7CE]/40 text-[#F7E7CE] flex items-center justify-between text-xs font-mono animate-slide-up">
           <span>{statusBanner}</span>
-          <button onClick={() => setStatusBanner(null)}>
+          <button onClick={() => setStatusBanner(null)} className="hover:scale-110 transition-transform">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      <section className="mt-6 boutique-glass rounded-2xl p-4 space-y-3.5">
+      <section className="mt-6 boutique-glass rounded-2xl p-4 space-y-3.5 animate-fade-in delay-75">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#C5A059] absolute left-4 top-1/2 -translate-y-1/2" />
@@ -633,8 +690,8 @@ function CollezioneContent() {
                   handleAskSommelier();
                 }
               }}
-              placeholder="Cerca profumo, brand, nota o Chiedi all’IA..."
-              className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#F7E7CE]"
+              placeholder="Cerca un brand, una nota o descrivi un'atmosfera..."
+              className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FF2A95] transition-all"
             />
             {searchQuery && (
               <button
@@ -652,17 +709,17 @@ function CollezioneContent() {
           <button
             onClick={handleAskSommelier}
             disabled={aiLoading || !searchQuery.trim()}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase tracking-wider hover:opacity-95 transition disabled:opacity-40 shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 shrink-0"
           >
             {aiLoading ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Ricerca...</span>
+                <span>Elaborazione...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi all’IA</span>
+                <span>Chiedi al Sommelier</span>
               </>
             )}
           </button>
@@ -679,828 +736,4 @@ function CollezioneContent() {
               <button
                 type="button"
                 onClick={() => setSelectedFamily('Tutte')}
-                className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition ${
-                  selectedFamily === 'Tutte'
-                    ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
-                    : 'bg-[#08080A] text-zinc-400 border border-[#F7E7CE]/15 hover:text-white'
-                }`}
-              >
-                Tutte ({activeList.length})
-              </button>
-
-              {archiveStats.sortedPureFamilies.map(([fam, count]) => (
-                <button
-                  key={fam}
-                  type="button"
-                  onClick={() =>
-                    setSelectedFamily(selectedFamily === fam ? 'Tutte' : fam)
-                  }
-                  className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition ${
-                    selectedFamily === fam
-                      ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
-                      : 'bg-[#08080A] text-zinc-300 border border-[#F7E7CE]/15 hover:border-[#F7E7CE]/40'
-                  }`}
-                >
-                  {fam} ({count})
-                </button>
-              ))}
-            </div>
-
-            {archiveStats.hasLegacyLabels && (
-              <button
-                type="button"
-                onClick={handleNormalizeAllDatabaseFamilies}
-                disabled={normalizingDb}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/30 font-mono text-[10px] uppercase hover:bg-[#C5A059]/30 transition shrink-0"
-              >
-                {normalizingDb ? (
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Check className="w-3 h-3 text-[#C5A059]" />
-                )}
-                <span>Allinea DB (12 Famiglie)</span>
-              </button>
-            )}
-          </div>
-        )}
-
-        {aiAdvice && (
-          <div className="p-4 rounded-xl bg-[#08080A]/95 border border-[#C5A059]/40 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059]">
-                Selezione AI
-              </span>
-              <button
-                onClick={resetAiFilter}
-                className="text-xs font-mono text-zinc-400 hover:text-[#F7E7CE]"
-              >
-                Mostra tutti ({activeList.length})
-              </button>
-            </div>
-            <p className="text-xs text-[#F7E7CE] leading-relaxed">{aiAdvice}</p>
-          </div>
-        )}
-      </section>
-
-      <section className="mt-6">
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-64 rounded-2xl boutique-glass animate-pulse p-6" />
-            ))}
-          </div>
-        ) : filteredList.length === 0 ? (
-          <div className="boutique-glass rounded-2xl p-12 text-center">
-            <p className="font-serif text-xl text-white">Nessun profumo trovato</p>
-          </div>
-        ) : layoutMode === 'vetrina' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {filteredList.map((p) => {
-              const imgUrl = p.url_foto_vetrina || p.immagine_url;
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => {
-                    setSelectedProfumo({
-                      ...p,
-                      famiglia_olfattiva: normalizeToPureFamily(p.famiglia_olfattiva),
-                    });
-                    setOfficialUrlInput('');
-                  }}
-                  className="boutique-glass boutique-glass-hover rounded-2xl p-4 cursor-pointer flex flex-col justify-between group text-center"
-                >
-                  <div className="w-full aspect-square rounded-xl bg-[#08080A] border border-[#F7E7CE]/10 flex items-center justify-center overflow-hidden relative mb-4">
-                    {imgUrl ? (
-                      <img
-                        src={imgUrl}
-                        alt={p.nome}
-                        referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
-                        className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-300"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-zinc-600 group-hover:text-[#C5A059] transition">
-                        <FlaskConical className="w-10 h-10 stroke-[1.2]" />
-                      </div>
-                    )}
-                    {p.prezzo_stimato_euro && (
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded font-mono text-[10px] bg-[#08080A]/90 text-[#F7E7CE] border border-[#F7E7CE]/20">
-                        {String(p.prezzo_stimato_euro).startsWith('€')
-                          ? p.prezzo_stimato_euro
-                          : `€${p.prezzo_stimato_euro}`}
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
-                      {p.brand}
-                    </p>
-                    <h2 className="font-serif text-lg text-white font-medium mt-0.5 line-clamp-1">
-                      {p.nome}
-                    </h2>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredList.map((p) => {
-              const unifiedNotes = getUnifiedNotes(p);
-              const aiReason = aiMotivazioni[p.id];
-              const isEnriching = enrichingId === p.id;
-              const imgUrl = p.url_foto_vetrina || p.immagine_url;
-              const pureFamily = normalizeToPureFamily(p.famiglia_olfattiva);
-
-              return (
-                <article
-                  key={p.id}
-                  className="boutique-glass boutique-glass-hover rounded-2xl p-5 flex flex-col justify-between relative group"
-                >
-                  <div>
-                    <div className="flex items-start gap-3.5">
-                      {imgUrl && (
-                        <div
-                          onClick={() => {
-                            setSelectedProfumo({
-                              ...p,
-                              famiglia_olfattiva: pureFamily,
-                            });
-                            setOfficialUrlInput('');
-                          }}
-                          className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 shrink-0 overflow-hidden flex items-center justify-center cursor-pointer"
-                        >
-                          <img
-                            src={imgUrl}
-                            alt={p.nome}
-                            referrerPolicy="no-referrer"
-                            crossOrigin="anonymous"
-                            className="w-full h-full object-contain p-1"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
-                            {p.brand || 'Maison'}
-                          </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {p.concentrazione && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 text-zinc-300 border border-white/10">
-                                {p.concentrazione}
-                              </span>
-                            )}
-                            {p.prezzo_stimato_euro && (
-                              <span className="px-2 py-0.5 rounded font-mono text-xs bg-[#C5A059]/20 text-[#F7E7CE] border border-[#F7E7CE]/25">
-                                {String(p.prezzo_stimato_euro).startsWith('€')
-                                  ? p.prezzo_stimato_euro
-                                  : `€${p.prezzo_stimato_euro}`}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <h2 className="font-serif text-xl sm:text-2xl text-white font-semibold mt-1 tracking-tight">
-                          {p.nome}
-                        </h2>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#F7E7CE]/10 text-[#F7E7CE] border border-[#F7E7CE]/20">
-                        {pureFamily}
-                      </span>
-                      {p.stagione_ideale && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-zinc-900 text-zinc-400 border border-white/10">
-                          {p.stagione_ideale}
-                        </span>
-                      )}
-                    </div>
-
-                    {aiReason && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/40 text-xs text-[#F7E7CE]">
-                        {aiReason}
-                      </div>
-                    )}
-
-                    <div className="mt-3.5 text-xs">
-                      {p.note_testa || p.note_cuore || p.note_fondo ? (
-                        <div className="space-y-1 bg-[#08080A]/60 p-3 rounded-xl border border-[#F7E7CE]/10">
-                          {p.note_testa && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                                Testa:
-                              </span>
-                              {p.note_testa}
-                            </p>
-                          )}
-                          {p.note_cuore && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                                Cuore:
-                              </span>
-                              {p.note_cuore}
-                            </p>
-                          )}
-                          {p.note_fondo && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                                Fondo:
-                              </span>
-                              {p.note_fondo}
-                            </p>
-                          )}
-                        </div>
-                      ) : unifiedNotes ? (
-                        <p className="text-zinc-300 bg-[#08080A]/60 p-3 rounded-xl border border-[#F7E7CE]/10 line-clamp-3">
-                          <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                            Note:
-                          </span>
-                          {unifiedNotes}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    {(vista === 'radar' || p.note_mouche || p.note_pelle) && (
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-[#F7E7CE]/15">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
-                            Su Mouche
-                          </span>
-                          <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_mouche || '-'}
-                          </p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-[#F7E7CE]/15">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
-                            Su Pelle
-                          </span>
-                          <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_pelle || '-'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-[#F7E7CE]/15 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleEnrichWithAI(p)}
-                        disabled={isEnriching}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#C5A059]/15 hover:bg-[#C5A059]/30 text-[#F7E7CE] border border-[#F7E7CE]/25 font-mono text-[11px] transition"
-                      >
-                        {isEnriching ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
-                        )}
-                        <span>{isEnriching ? '...' : 'AI'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedProfumo({
-                            ...p,
-                            famiglia_olfattiva: pureFamily,
-                          });
-                          setOfficialUrlInput('');
-                        }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] transition"
-                      >
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-[#C5A059]" />
-                        <span>Scheda</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setWearProfumo(p)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] transition"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-[#C5A059]" />
-                        <span>Indossa</span>
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(p)}
-                      title="Elimina"
-                      className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* MODALE SCHEDA TECNICA CON TASTO ELIMINA DISCRETO */}
-      {selectedProfumo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-[#F7E7CE]/30 my-8 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#F7E7CE]/15">
-              <div className="flex items-center gap-3.5">
-                {selectedProfumo.url_foto_vetrina && (
-                  <img
-                    src={selectedProfumo.url_foto_vetrina}
-                    alt={selectedProfumo.nome}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#F7E7CE]/25 object-contain p-1"
-                  />
-                )}
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                    Scheda Tecnica
-                  </p>
-                  <h3 className="font-serif text-2xl text-white mt-0.5">
-                    {selectedProfumo.nome} - {selectedProfumo.brand}
-                  </h3>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedProfumo(null)}
-                className="p-2 rounded-lg text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mt-4 p-3 rounded-xl bg-[#08080A] border border-[#C5A059]/30">
-              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1.5">
-                Aggiorna da Link
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  value={officialUrlInput}
-                  onChange={(e) => setOfficialUrlInput(e.target.value)}
-                  placeholder="URL pagina prodotto..."
-                  className="flex-1 rounded-lg bg-[#0D0D11] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white placeholder:text-zinc-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleModalExtractFromOfficial}
-                  disabled={modalExtracting}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold hover:bg-[#C5A059] transition shrink-0"
-                >
-                  {modalExtracting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>Estrai</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleSaveDetails} className="space-y-4 mt-4">
-              {isRadarProfumo(selectedProfumo) && (
-                <div className="p-3 rounded-xl bg-[#C5A059]/15 border border-[#F7E7CE]/35 flex items-center justify-between gap-3">
-                  <span className="text-xs font-mono text-[#F7E7CE]">
-                    In Testing
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handlePromoteToCollection(selectedProfumo)}
-                    className="px-3.5 py-1.5 rounded-lg bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold uppercase"
-                  >
-                    Sposta in Collezione
-                  </button>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Brand
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.brand || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, brand: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Nome
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.nome || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, nome: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Prezzo (€)
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.prezzo_stimato_euro || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        prezzo_stimato_euro: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs font-mono text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Famiglia Olfattiva (12 Pure)
-                  </label>
-                  <select
-                    value={normalizeToPureFamily(selectedProfumo.famiglia_olfattiva)}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        famiglia_olfattiva: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  >
-                    {PURE_FAMILIES.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Concentrazione
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.concentrazione || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        concentrazione: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Archivio
-                  </label>
-                  <select
-                    value={isRadarProfumo(selectedProfumo) ? 'radar' : 'collezione'}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, stato: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  >
-                    <option value="collezione">Collezione Privata</option>
-                    <option value="radar">Radar - Testing</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  URL Immagine Flacone
-                </label>
-                <input
-                  type="text"
-                  value={selectedProfumo.url_foto_vetrina || ''}
-                  onChange={(e) =>
-                    setSelectedProfumo({
-                      ...selectedProfumo,
-                      url_foto_vetrina: e.target.value,
-                    })
-                  }
-                  placeholder="https://..."
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white font-mono"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Testa
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_testa || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_testa: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Cuore
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_cuore || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_cuore: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Fondo
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_fondo || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_fondo: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/25 space-y-3">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#F7E7CE]">
-                  Test Olfattivo
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Mouche
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_mouche || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_mouche: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Pelle
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_pelle || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_pelle: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-[#08080A]/70 border border-[#F7E7CE]/15">
-                {[
-                  { key: 'voto_longevita', label: 'Durata' },
-                  { key: 'voto_scia', label: 'Scia' },
-                  { key: 'voto_proiezione', label: 'Proiezione' },
-                  { key: 'voto_complessita', label: 'Complessita' },
-                ].map(({ key, label }) => {
-                  const val = Number((selectedProfumo as any)[key] ?? 8);
-                  return (
-                    <div key={key}>
-                      <div className="flex justify-between text-xs font-mono mb-1.5">
-                        <span className="text-zinc-300">{label}</span>
-                        <span className="text-[#F7E7CE] font-semibold">{val}/10</span>
-                      </div>
-                      <div className="grid grid-cols-10 gap-1">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) => (
-                          <button
-                            key={step}
-                            type="button"
-                            onClick={() =>
-                              setSelectedProfumo({
-                                ...selectedProfumo,
-                                [key]: step,
-                              })
-                            }
-                            className={`h-2.5 rounded-sm transition ${
-                              step <= val
-                                ? step >= 8
-                                  ? 'bg-[#F7E7CE]'
-                                  : 'bg-[#C5A059]'
-                                : 'bg-zinc-800 hover:bg-zinc-700'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-[#F7E7CE]/15">
-                {/* Tasto Elimina Discreto a Sinistra */}
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(selectedProfumo)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 font-mono text-xs transition"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Elimina Profilo</span>
-                </button>
-
-                {/* Pulsanti Azione Principali a Destra */}
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfumo(null)}
-                    className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase hover:bg-white/10 transition"
-                  >
-                    Annulla
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingDetail}
-                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase shadow-champagne-glow hover:opacity-95 transition"
-                  >
-                    {savingDetail ? 'Salvataggio...' : 'Salva Modifiche'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODALE INDOSSO */}
-      {wearProfumo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#F7E7CE]/30 space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                  Indosso
-                </p>
-                <h3 className="font-serif text-2xl text-white mt-0.5">
-                  {wearProfumo.nome}
-                </h3>
-              </div>
-              <button
-                onClick={() => setWearProfumo(null)}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordWear} className="space-y-4">
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1.5">
-                  Momento
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const).map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      onClick={() => setMomentoGiornata(m)}
-                      className={`py-2 rounded-xl font-mono text-xs border transition ${
-                        momentoGiornata === m
-                          ? 'bg-[#F7E7CE] text-[#08080A] border-[#F7E7CE] font-semibold'
-                          : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Contesto
-                </label>
-                <select
-                  value={contestoOutfit}
-                  onChange={(e) => setContestoOutfit(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                >
-                  <option value="Ufficio">Ufficio</option>
-                  <option value="Aperitivo">Aperitivo</option>
-                  <option value="Cena">Cena</option>
-                  <option value="Serata">Serata</option>
-                  <option value="Evento">Evento</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Note
-                </label>
-                <textarea
-                  rows={2}
-                  value={noteGiorno}
-                  onChange={(e) => setNoteGiorno(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setWearProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingWear}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold"
-                >
-                  {savingWear ? '...' : 'Conferma'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODALE CONFERMA ELIMINAZIONE */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4">
-            <h3 className="font-serif text-xl text-white">
-              Eliminare definitivamente {deleteTarget.brand ? `${deleteTarget.brand} - ` : ''}{deleteTarget.nome}?
-            </h3>
-            <p className="text-xs text-zinc-400">
-              Questa operazione cancellerà il profumo dal database Supabase.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-semibold"
-              >
-                Conferma Eliminazione
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
-
-export default function CollezionePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-[#F7E7CE] font-mono text-xs">
-          Caricamento...
-        </div>
-      }
-    >
-      <CollezioneContent />
-    </Suspense>
-  );
-}
+                className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-
