@@ -68,11 +68,7 @@ function normalizeToPureFamily(raw?: string | null): string {
 }
 
 /**
- * COMPONENTE CORAZZato ANTI-CORS & ANTI-HOTLINK (3 LIVELLI)
- * 1. Tenta il caricamento diretto con referrerPolicy="no-referrer" (SENZA crossOrigin che innesca blocchi CORS).
- * 2. Se il server originale blocca comunque (es. Cloudflare/Fragrantica), passa automaticamente
- *    attraverso il tunnel proxy CDN globale wsrv.nl che aggira ogni blocco su mobile e PC.
- * 3. Se l'URL è proprio inesistente (404), mostra l'icona del flacone elegante.
+ * COMPONENTE CORAZZATO ANTI-CORS & ANTI-HOTLINK (3 LIVELLI)
  */
 function SmartBottleImage({
   src,
@@ -310,13 +306,13 @@ function CollezioneContent() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Errore ricerca AI');
+      if (!res.ok) throw new Error(data.error || 'Errore ricerca IA');
 
       setAiAdvice(data.sommelierAdvice || null);
       setAiRecommendedIds(data.recommendedIds || []);
       setAiMotivazioni(data.motivazioniPerProfumo || {});
     } catch (err: any) {
-      alert(err?.message || 'Errore durante la consultazione AI.');
+      alert(err?.message || 'Errore durante la consultazione IA.');
     } finally {
       setAiLoading(false);
     }
@@ -337,7 +333,7 @@ function CollezioneContent() {
         body: JSON.stringify({ brand: p.brand, nome: p.nome }),
       });
       const aiData = await res.json();
-      if (!res.ok) throw new Error(aiData.error || 'Errore verifica AI');
+      if (!res.ok) throw new Error(aiData.error || 'Errore verifica IA');
 
       const pureFam = normalizeToPureFamily(aiData.famiglia_olfattiva || p.famiglia_olfattiva);
 
@@ -384,7 +380,7 @@ function CollezioneContent() {
       setStatusBanner(`Aggiornato: ${updatePayload.brand} - ${updatePayload.nome}`);
       setTimeout(() => setStatusBanner(null), 3500);
     } catch (err: any) {
-      alert(err?.message || 'Errore verifica AI.');
+      alert(err?.message || 'Errore verifica IA.');
     } finally {
       setEnrichingId(null);
     }
@@ -690,7 +686,7 @@ function CollezioneContent() {
                   handleAskSommelier();
                 }
               }}
-              placeholder="Cerca un brand, una nota o descrivi un'atmosfera..."
+              placeholder="Cerca profumo, brand, nota o chiedi all'IA..."
               className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FF2A95] transition-all"
             />
             {searchQuery && (
@@ -719,7 +715,7 @@ function CollezioneContent() {
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi al Sommelier</span>
+                <span>Chiedi all&apos;IA</span>
               </>
             )}
           </button>
@@ -785,7 +781,7 @@ function CollezioneContent() {
           <div className="p-4 rounded-xl bg-[#08080A]/95 border border-[#C5A059]/40 space-y-1.5 animate-slide-up">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059]">
-                Consiglio del Sommelier
+                Risposta dell&apos;IA
               </span>
               <button
                 onClick={resetAiFilter}
@@ -1006,7 +1002,7 @@ function CollezioneContent() {
                         ) : (
                           <Sparkles className="w-3.5 h-3.5 text-[#FF2A95]" />
                         )}
-                        <span>{isEnriching ? '...' : 'INFO'}</span>
+                        <span>{isEnriching ? '...' : 'IA'}</span>
                       </button>
 
                       <button
