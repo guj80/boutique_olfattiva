@@ -19,19 +19,19 @@ export interface GeminiCallOptions {
 }
 
 const FALLBACK_2026_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
+  'gemini-flash-latest',
   'gemini-3-flash-preview',
   'gemini-3.1-flash-lite-preview',
-  'gemini-flash-latest',
   'gemini-flash-lite-latest',
+  'gemini-pro-latest',
   'gemini-3-pro-preview',
   'gemini-3.1-pro-preview',
-  'gemini-pro-latest',
 ];
 
 let cachedDiscoveredModels: string[] | null = null;
 let lastDiscoveryTimestamp = 0;
+let lastWorkingModel: string | null = null;
+const deadModelsForKey = new Set<string>();
 const CACHE_TTL_MS = 3600000;
 
 function normalizeParts(parts: GeminiPart[]): any[] {
@@ -54,6 +54,48 @@ function normalizeParts(parts: GeminiPart[]): any[] {
   });
 }
 
+function isModelNameAllowed(rawName: string): boolean {
+  const name = rawName.toLowerCase().replace(/^models\//, '');
+  if (deadModelsForKey.has(name)) return false;
+
+  const excludedKeywords = [
+    'embedding',
+    'aqa',
+    'imagen',
+    'image',
+    'veo',
+    'tts',
+    'audio',
+    'live',
+    'robotics',
+    'computer-use',
+    'learnlm',
+    'gemma',
+    '1.0',
+    '1.5',
+    '2.0',
+    '2.5-pro',
+    'thinking',
+    'customtools',
+    'exp',
+  ];
+
+  return !excludedKeywords.some((kw) => name.includes(kw));
+}
+
+function scoreModelPriority(modelName: string): number {
+  if (lastWorkingModel && modelName === lastWorkingModel) return 0;
+  if (modelName === 'gemini-flash-latest') return 1;
+  if (modelName === 'gemini-3-flash-preview') return 2;
+  if (modelName === 'gemini-3.1-flash-lite-preview') return 3;
+  if (modelName === 'gemini-flash-lite-latest') return 4;
+  if (modelName.includes('3') && modelName.includes('flash')) return 5;
+  if (modelName.includes('flash') && !modelName.includes('2.5')) return 6;
+  if (modelName === 'gemini-pro-latest') return 7;
+  if (modelName.includes('3') && modelName.includes('pro')) return 8;
+  return 15;
+}
+
 async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<string[]> {
   const now = Date.now();
   if (
@@ -61,17 +103,18 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
     cachedDiscoveredModels.length > 0 &&
     now - lastDiscoveryTimestamp < CACHE_TTL_MS
   ) {
-    return cachedDiscoveredModels;
+    return cachedDiscoveredModels.filter((m) => !deadModelsForKey.has(m));
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2200);
 
+  try {
     const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
     const listRes = await fetch(listUrl, {
+      method: 'GET',
       signal: controller.signal,
-      next: { revalidate: 3600 },
+      cache: 'no-store',
     });
     clearTimeout(timeout);
 
@@ -81,42 +124,13 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
 
       const validFromGoogle = allModels
         .filter((m) => {
-          const name = String(m?.name || '').toLowerCase();
           const methods: string[] = m?.supportedGenerationMethods || [];
           if (!methods.includes('generateContent')) return false;
-
-          const excludedKeywords = [
-            'embedding',
-            'aqa',
-            'imagen',
-            'veo',
-            'tts',
-            'audio',
-            'robotics',
-            'computer-use',
-            'learnlm',
-            'gemma',
-            'image-generation',
-            '1.5',
-            '2.0',
-            '2.5-pro',
-            'thinking',
-          ];
-          return !excludedKeywords.some((kw) => name.includes(kw));
+          return isModelNameAllowed(String(m?.name || ''));
         })
         .map((m) => String(m.name).replace(/^models\//, ''));
 
-      validFromGoogle.sort((a, b) => {
-        const getScore = (modelName: string) => {
-          if (modelName === 'gemini-2.5-flash') return 1;
-          if (modelName === 'gemini-2.5-flash-lite') return 2;
-          if (modelName.includes('2.5') && modelName.includes('flash')) return 3;
-          if (modelName.includes('flash') && !modelName.includes('preview')) return 4;
-          if (modelName.includes('flash')) return 5;
-          return 10;
-        };
-        return getScore(a) - getScore(b);
-      });
+      validFromGoogle.sort((a, b) => scoreModelPriority(a) - scoreModelPriority(b));
 
       if (validFromGoogle.length > 0) {
         cachedDiscoveredModels = validFromGoogle;
@@ -125,11 +139,12 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
       }
     } else {
       const errTxt = await listRes.text();
-      errors.push(`ListModels (${listRes.status}): ${errTxt.slice(0, 100)}`);
+      errors.push(`ListModels (${listRes.status}): ${errTxt.slice(0, 80)}`);
     }
   } catch (e: any) {
+    clearTimeout(timeout);
     errors.push(
-      `ListModels skip: ${e?.name === 'AbortError' ? 'Timeout 3.5s' : e?.message}`
+      `ListModels skip: ${e?.name === 'AbortError' ? 'Timeout 2.2s' : e?.message}`
     );
   }
 
@@ -140,6 +155,9 @@ export async function callGeminiWithFallback(
   parts: GeminiPart[],
   options?: GeminiCallOptions
 ): Promise<{ text: string; modelUsed: string }> {
+  const startTime = Date.now();
+  const totalBudgetMs = 8800;
+
   const apiKey = (
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
@@ -153,16 +171,22 @@ export async function callGeminiWithFallback(
     );
   }
 
-  const temperature = options?.temperature ?? 0.1;
+  const temperature = options?.temperature ?? 0.15;
   const jsonMode = options?.jsonMode ?? false;
-  const useGoogleSearch = options?.useGoogleSearch ?? false;
-  const timeoutPerModelMs = options?.timeoutMs ?? 9000;
+  const perAttemptTimeoutMs = options?.timeoutMs ?? 4200;
   const errors: string[] = [];
 
   const discoveredModels = await getActiveModelsForKey(apiKey, errors);
-  const finalQueue = Array.from(
-    new Set([...discoveredModels, ...FALLBACK_2026_MODELS])
-  );
+
+  const rawQueue = Array.from(
+    new Set([
+      ...(lastWorkingModel ? [lastWorkingModel] : []),
+      ...discoveredModels,
+      ...FALLBACK_2026_MODELS,
+    ])
+  ).filter((m) => !deadModelsForKey.has(m));
+
+  rawQueue.sort((a, b) => scoreModelPriority(a) - scoreModelPriority(b));
 
   const normalizedParts = normalizeParts(parts);
 
@@ -173,26 +197,21 @@ export async function callGeminiWithFallback(
     { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
   ];
 
-  // Costruiamo le configurazioni da tentare: se useGoogleSearch è attivo, proviamo prima col Grounding Google!
-  const attemptModes: Array<{ search: boolean; strictJson: boolean }> = [];
-  if (useGoogleSearch) {
-    attemptModes.push({ search: true, strictJson: false });
-  }
-  if (jsonMode) {
-    attemptModes.push({ search: false, strictJson: true });
-  }
-  attemptModes.push({ search: false, strictJson: false });
+  for (const model of rawQueue) {
+    if (Date.now() - startTime > totalBudgetMs && errors.length > 0) {
+      errors.push('Stop preventivo per budget tempo Serverless');
+      break;
+    }
 
-  for (const model of finalQueue) {
-    for (const mode of attemptModes) {
+    for (const useStrictJsonConfig of jsonMode ? [true, false] : [false]) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), perAttemptTimeoutMs);
+
       try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutPerModelMs);
-
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         const generationConfig: Record<string, any> = { temperature };
-        if (mode.strictJson) {
+        if (useStrictJsonConfig) {
           generationConfig.responseMimeType = 'application/json';
         }
 
@@ -201,10 +220,6 @@ export async function callGeminiWithFallback(
           generationConfig,
           safetySettings,
         };
-
-        if (mode.search) {
-          payload.tools = [{ google_search: {} }];
-        }
 
         if (options?.systemInstruction) {
           payload.systemInstruction = {
@@ -217,25 +232,31 @@ export async function callGeminiWithFallback(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           signal: controller.signal,
+          cache: 'no-store',
         });
         clearTimeout(timer);
 
         if (res.ok) {
           const data = await res.json();
           const candidate = data?.candidates?.[0];
+          const rawParts: any[] = candidate?.content?.parts || [];
 
-          const text =
-            candidate?.content?.parts
-              ?.map((p: { text?: string }) => p.text || '')
-              .join('') || '';
+          const nonThoughtParts = rawParts.filter((p) => !p?.thought);
+          const partsToRead = nonThoughtParts.length > 0 ? nonThoughtParts : rawParts;
 
-          if (text && text.trim().length > 0) {
-            return { text: text.trim(), modelUsed: model };
+          const text = partsToRead
+            .map((p: { text?: string }) => p?.text || '')
+            .join('')
+            .trim();
+
+          if (text.length > 0) {
+            lastWorkingModel = model;
+            return { text, modelUsed: model };
           } else {
             const blockReason =
               candidate?.finishReason ||
               data?.promptFeedback?.blockReason ||
-              'UNKNOWN';
+              'EMPTY';
             errors.push(`${model}: risposta vuota (${blockReason})`);
             break;
           }
@@ -248,21 +269,28 @@ export async function callGeminiWithFallback(
             );
           }
 
-          // Se il modello non supporta google_search o responseMimeType (400), passa subito al tentativo successivo sullo stesso modello
-          if (res.status === 400 && (mode.search || mode.strictJson)) {
+          if (res.status === 404 || res.status === 403) {
+            deadModelsForKey.add(model);
+            if (lastWorkingModel === model) lastWorkingModel = null;
+            errors.push(`${model} (${res.status}): escluso`);
+            break;
+          }
+
+          if (res.status === 400 && useStrictJsonConfig) {
             continue;
           }
 
-          errors.push(`${model} (${res.status}): ${errBody.slice(0, 90)}`);
+          errors.push(`${model} (${res.status}): ${errBody.slice(0, 70)}`);
           break;
         }
       } catch (err: any) {
+        clearTimeout(timer);
         if (err?.message?.includes('GEMINI_API_KEY non è valida')) {
           throw err;
         }
         const msg =
           err?.name === 'AbortError'
-            ? `Timeout (${timeoutPerModelMs}ms)`
+            ? `Timeout (${perAttemptTimeoutMs}ms)`
             : err?.message || 'Network error';
         errors.push(`${model}: ${msg}`);
         break;
@@ -271,9 +299,9 @@ export async function callGeminiWithFallback(
   }
 
   throw new Error(
-    `Nessun modello Gemini ha risposto. Modelli testati [${finalQueue
-      .slice(0, 6)
-      .join(', ')}...]. Dettagli: ${errors.slice(0, 4).join(' | ')}`
+    `Nessun modello Gemini ha risposto in tempo. Dettagli: ${errors
+      .slice(0, 5)
+      .join(' | ')}`
   );
 }
 
@@ -288,11 +316,13 @@ export function extractJsonFromAiText<T = any>(rawText: string): T {
     .trim();
 
   const safeParse = (str: string): T => {
+    const normalizedQuotes = str
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/,\s*([}\]])/g, '$1');
     try {
       return JSON.parse(str) as T;
     } catch {
-      const fixedStr = str.replace(/,\s*([}\]])/g, '$1');
-      return JSON.parse(fixedStr) as T;
+      return JSON.parse(normalizedQuotes) as T;
     }
   };
 
@@ -308,7 +338,11 @@ export function extractJsonFromAiText<T = any>(rawText: string): T {
       firstArr !== -1 && (firstObj === -1 || firstArr < firstObj);
 
     if (isArrayFirst && lastArr > firstArr) {
-      return safeParse(cleaned.slice(firstArr, lastArr + 1));
+      try {
+        return safeParse(cleaned.slice(firstArr, lastArr + 1));
+      } catch {
+        // Fallback sull'oggetto se la parentesi quadra era nel testo discorsivo
+      }
     }
 
     if (firstObj !== -1 && lastObj > firstObj) {
