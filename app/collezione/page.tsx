@@ -1219,3 +1219,79 @@ function CollezioneContent() {
                   <option value="Cena">Cena</option>
                   <option value="Serata">Serata</option>
                   <option value="Evento">Evento</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Note
+                </label>
+                <textarea
+                  rows={2}
+                  value={noteGiorno}
+                  onChange={(e) => setNoteGiorno(e.target.value)}
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setWearProfumo(null)}
+                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingWear}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold"
+                >
+                  {savingWear ? '...' : 'Conferma'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4">
+            <h3 className="font-serif text-xl text-white">
+              Eliminare {deleteTarget.nome}?
+            </h3>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-semibold"
+              >
+                Elimina
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+export default function CollezionePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-[#F7E7CE] font-mono text-xs">
+          Caricamento...
+        </div>
+      }
+    >
+      <CollezioneContent />
+    </Suspense>
+  );
+}
