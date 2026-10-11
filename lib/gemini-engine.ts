@@ -19,13 +19,13 @@ export interface GeminiCallOptions {
 }
 
 const FALLBACK_2026_MODELS = [
-  'gemini-flash-latest',
-  'gemini-3-flash-preview',
   'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
   'gemini-flash-lite-latest',
-  'gemini-pro-latest',
+  'gemini-flash-latest',
   'gemini-3-pro-preview',
   'gemini-3.1-pro-preview',
+  'gemini-pro-latest',
 ];
 
 let cachedDiscoveredModels: string[] | null = null;
@@ -74,7 +74,7 @@ function isModelNameAllowed(rawName: string): boolean {
     '1.0',
     '1.5',
     '2.0',
-    '2.5-pro',
+    '2.5',
     'thinking',
     'customtools',
     'exp',
@@ -85,12 +85,12 @@ function isModelNameAllowed(rawName: string): boolean {
 
 function scoreModelPriority(modelName: string): number {
   if (lastWorkingModel && modelName === lastWorkingModel) return 0;
-  if (modelName === 'gemini-flash-latest') return 1;
-  if (modelName === 'gemini-3-flash-preview') return 2;
-  if (modelName === 'gemini-3.1-flash-lite-preview') return 3;
-  if (modelName === 'gemini-flash-lite-latest') return 4;
-  if (modelName.includes('3') && modelName.includes('flash')) return 5;
-  if (modelName.includes('flash') && !modelName.includes('2.5')) return 6;
+  if (modelName === 'gemini-3.1-flash-lite-preview') return 1;
+  if (modelName === 'gemini-flash-lite-latest') return 2;
+  if (modelName === 'gemini-3-flash-preview') return 3;
+  if (modelName === 'gemini-flash-latest') return 4;
+  if (modelName.includes('lite')) return 5;
+  if (modelName.includes('flash')) return 6;
   if (modelName === 'gemini-pro-latest') return 7;
   if (modelName.includes('3') && modelName.includes('pro')) return 8;
   return 15;
@@ -107,7 +107,7 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2200);
+  const timeout = setTimeout(() => controller.abort(), 3000);
 
   try {
     const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
@@ -144,7 +144,7 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
   } catch (e: any) {
     clearTimeout(timeout);
     errors.push(
-      `ListModels skip: ${e?.name === 'AbortError' ? 'Timeout 2.2s' : e?.message}`
+      `ListModels skip: ${e?.name === 'AbortError' ? 'Timeout 3s' : e?.message}`
     );
   }
 
@@ -155,9 +155,6 @@ export async function callGeminiWithFallback(
   parts: GeminiPart[],
   options?: GeminiCallOptions
 ): Promise<{ text: string; modelUsed: string }> {
-  const startTime = Date.now();
-  const totalBudgetMs = 8800;
-
   const apiKey = (
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
@@ -173,7 +170,7 @@ export async function callGeminiWithFallback(
 
   const temperature = options?.temperature ?? 0.15;
   const jsonMode = options?.jsonMode ?? false;
-  const perAttemptTimeoutMs = options?.timeoutMs ?? 4200;
+  const perAttemptTimeoutMs = options?.timeoutMs ?? 15000;
   const errors: string[] = [];
 
   const discoveredModels = await getActiveModelsForKey(apiKey, errors);
@@ -181,8 +178,8 @@ export async function callGeminiWithFallback(
   const rawQueue = Array.from(
     new Set([
       ...(lastWorkingModel ? [lastWorkingModel] : []),
-      ...discoveredModels,
       ...FALLBACK_2026_MODELS,
+      ...discoveredModels,
     ])
   ).filter((m) => !deadModelsForKey.has(m));
 
@@ -198,11 +195,6 @@ export async function callGeminiWithFallback(
   ];
 
   for (const model of rawQueue) {
-    if (Date.now() - startTime > totalBudgetMs && errors.length > 0) {
-      errors.push('Stop preventivo per budget tempo Serverless');
-      break;
-    }
-
     for (const useStrictJsonConfig of jsonMode ? [true, false] : [false]) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), perAttemptTimeoutMs);
@@ -299,7 +291,7 @@ export async function callGeminiWithFallback(
   }
 
   throw new Error(
-    `Nessun modello Gemini ha risposto in tempo. Dettagli: ${errors
+    `Nessun modello Gemini ha risposto. Dettagli: ${errors
       .slice(0, 5)
       .join(' | ')}`
   );
@@ -341,7 +333,7 @@ export function extractJsonFromAiText<T = any>(rawText: string): T {
       try {
         return safeParse(cleaned.slice(firstArr, lastArr + 1));
       } catch {
-        // Fallback sull'oggetto se la parentesi quadra era nel testo discorsivo
+        // Fallback
       }
     }
 
