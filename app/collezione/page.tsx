@@ -74,7 +74,6 @@ function normalizeToPureFamily(raw?: string | null): string {
 
 /**
  * 1. MOTORE DI PULIZIA E UNIFICAZIONE MARCHI (BRAND)
- * Elimina doppi spazi, spazi finali, refusi di maiuscole/accenti
  */
 function normalizeBrandName(raw?: string | null): string {
   const cleaned = (raw || '')
@@ -91,6 +90,8 @@ function normalizeBrandName(raw?: string | null): string {
     'bois 1920': 'Bois 1920',
     'byredo': 'Byredo',
     'chanel': 'Chanel',
+    'cigno nero': 'Cigno Nero Milano',
+    'cigno nero milano': 'Cigno Nero Milano',
     'creed': 'Creed',
     'clive christian': 'Clive Christian',
     'dolce & gabbana': 'Dolce & Gabbana',
@@ -108,6 +109,10 @@ function normalizeBrandName(raw?: string | null): string {
     'francis kurkdjian': 'Maison Francis Kurkdjian',
     'maison francis kurkdjian': 'Maison Francis Kurkdjian',
     'mfk': 'Maison Francis Kurkdjian',
+    'marc-antoine barrois': 'Marc-Antoine Barrois',
+    'marc antoine barrois': 'Marc-Antoine Barrois',
+    'montale': 'Montale',
+    'montale paris': 'Montale',
     'tom ford': 'Tom Ford',
     'amouage': 'Amouage',
     'xerjoff': 'Xerjoff',
@@ -117,7 +122,6 @@ function normalizeBrandName(raw?: string | null): string {
     'orto parisi': 'Orto Parisi',
     'nasomatto': 'Nasomatto',
     'lorenzo pazzaglia': 'Lorenzo Pazzaglia',
-    'montale': 'Montale',
     'mancera': 'Mancera',
     'diptyque': 'Diptyque',
     'le labo': 'Le Labo',
@@ -131,7 +135,6 @@ function normalizeBrandName(raw?: string | null): string {
     'penhaligon\'s': 'Penhaligon\'s',
     'penhaligons': 'Penhaligon\'s',
     'nishane': 'Nishane',
-    'bdK': 'BDK Parfums',
     'bdk': 'BDK Parfums',
     'bdk parfums': 'BDK Parfums',
     'stephane humbert lucas': 'Stéphane Humbert Lucas',
@@ -139,7 +142,6 @@ function normalizeBrandName(raw?: string | null): string {
 
   if (BRAND_ALIASES[low]) return BRAND_ALIASES[low];
 
-  // Title Case intelligente per qualsiasi altro marchio
   return cleaned
     .split(' ')
     .map((word) => {
@@ -155,8 +157,6 @@ function normalizeBrandName(raw?: string | null): string {
 
 /**
  * 2. MOTORE DI RAZIONALIZZAZIONE NOTE OLFATTIVE (IT / EN & SINONIMI)
- * Unifica es: "Musk", "White Musk", "Muschio Bianco" -> "Muschio"
- * "Sandalwood", "Legno di Sandalo" -> "Sandalo", ecc.
  */
 function canonicalizeNote(rawNote: string): string | null {
   let s = rawNote
@@ -168,7 +168,6 @@ function canonicalizeNote(rawNote: string): string | null {
 
   if (!s || s.length < 2 || s === '-' || s === 'n/a') return null;
 
-  // Dizionario di unificazione bilingue (Inglese/Italiano e Varianti Regionali)
   if (s.includes('musk') || s.includes('muschi') || s.includes('musc')) return 'Muschio';
   if (s.includes('sandal') || s.includes('sandalo')) return 'Sandalo';
   if (s.includes('bergamot')) return 'Bergamotto';
@@ -190,7 +189,7 @@ function canonicalizeNote(rawNote: string): string | null {
   if (s.includes('lavender') || s.includes('lavand')) return 'Lavanda';
   if (s.includes('iris') || s.includes('orris') || s.includes('giaggiolo')) return 'Iris';
   if (s.includes('violet') || s.includes('violett')) return 'Violetta';
-  if (s.includes('orange blossom') || s.includes('arancio') && s.includes('fior')) return 'Fiori d\'Arancio';
+  if (s.includes('orange blossom') || (s.includes('arancio') && s.includes('fior'))) return 'Fiori d\'Arancio';
   if (s.includes('neroli')) return 'Neroli';
   if (s.includes('petitgrain')) return 'Petitgrain';
   if (s.includes('lemon') || s.includes('limon')) return 'Limone';
@@ -222,7 +221,7 @@ function canonicalizeNote(rawNote: string): string | null {
   if (s.includes('cherry') || s.includes('ciliegi') || s.includes('amarena')) return 'Ciliegia';
   if (s.includes('raspberry') || s.includes('lampon')) return 'Lampone';
   if (s.includes('blackcurrant') || s.includes('ribes') || s.includes('cassis')) return 'Ribes Nero';
-  if (s.includes('sea ') || s.includes('marine') || s.includes('marino') || s.includes('marine') || s.includes('acquat') || s.includes('sale') || s.includes('salt') || s.includes('alghe')) return 'Note Marine';
+  if (s.includes('sea ') || s.includes('marine') || s.includes('marino') || s.includes('acquat') || s.includes('sale') || s.includes('salt') || s.includes('alghe')) return 'Note Marine';
   if (s.includes('tea') || s === 'te' || s === 'tè' || s.includes('tè ') || s.includes('matcha')) return 'Tè';
   if (s.includes('mint') || s.includes('menta')) return 'Menta';
   if (s.includes('sage') || s.includes('salvia')) return 'Salvia';
@@ -231,7 +230,7 @@ function canonicalizeNote(rawNote: string): string | null {
   if (s.includes('cypress') || s.includes('cipress')) return 'Cipresso';
   if (s.includes('pine') || s === 'pino') return 'Pino';
   if (s.includes('oakmoss') || s.includes('quercia')) return 'Muschio di Quercia';
-  if (s.includes('benzoin') || s.includes('benzoin')) return 'Benzoino';
+  if (s.includes('benzoin')) return 'Benzoino';
   if (s.includes('labdan') || s.includes('ladano')) return 'Labdano';
   if (s.includes('myrrh') || s.includes('mirra')) return 'Mirra';
   if (s.includes('guaiac') || s.includes('gaiac')) return 'Legno di Guaiaco';
@@ -249,13 +248,9 @@ function canonicalizeNote(rawNote: string): string | null {
   if (s.includes('heliotrop') || s.includes('eliotrop')) return 'Eliotropio';
   if (s.includes('rhubarb') || s.includes('rabarbar')) return 'Rabarbaro';
 
-  // Capitalizzazione pulita per qualsiasi altra nota specifica
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/**
- * Estrae l'elenco unico di note razionalizzate di un profumo (Testa + Cuore + Fondo + Generali)
- */
 function extractCanonicalNotesForPerfume(p: Profumo): string[] {
   const rawChunks = [
     p.note_testa,
@@ -277,9 +272,6 @@ function extractCanonicalNotesForPerfume(p: Profumo): string[] {
   return Array.from(set);
 }
 
-/**
- * COMPONENTE CORAZZATO ANTI-CORS & ANTI-HOTLINK (3 LIVELLI)
- */
 function SmartBottleImage({
   src,
   alt,
@@ -340,13 +332,18 @@ function CollezioneContent() {
   const [vista, setVista] = useState<'collezione' | 'radar'>(initialVista);
   const [layoutMode, setLayoutMode] = useState<'dettagli' | 'vetrina'>('dettagli');
 
-  // NUOVI STATI FILTRI MULTILIVELLO & ORDINAMENTO
+  // STATI DI SELEZIONE FILTRI & ORDINAMENTO
   const [selectedBrand, setSelectedBrand] = useState<string>('Tutti');
   const [selectedFamily, setSelectedFamily] = useState<string>('Tutte');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [noteFilterSearch, setNoteFilterSearch] = useState('');
   const [sortBy, setSortBy] = useState<'nome_asc' | 'nome_desc' | 'brand_asc'>('nome_asc');
+
+  // STATI PER ESPANDERE / COMPRIMERE LE 3 CATEGORIE (CON FRECCETTA v / ^)
+  const [openBrandPanel, setOpenBrandPanel] = useState(false);
+  const [openFamilyPanel, setOpenFamilyPanel] = useState(true);
+  const [openNotesPanel, setOpenNotesPanel] = useState(false);
 
   const [normalizingDb, setNormalizingDb] = useState(false);
 
@@ -415,7 +412,6 @@ function CollezioneContent() {
   const radarList = useMemo(() => profumi.filter(isRadarProfumo), [profumi]);
   const activeList = vista === 'collezione' ? collezioneList : radarList;
 
-  // STATISTICHE GLOBALI: MARCHI PULITI, FAMIGLIE OLFATTIVE E NOTE RAZIONALIZZATE
   const archiveStats = useMemo(() => {
     const familyCounts: Record<string, number> = {};
     const brandSet = new Set<string>();
@@ -424,7 +420,6 @@ function CollezioneContent() {
     let needsCleanup = false;
 
     activeList.forEach((p) => {
-      // 1. Controllo e pulizia Marchio
       const rawBrand = p.brand || '';
       const cleanBrand = normalizeBrandName(rawBrand);
       brandSet.add(cleanBrand);
@@ -432,7 +427,6 @@ function CollezioneContent() {
         needsCleanup = true;
       }
 
-      // 2. Controllo e conteggio Famiglia Olfattiva
       const rawFam = (p.famiglia_olfattiva || '').trim();
       const pure = normalizeToPureFamily(rawFam);
       if (rawFam && !(PURE_FAMILIES as readonly string[]).includes(rawFam)) {
@@ -440,13 +434,11 @@ function CollezioneContent() {
       }
       familyCounts[pure] = (familyCounts[pure] || 0) + 1;
 
-      // 3. Estrazione e conteggio Note Razionalizzate
       const cNotes = extractCanonicalNotesForPerfume(p);
       cNotes.forEach((n) => {
         noteCounts[n] = (noteCounts[n] || 0) + 1;
       });
 
-      // 4. Calcolo valore
       const val = parsePrezzoEuro(p);
       if (val > 0) totalEuro += val;
     });
@@ -526,23 +518,19 @@ function CollezioneContent() {
     resetAiFilter();
   }
 
-  // FILTRAGGIO MULTILIVELLO + ORDINAMENTO ALFABETICO PER NOME PROFUMO
   const filteredList = useMemo(() => {
     let base = [...activeList];
 
-    // 1. Filtro per Marchio (1° Livello)
     if (selectedBrand !== 'Tutti') {
       base = base.filter((p) => normalizeBrandName(p.brand) === selectedBrand);
     }
 
-    // 2. Filtro per Famiglia Olfattiva (2° Livello)
     if (selectedFamily !== 'Tutte') {
       base = base.filter(
         (p) => normalizeToPureFamily(p.famiglia_olfattiva) === selectedFamily
       );
     }
 
-    // 3. Filtro per Note Olfattive Multi-Selezione (Testa + Cuore + Fondo)
     if (selectedNotes.length > 0) {
       base = base.filter((p) => {
         const pNotes = extractCanonicalNotesForPerfume(p);
@@ -550,14 +538,12 @@ function CollezioneContent() {
       });
     }
 
-    // 4. Filtro IA se attivo
     if (aiRecommendedIds && aiRecommendedIds.length > 0) {
       const map = new Map(base.map((p) => [p.id, p]));
       const ordered = aiRecommendedIds.map((id) => map.get(id)).filter(Boolean) as Profumo[];
       if (ordered.length > 0) return ordered;
     }
 
-    // 5. Ricerca testuale libera
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       base = base.filter((p) => {
@@ -587,7 +573,6 @@ function CollezioneContent() {
       });
     }
 
-    // 6. Ordinamento Alfabetico (Default: per Nome Profumo A -> Z, non per Marchio)
     base.sort((a, b) => {
       const nomeA = (a.nome || '').trim();
       const nomeB = (b.nome || '').trim();
@@ -600,7 +585,6 @@ function CollezioneContent() {
       if (sortBy === 'nome_desc') {
         return nomeB.localeCompare(nomeA, 'it', { sensitivity: 'base' });
       }
-      // brand_asc
       const cmpBrand = brandA.localeCompare(brandB, 'it', { sensitivity: 'base' });
       if (cmpBrand !== 0) return cmpBrand;
       return nomeA.localeCompare(nomeB, 'it', { sensitivity: 'base' });
@@ -1014,10 +998,10 @@ function CollezioneContent() {
         </div>
       )}
 
-      {/* CONSOLE DI RICERCA & FILTRI MULTILIVELLO */}
-      <section className="mt-6 boutique-glass rounded-2xl p-4 sm:p-5 space-y-4 animate-fade-in delay-75">
-        {/* RIGA 0: BARRA DI RICERCA + ORDINAMENTO ALFABETICO PER NOME + CHIEDI ALL'IA */}
-        <div className="flex flex-col lg:flex-row gap-3">
+      {/* CONSOLE DI RICERCA & FILTRI PIEGHEVOLI (ACCORDION) */}
+      <section className="mt-6 boutique-glass rounded-2xl p-4 sm:p-5 space-y-3.5 animate-fade-in delay-75">
+        {/* RIGA 1: SOLO BARRA DI RICERCA + CHIEDI ALL'IA ALLO STESSO IDENTICO LIVELLO */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#C5A059] absolute left-4 top-1/2 -translate-y-1/2" />
             <input
@@ -1048,213 +1032,285 @@ function CollezioneContent() {
             )}
           </div>
 
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
-            {/* SELETTORE ORDINAMENTO ALFABETICO (DEFAULT: NOME PROFUMO A-Z) */}
-            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#08080A] border border-white/10 text-xs font-mono text-zinc-300 shrink-0">
-              <ArrowDownAZ className="w-4 h-4 text-[#1FE866]" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer"
-                title="Criterio di ordinamento"
-              >
-                <option value="nome_asc" className="bg-[#08080A] text-white">
-                  Ordine: Nome Profumo (A → Z)
-                </option>
-                <option value="nome_desc" className="bg-[#08080A] text-white">
-                  Ordine: Nome Profumo (Z → A)
-                </option>
-                <option value="brand_asc" className="bg-[#08080A] text-white">
-                  Ordine: Marchio (A → Z)
-                </option>
-              </select>
-            </div>
-
-            <button
-              onClick={handleAskSommelier}
-              disabled={aiLoading || !searchQuery.trim()}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 shrink-0"
-            >
-              {aiLoading ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Elaborazione...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Chiedi all&apos;IA</span>
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={handleAskSommelier}
+            disabled={aiLoading || !searchQuery.trim()}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 shrink-0"
+          >
+            {aiLoading ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Elaborazione...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Chiedi all&apos;IA</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {/* LIVELLO 1: MARCHIO (SENZA NUMERI E CON NOMI RIPULITI) */}
-        {archiveStats.sortedBrands.length > 0 && (
-          <div className="pt-3 border-t border-white/10 flex items-center gap-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mr-1.5 shrink-0">
-              <Tag className="w-3 h-3" />
-              <span>Marchio:</span>
-            </span>
+        {/* RIGA 2: BARRA ORDINE ALFABETICO + PULIZIA DB */}
+        <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2 flex-wrap">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#08080A] border border-white/10 text-xs font-mono text-zinc-300">
+            <ArrowDownAZ className="w-3.5 h-3.5 text-[#1FE866]" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent text-white font-mono text-[11px] focus:outline-none cursor-pointer"
+              title="Criterio di ordinamento"
+            >
+              <option value="nome_asc" className="bg-[#08080A] text-white">
+                Ordine: Nome Profumo (A → Z)
+              </option>
+              <option value="nome_desc" className="bg-[#08080A] text-white">
+                Ordine: Nome Profumo (Z → A)
+              </option>
+              <option value="brand_asc" className="bg-[#08080A] text-white">
+                Ordine: Marchio (A → Z)
+              </option>
+            </select>
+          </div>
 
+          {archiveStats.needsCleanup && (
             <button
               type="button"
-              onClick={() => setSelectedBrand('Tutti')}
-              className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
-                selectedBrand === 'Tutti'
-                  ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
-                  : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
-              }`}
+              onClick={handleNormalizeAllDatabase}
+              disabled={normalizingDb}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/30 font-mono text-[10px] uppercase hover:bg-[#C5A059]/30 transition-all shrink-0"
             >
-              Tutti
+              {normalizingDb ? (
+                <RefreshCw className="w-3 h-3 animate-spin" />
+              ) : (
+                <Check className="w-3 h-3 text-[#C5A059]" />
+              )}
+              <span>Pulisci Marchi & Famiglie nel DB</span>
+            </button>
+          )}
+        </div>
+
+        {/* CATEGORIA 1 (ESPANDIBILE / COMPRIMIBILE): MARCHIO */}
+        {archiveStats.sortedBrands.length > 0 && (
+          <div className="pt-2.5 border-t border-white/10">
+            <button
+              type="button"
+              onClick={() => setOpenBrandPanel((v) => !v)}
+              className="w-full flex items-center justify-between py-1 text-left group"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <Tag className="w-3.5 h-3.5 text-[#C5A059]" />
+                <span className="font-mono text-[11px] uppercase tracking-wider text-[#C5A059] group-hover:text-white transition">
+                  Marchio
+                </span>
+                {selectedBrand !== 'Tutti' && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#FF2A95]/20 border border-[#FF2A95]/40 font-mono text-[10px] text-[#FF4DA6]">
+                    {selectedBrand}
+                  </span>
+                )}
+              </div>
+              <div className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 group-hover:text-white">
+                <span>{openBrandPanel ? 'Comprimi' : 'Espandi'}</span>
+                {openBrandPanel ? (
+                  <ChevronUp className="w-4 h-4 text-[#C5A059]" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#C5A059]" />
+                )}
+              </div>
             </button>
 
-            {archiveStats.sortedBrands.map((brandName) => (
-              <button
-                key={brandName}
-                type="button"
-                onClick={() =>
-                  setSelectedBrand(selectedBrand === brandName ? 'Tutti' : brandName)
-                }
-                className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
-                  selectedBrand === brandName
-                    ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
-                    : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-zinc-600'
-                }`}
-              >
-                {brandName}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* LIVELLO 2: FAMIGLIE OLFATTIVE */}
-        {archiveStats.sortedPureFamilies.length > 0 && (
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mr-1.5 shrink-0">
-                <Droplets className="w-3 h-3" />
-                <span>Famiglie Olfattive:</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setSelectedFamily('Tutte')}
-                className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
-                  selectedFamily === 'Tutte'
-                    ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
-                    : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
-                }`}
-              >
-                Tutte ({activeList.length})
-              </button>
-
-              {archiveStats.sortedPureFamilies.map(([fam, count]) => (
+            {openBrandPanel && (
+              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap animate-fade-in">
                 <button
-                  key={fam}
                   type="button"
-                  onClick={() =>
-                    setSelectedFamily(selectedFamily === fam ? 'Tutte' : fam)
-                  }
+                  onClick={() => setSelectedBrand('Tutti')}
                   className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
-                    selectedFamily === fam
+                    selectedBrand === 'Tutti'
                       ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
-                      : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-zinc-600'
+                      : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
                   }`}
                 >
-                  {fam} ({count})
+                  Tutti
                 </button>
-              ))}
-            </div>
 
-            {archiveStats.needsCleanup && (
-              <button
-                type="button"
-                onClick={handleNormalizeAllDatabase}
-                disabled={normalizingDb}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/30 font-mono text-[10px] uppercase hover:bg-[#C5A059]/30 hover:scale-105 active:scale-95 transition-all shrink-0"
-              >
-                {normalizingDb ? (
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Check className="w-3 h-3 text-[#C5A059]" />
-                )}
-                <span>Pulisci Marchi & Famiglie nel DB</span>
-              </button>
+                {archiveStats.sortedBrands.map((brandName) => (
+                  <button
+                    key={brandName}
+                    type="button"
+                    onClick={() =>
+                      setSelectedBrand(selectedBrand === brandName ? 'Tutti' : brandName)
+                    }
+                    className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
+                      selectedBrand === brandName
+                        ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
+                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-zinc-600'
+                    }`}
+                  >
+                    {brandName}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         )}
 
-        {/* LIVELLO 3: NOTE OLFATTIVE RAZIONALIZZATE (MULTI-SELEZIONE TESTA/CUORE/FONDO) */}
-        {archiveStats.sortedNotes.length > 0 && (
-          <div className="pt-3 border-t border-white/10 space-y-2.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* CATEGORIA 2 (ESPANDIBILE / COMPRIMIBILE): FAMIGLIE OLFATTIVE */}
+        {archiveStats.sortedPureFamilies.length > 0 && (
+          <div className="pt-2.5 border-t border-white/10">
+            <button
+              type="button"
+              onClick={() => setOpenFamilyPanel((v) => !v)}
+              className="w-full flex items-center justify-between py-1 text-left group"
+            >
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#1FE866]">
-                  <Filter className="w-3 h-3" />
-                  <span>Note Olfattive (Multi-Selezione):</span>
+                <Droplets className="w-3.5 h-3.5 text-[#C5A059]" />
+                <span className="font-mono text-[11px] uppercase tracking-wider text-[#C5A059] group-hover:text-white transition">
+                  Famiglie Olfattive
                 </span>
-                {selectedNotes.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedNotes([])}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 text-zinc-300 hover:text-white font-mono text-[10px]"
-                  >
-                    <span>Azzera note ({selectedNotes.length})</span>
-                    <X className="w-3 h-3" />
-                  </button>
+                {selectedFamily !== 'Tutte' && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#FF2A95]/20 border border-[#FF2A95]/40 font-mono text-[10px] text-[#FF4DA6]">
+                    {selectedFamily}
+                  </span>
                 )}
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={noteFilterSearch}
-                  onChange={(e) => setNoteFilterSearch(e.target.value)}
-                  placeholder="Filtra nota (es. Sandalo, Muschio, Oud)..."
-                  className="px-2.5 py-1 rounded-lg bg-[#08080A] border border-white/10 text-[11px] font-mono text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#1FE866] w-full sm:w-64"
-                />
-                {archiveStats.sortedNotes.length > 16 && !noteFilterSearch.trim() && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllNotes((v) => !v)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 font-mono text-[10px] uppercase shrink-0"
-                  >
-                    <span>
-                      {showAllNotes
-                        ? 'Mostra principali'
-                        : `Tutte (${archiveStats.sortedNotes.length})`}
-                    </span>
-                    {showAllNotes ? (
-                      <ChevronUp className="w-3 h-3" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3" />
-                    )}
-                  </button>
+              <div className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 group-hover:text-white">
+                <span>{openFamilyPanel ? 'Comprimi' : 'Espandi'}</span>
+                {openFamilyPanel ? (
+                  <ChevronUp className="w-4 h-4 text-[#C5A059]" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#C5A059]" />
                 )}
               </div>
-            </div>
+            </button>
 
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {displayedNotes.map(([noteName, count]) => {
-                const isSelected = selectedNotes.includes(noteName);
-                return (
+            {openFamilyPanel && (
+              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap animate-fade-in">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFamily('Tutte')}
+                  className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
+                    selectedFamily === 'Tutte'
+                      ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
+                      : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
+                  }`}
+                >
+                  Tutte ({activeList.length})
+                </button>
+
+                {archiveStats.sortedPureFamilies.map(([fam, count]) => (
                   <button
-                    key={noteName}
+                    key={fam}
                     type="button"
-                    onClick={() => toggleNoteSelection(noteName)}
+                    onClick={() =>
+                      setSelectedFamily(selectedFamily === fam ? 'Tutte' : fam)
+                    }
                     className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
-                      isSelected
-                        ? 'bg-[#1FE866]/20 text-[#1FE866] border border-[#1FE866]/60 font-semibold shadow-sm'
-                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#1FE866]/40'
+                      selectedFamily === fam
+                        ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
+                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-zinc-600'
                     }`}
                   >
-                    {noteName} ({count})
+                    {fam} ({count})
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CATEGORIA 3 (ESPANDIBILE / COMPRIMIBILE): NOTE OLFATTIVE (MULTI-SELEZIONE) */}
+        {archiveStats.sortedNotes.length > 0 && (
+          <div className="pt-2.5 border-t border-white/10">
+            <button
+              type="button"
+              onClick={() => setOpenNotesPanel((v) => !v)}
+              className="w-full flex items-center justify-between py-1 text-left group"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <Filter className="w-3.5 h-3.5 text-[#1FE866]" />
+                <span className="font-mono text-[11px] uppercase tracking-wider text-[#1FE866] group-hover:text-white transition">
+                  Note Olfattive (Multi-Selezione)
+                </span>
+                {selectedNotes.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#1FE866]/20 border border-[#1FE866]/50 font-mono text-[10px] text-[#1FE866]">
+                    {selectedNotes.join(' + ')}
+                  </span>
+                )}
+              </div>
+              <div className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 group-hover:text-white">
+                <span>{openNotesPanel ? 'Comprimi' : 'Espandi'}</span>
+                {openNotesPanel ? (
+                  <ChevronUp className="w-4 h-4 text-[#1FE866]" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#1FE866]" />
+                )}
+              </div>
+            </button>
+
+            {openNotesPanel && (
+              <div className="mt-2.5 space-y-2.5 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={noteFilterSearch}
+                      onChange={(e) => setNoteFilterSearch(e.target.value)}
+                      placeholder="Filtra nota (es. Sandalo, Muschio, Oud)..."
+                      className="px-2.5 py-1 rounded-lg bg-[#08080A] border border-white/10 text-[11px] font-mono text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#1FE866] w-full sm:w-64"
+                    />
+                    {selectedNotes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedNotes([])}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 text-zinc-300 hover:text-white font-mono text-[10px] shrink-0"
+                      >
+                        <span>Azzera ({selectedNotes.length})</span>
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {archiveStats.sortedNotes.length > 16 && !noteFilterSearch.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllNotes((v) => !v)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 font-mono text-[10px] uppercase self-start sm:self-auto shrink-0"
+                    >
+                      <span>
+                        {showAllNotes
+                          ? 'Mostra principali (16)'
+                          : `Mostra tutte (${archiveStats.sortedNotes.length})`}
+                      </span>
+                      {showAllNotes ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {displayedNotes.map(([noteName, count]) => {
+                    const isSelected = selectedNotes.includes(noteName);
+                    return (
+                      <button
+                        key={noteName}
+                        type="button"
+                        onClick={() => toggleNoteSelection(noteName)}
+                        className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-[#1FE866]/20 text-[#1FE866] border border-[#1FE866]/60 font-semibold shadow-sm'
+                            : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#1FE866]/40'
+                        }`}
+                      >
+                        {noteName} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1264,11 +1320,6 @@ function CollezioneContent() {
             <span className="text-zinc-400">
               Risultati: <strong className="text-white">{filteredList.length}</strong> su{' '}
               {activeList.length} profumi
-              {selectedNotes.length > 0 && (
-                <span className="text-[#1FE866] ml-2">
-                  • Note: {selectedNotes.join(' + ')}
-                </span>
-              )}
             </span>
             <button
               type="button"
