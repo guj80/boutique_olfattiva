@@ -19,6 +19,8 @@ import {
   List,
   FlaskConical,
   Globe,
+  Droplets,
+  Check,
 } from 'lucide-react';
 import {
   supabase,
@@ -26,7 +28,44 @@ import {
   isCollezioneProfumo,
   isRadarProfumo,
   getUnifiedNotes,
+  parsePrezzoEuro,
 } from '@/lib/supabase';
+
+const PURE_FAMILIES = [
+  'Agrumata',
+  'Aromatica',
+  'Marina',
+  'Floreale',
+  'Fruttata',
+  'Verde',
+  'Speziata',
+  'Legnosa',
+  'Ambrata',
+  'Gourmand',
+  'Cuoiata',
+  'Muschiata',
+] as const;
+
+function normalizeToPureFamily(raw?: string | null): string {
+  const s = (raw || '').toLowerCase().trim();
+  if (!s) return 'Non classificata';
+  for (const pure of PURE_FAMILIES) {
+    if (s === pure.toLowerCase()) return pure;
+  }
+  if (s.includes('marin') || s.includes('acquat') || s.includes('ozon')) return 'Marina';
+  if (s.includes('gourmand') || s.includes('vanigl') || s.includes('dolce')) return 'Gourmand';
+  if (s.includes('cuoi') || s.includes('leather') || s.includes('tabacc')) return 'Cuoiata';
+  if (s.includes('musch') || s.includes('pulit') || s.includes('talc') || s.includes('mineral')) return 'Muschiata';
+  if (s.includes('speziat')) return 'Speziata';
+  if (s.includes('verd') || s.includes('green')) return 'Verde';
+  if (s.includes('fruttat')) return 'Fruttata';
+  if (s.includes('agrum') || s.includes('esperid')) return 'Agrumata';
+  if (s.includes('ambrat') || s.includes('oriental') || s.includes('incens') || s.includes('resin')) return 'Ambrata';
+  if (s.includes('floreal') || s.includes('fiorit')) return 'Floreale';
+  if (s.includes('aromatic') || s.includes('fouger') || s.includes('fougèr')) return 'Aromatica';
+  if (s.includes('legnos') || s.includes('bois') || s.includes('chypre') || s.includes('oud')) return 'Legnosa';
+  return 'Legnosa';
+}
 
 function CollezioneContent() {
   const searchParams = useSearchParams();
@@ -37,6 +76,9 @@ function CollezioneContent() {
   const [loading, setLoading] = useState(true);
   const [vista, setVista] = useState<'collezione' | 'radar'>(initialVista);
   const [layoutMode, setLayoutMode] = useState<'dettagli' | 'vetrina'>('dettagli');
+
+  const [selectedFamily, setSelectedFamily] = useState<string>('Tutte');
+  const [normalizingDb, setNormalizingDb] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [aiLoading, setAiLoading] = useState(false);
@@ -103,8 +145,67 @@ function CollezioneContent() {
   const radarList = useMemo(() => profumi.filter(isRadarProfumo), [profumi]);
   const activeList = vista === 'collezione' ? collezioneList : radarList;
 
+  // Statistiche interne della vista attiva (Valore stimato + Conteggio per le 12 Famiglie Pure)
+  const archiveStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let totalEuro = 0;
+    let hasLegacyLabels = false;
+
+    activeList.forEach((p) => {
+      const rawFam = (p.famiglia_olfattiva || '').trim();
+      const pure = normalizeToPureFamily(rawFam);
+      if (rawFam && !(PURE_FAMILIES as readonly string[]).includes(rawFam)) {
+        hasLegacyLabels = true;
+      }
+      counts[pure] = (counts[pure] || 0) + 1;
+
+      const val = parsePrezzoEuro(p);
+      if (val > 0) totalEuro += val;
+    });
+
+    const sortedPureFamilies = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+    return {
+      totalEuro: Math.round(totalEuro),
+      sortedPureFamilies,
+      hasLegacyLabels,
+    };
+  }, [activeList]);
+
+  // Allinea definitivamente su Supabase le vecchie 36 etichette alle 12 Famiglie Pure con 1 click
+  async function handleNormalizeAllDatabaseFamilies() {
+    setNormalizingDb(true);
+    try {
+      const updates = profumi.map(async (p) => {
+        const pure = normalizeToPureFamily(p.famiglia_olfattiva);
+        if (p.famiglia_olfattiva !== pure) {
+          await supabase
+            .from('profumi')
+            .update({ famiglia_olfattiva: pure })
+            .eq('id', p.id);
+        }
+        return { ...p, famiglia_olfattiva: pure };
+      });
+
+      const updatedList = await Promise.all(updates);
+      setProfumi(updatedList);
+      setStatusBanner('Tutte le fragranze sono state allineate alle 12 Famiglie Pure.');
+      setTimeout(() => setStatusBanner(null), 3500);
+    } catch (err: any) {
+      alert(err?.message || 'Errore normalizzazione famiglie.');
+    } finally {
+      setNormalizingDb(false);
+    }
+  }
+
   const filteredList = useMemo(() => {
-    const base = activeList;
+    let base = activeList;
+
+    if (selectedFamily !== 'Tutte') {
+      base = base.filter(
+        (p) => normalizeToPureFamily(p.famiglia_olfattiva) === selectedFamily
+      );
+    }
 
     if (aiRecommendedIds && aiRecommendedIds.length > 0) {
       const map = new Map(base.map((p) => [p.id, p]));
@@ -115,9 +216,11 @@ function CollezioneContent() {
     if (!searchQuery.trim()) return base;
     const q = searchQuery.toLowerCase().trim();
     return base.filter((p) => {
+      const pureFam = normalizeToPureFamily(p.famiglia_olfattiva);
       const haystack = [
         p.nome,
         p.brand,
+        pureFam,
         p.famiglia_olfattiva,
         p.note_testa,
         p.note_cuore,
@@ -133,7 +236,7 @@ function CollezioneContent() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [activeList, searchQuery, aiRecommendedIds]);
+  }, [activeList, selectedFamily, searchQuery, aiRecommendedIds]);
 
   async function handleAskSommelier() {
     if (!searchQuery.trim()) return;
@@ -181,11 +284,13 @@ function CollezioneContent() {
       const aiData = await res.json();
       if (!res.ok) throw new Error(aiData.error || 'Errore verifica AI');
 
+      const pureFam = normalizeToPureFamily(aiData.famiglia_olfattiva || p.famiglia_olfattiva);
+
       const updatePayload: Partial<Profumo> = {
         nome: aiData.nome || p.nome,
         brand: aiData.brand || p.brand,
         concentrazione: aiData.concentrazione || p.concentrazione,
-        famiglia_olfattiva: aiData.famiglia_olfattiva || p.famiglia_olfattiva,
+        famiglia_olfattiva: pureFam,
         note_testa: aiData.note_testa || p.note_testa,
         note_cuore: aiData.note_cuore || p.note_cuore,
         note_fondo: aiData.note_fondo || p.note_fondo,
@@ -212,7 +317,7 @@ function CollezioneContent() {
           .update({
             nome: updatePayload.nome,
             brand: updatePayload.brand,
-            famiglia_olfattiva: updatePayload.famiglia_olfattiva,
+            famiglia_olfattiva: pureFam,
             note_olfattive: updatePayload.note_olfattive,
           })
           .eq('id', p.id);
@@ -221,7 +326,7 @@ function CollezioneContent() {
       setProfumi((prev) =>
         prev.map((item) => (item.id === p.id ? { ...item, ...updatePayload } : item))
       );
-      setStatusBanner(`Aggiornato: ${updatePayload.brand} — ${updatePayload.nome}`);
+      setStatusBanner(`Aggiornato: ${updatePayload.brand} - ${updatePayload.nome}`);
       setTimeout(() => setStatusBanner(null), 3500);
     } catch (err: any) {
       alert(err?.message || 'Errore verifica AI.');
@@ -246,12 +351,16 @@ function CollezioneContent() {
       const aiData = await res.json();
       if (!res.ok) throw new Error(aiData.error || 'Errore estrazione dati');
 
+      const pureFam = normalizeToPureFamily(
+        aiData.famiglia_olfattiva || selectedProfumo.famiglia_olfattiva
+      );
+
       setSelectedProfumo({
         ...selectedProfumo,
         nome: aiData.nome || selectedProfumo.nome,
         brand: aiData.brand || selectedProfumo.brand,
         concentrazione: aiData.concentrazione || selectedProfumo.concentrazione,
-        famiglia_olfattiva: aiData.famiglia_olfattiva || selectedProfumo.famiglia_olfattiva,
+        famiglia_olfattiva: pureFam,
         note_testa: aiData.note_testa || selectedProfumo.note_testa,
         note_cuore: aiData.note_cuore || selectedProfumo.note_cuore,
         note_fondo: aiData.note_fondo || selectedProfumo.note_fondo,
@@ -280,11 +389,12 @@ function CollezioneContent() {
     setSavingDetail(true);
 
     try {
+      const pureFam = normalizeToPureFamily(selectedProfumo.famiglia_olfattiva);
       const payload = {
         nome: selectedProfumo.nome,
         brand: selectedProfumo.brand,
         concentrazione: selectedProfumo.concentrazione,
-        famiglia_olfattiva: selectedProfumo.famiglia_olfattiva,
+        famiglia_olfattiva: pureFam,
         note_testa: selectedProfumo.note_testa,
         note_cuore: selectedProfumo.note_cuore,
         note_fondo: selectedProfumo.note_fondo,
@@ -317,7 +427,7 @@ function CollezioneContent() {
         )
       );
       setSelectedProfumo(null);
-      setStatusBanner(`Salvato: ${payload.brand} — ${payload.nome}`);
+      setStatusBanner(`Salvato: ${payload.brand} - ${payload.nome}`);
       setTimeout(() => setStatusBanner(null), 3000);
     } catch (err: any) {
       alert(`Errore salvataggio: ${err?.message}`);
@@ -392,6 +502,7 @@ function CollezioneContent() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-7xl mx-auto w-full">
+      {/* HEADER CON PRIVATE OLFACTORY + VALORE STIMATO DISCRETO */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15">
         <div className="flex items-center gap-4">
           <Link
@@ -403,13 +514,20 @@ function CollezioneContent() {
           </Link>
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#C5A059]">
-              Boutique Olfattiva di Luca
+              Private Olfactory
             </p>
-            <h1 className="font-serif text-2xl sm:text-3xl text-white">
-              {vista === 'collezione'
-                ? `Collezione Privata (${collezioneList.length})`
-                : `Radar - Testing (${radarList.length})`}
-            </h1>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <h1 className="font-serif text-2xl sm:text-3xl text-white">
+                {vista === 'collezione'
+                  ? `Collezione Privata (${collezioneList.length})`
+                  : `Radar - Testing (${radarList.length})`}
+              </h1>
+              {vista === 'collezione' && archiveStats.totalEuro > 0 && (
+                <span className="font-mono text-xs text-[#C5A059]">
+                  Valore stimato: €{archiveStats.totalEuro.toLocaleString('it-IT')}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -446,6 +564,7 @@ function CollezioneContent() {
               type="button"
               onClick={() => {
                 setVista('collezione');
+                setSelectedFamily('Tutte');
                 resetAiFilter();
               }}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
@@ -461,6 +580,7 @@ function CollezioneContent() {
               type="button"
               onClick={() => {
                 setVista('radar');
+                setSelectedFamily('Tutte');
                 resetAiFilter();
               }}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
@@ -493,7 +613,8 @@ function CollezioneContent() {
         </div>
       )}
 
-      <section className="mt-6 boutique-glass rounded-2xl p-4">
+      {/* BARRA DI RICERCA + FILTRO PER LE 12 FAMIGLIE OLFATTIVE PURE */}
+      <section className="mt-6 boutique-glass rounded-2xl p-4 space-y-3.5">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#C5A059] absolute left-4 top-1/2 -translate-y-1/2" />
@@ -509,7 +630,7 @@ function CollezioneContent() {
                   handleAskSommelier();
                 }
               }}
-              placeholder="Cerca profumo, brand, nota o chiedi all'AI..."
+              placeholder="Cerca profumo, brand, nota o chiedi a AI..."
               className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#F7E7CE]"
             />
             {searchQuery && (
@@ -538,14 +659,72 @@ function CollezioneContent() {
             ) : (
               <>
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi all&apos;AI</span>
+                <span>Chiedi a AI</span>
               </>
             )}
           </button>
         </div>
 
+        {/* BARRA INTERATTIVA DELLE FAMIGLIE OLFATTIVE PURE */}
+        {archiveStats.sortedPureFamilies.length > 0 && (
+          <div className="pt-2 border-t border-[#F7E7CE]/10 flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mr-1">
+                <Droplets className="w-3 h-3" />
+                <span>Famiglie ({archiveStats.sortedPureFamilies.length}):</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setSelectedFamily('Tutte')}
+                className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition ${
+                  selectedFamily === 'Tutte'
+                    ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
+                    : 'bg-[#08080A] text-zinc-400 border border-[#F7E7CE]/15 hover:text-white'
+                }`}
+              >
+                Tutte ({activeList.length})
+              </button>
+
+              {archiveStats.sortedPureFamilies.map(([fam, count]) => (
+                <button
+                  key={fam}
+                  type="button"
+                  onClick={() =>
+                    setSelectedFamily(selectedFamily === fam ? 'Tutte' : fam)
+                  }
+                  className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition ${
+                    selectedFamily === fam
+                      ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
+                      : 'bg-[#08080A] text-zinc-300 border border-[#F7E7CE]/15 hover:border-[#F7E7CE]/40'
+                  }`}
+                >
+                  {fam} ({count})
+                </button>
+              ))}
+            </div>
+
+            {archiveStats.hasLegacyLabels && (
+              <button
+                type="button"
+                onClick={handleNormalizeAllDatabaseFamilies}
+                disabled={normalizingDb}
+                title="Salva nel database le 12 Famiglie Pure al posto delle 36 vecchie combinazioni"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/30 font-mono text-[10px] uppercase hover:bg-[#C5A059]/30 transition shrink-0"
+              >
+                {normalizingDb ? (
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Check className="w-3 h-3 text-[#C5A059]" />
+                )}
+                <span>Allinea DB (12 Famiglie)</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {aiAdvice && (
-          <div className="mt-4 p-4 rounded-xl bg-[#08080A]/95 border border-[#C5A059]/40 space-y-1.5">
+          <div className="p-4 rounded-xl bg-[#08080A]/95 border border-[#C5A059]/40 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059]">
                 Selezione AI
@@ -562,6 +741,7 @@ function CollezioneContent() {
         )}
       </section>
 
+      {/* GRIGLIA FRAGRANZE */}
       <section className="mt-6">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -581,7 +761,10 @@ function CollezioneContent() {
                 <div
                   key={p.id}
                   onClick={() => {
-                    setSelectedProfumo({ ...p });
+                    setSelectedProfumo({
+                      ...p,
+                      famiglia_olfattiva: normalizeToPureFamily(p.famiglia_olfattiva),
+                    });
                     setOfficialUrlInput('');
                   }}
                   className="boutique-glass boutique-glass-hover rounded-2xl p-4 cursor-pointer flex flex-col justify-between group text-center"
@@ -629,6 +812,7 @@ function CollezioneContent() {
               const aiReason = aiMotivazioni[p.id];
               const isEnriching = enrichingId === p.id;
               const imgUrl = p.url_foto_vetrina || p.immagine_url;
+              const pureFamily = normalizeToPureFamily(p.famiglia_olfattiva);
 
               return (
                 <article
@@ -640,7 +824,10 @@ function CollezioneContent() {
                       {imgUrl && (
                         <div
                           onClick={() => {
-                            setSelectedProfumo({ ...p });
+                            setSelectedProfumo({
+                              ...p,
+                              famiglia_olfattiva: pureFamily,
+                            });
                             setOfficialUrlInput('');
                           }}
                           className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 shrink-0 overflow-hidden flex items-center justify-center cursor-pointer"
@@ -684,11 +871,9 @@ function CollezioneContent() {
                     </div>
 
                     <div className="flex flex-wrap gap-1.5 mt-3">
-                      {p.famiglia_olfattiva && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#F7E7CE]/10 text-[#F7E7CE] border border-[#F7E7CE]/20">
-                          {p.famiglia_olfattiva}
-                        </span>
-                      )}
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#F7E7CE]/10 text-[#F7E7CE] border border-[#F7E7CE]/20">
+                        {pureFamily}
+                      </span>
                       {p.stagione_ideale && (
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-zinc-900 text-zinc-400 border border-white/10">
                           {p.stagione_ideale}
@@ -747,7 +932,7 @@ function CollezioneContent() {
                             Su Mouche
                           </span>
                           <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_mouche || '—'}
+                            {p.note_mouche || '-'}
                           </p>
                         </div>
                         <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-[#F7E7CE]/15">
@@ -755,7 +940,7 @@ function CollezioneContent() {
                             Su Pelle
                           </span>
                           <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_pelle || '—'}
+                            {p.note_pelle || '-'}
                           </p>
                         </div>
                       </div>
@@ -781,7 +966,10 @@ function CollezioneContent() {
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedProfumo({ ...p });
+                          setSelectedProfumo({
+                            ...p,
+                            famiglia_olfattiva: pureFamily,
+                          });
                           setOfficialUrlInput('');
                         }}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] transition"
@@ -816,6 +1004,7 @@ function CollezioneContent() {
         )}
       </section>
 
+      {/* MODALE 1: SCHEDA TECNICA CON SELETTORE DELLE 12 FAMIGLIE PURE */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-[#F7E7CE]/30 my-8 max-h-[92vh] overflow-y-auto">
@@ -836,7 +1025,7 @@ function CollezioneContent() {
                     Scheda Tecnica
                   </p>
                   <h3 className="font-serif text-2xl text-white mt-0.5">
-                    {selectedProfumo.nome} — {selectedProfumo.brand}
+                    {selectedProfumo.nome} - {selectedProfumo.brand}
                   </h3>
                 </div>
               </div>
@@ -945,11 +1134,10 @@ function CollezioneContent() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Famiglia Olfattiva
+                    Famiglia Olfattiva (12 Pure)
                   </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.famiglia_olfattiva || ''}
+                  <select
+                    value={normalizeToPureFamily(selectedProfumo.famiglia_olfattiva)}
                     onChange={(e) =>
                       setSelectedProfumo({
                         ...selectedProfumo,
@@ -957,7 +1145,13 @@ function CollezioneContent() {
                       })
                     }
                     className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
+                  >
+                    {PURE_FAMILIES.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
@@ -1106,7 +1300,7 @@ function CollezioneContent() {
                   { key: 'voto_longevita', label: 'Durata' },
                   { key: 'voto_scia', label: 'Scia' },
                   { key: 'voto_proiezione', label: 'Proiezione' },
-                  { key: 'voto_complessita', label: 'Complessità' },
+                  { key: 'voto_complessita', label: 'Complessita' },
                 ].map(({ key, label }) => {
                   const val = Number((selectedProfumo as any)[key] ?? 8);
                   return (
@@ -1162,6 +1356,7 @@ function CollezioneContent() {
         </div>
       )}
 
+      {/* MODALE 2: SCENT TRACKER */}
       {wearProfumo && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#F7E7CE]/30 space-y-4">
@@ -1255,6 +1450,7 @@ function CollezioneContent() {
         </div>
       )}
 
+      {/* MODALE 3: ELIMINAZIONE */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4">
