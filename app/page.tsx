@@ -18,98 +18,6 @@ import {
   getUnifiedNotes,
 } from '@/lib/supabase';
 
-function LogoLG({ className = 'w-14 h-14' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 200 200"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-    >
-      <rect
-        x="8"
-        y="8"
-        width="184"
-        height="184"
-        rx="42"
-        fill="#08080A"
-        stroke="#C5A059"
-        strokeWidth="4"
-      />
-      {/* Collo e Vaporizzatore */}
-      <rect
-        x="86"
-        y="42"
-        width="24"
-        height="18"
-        rx="3"
-        stroke="#F7E7CE"
-        strokeWidth="4"
-      />
-      <circle cx="105" cy="51" r="3" fill="#F7E7CE" />
-      <rect
-        x="80"
-        y="60"
-        width="36"
-        height="7"
-        rx="3.5"
-        stroke="#C5A059"
-        strokeWidth="4"
-      />
-      <rect
-        x="75"
-        y="67"
-        width="46"
-        height="8"
-        rx="4"
-        stroke="#F7E7CE"
-        strokeWidth="4"
-      />
-      {/* Spalla sinistra e Monogramma L */}
-      <path
-        d="M80 75 C76 86 64 94 46 96 L52 104 L52 162 L46 170 L102 170"
-        stroke="#F7E7CE"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M66 95 L66 156 L98 156"
-        stroke="#C5A059"
-        strokeWidth="4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Spalla destra e Monogramma G */}
-      <path
-        d="M116 75 C120 84 130 92 146 95"
-        stroke="#F7E7CE"
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M148 114 C142 98 128 92 115 96 C98 102 92 124 98 146 C104 164 122 172 138 166 C148 162 154 152 154 134 L122 134"
-        stroke="#F7E7CE"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Nebulizzazione Spray */}
-      <path
-        d="M118 48 L168 24 L152 44 L178 38 L156 54 L182 52 L152 64 L172 72 L118 55 Z"
-        stroke="#C5A059"
-        strokeWidth="2.5"
-        fill="#C5A059"
-        fillOpacity="0.2"
-        strokeLinejoin="round"
-      />
-      <circle cx="174" cy="28" r="2.5" fill="#F7E7CE" />
-      <circle cx="185" cy="45" r="2.5" fill="#F7E7CE" />
-      <circle cx="180" cy="64" r="2" fill="#C5A059" />
-    </svg>
-  );
-}
-
 function PerfumeBottleIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg
@@ -135,6 +43,7 @@ export default function BoutiqueHomePage() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [ultimoIndosso, setUltimoIndosso] = useState<Indosso | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logoSrc, setLogoSrc] = useState('/logo.png');
 
   const [activePanel, setActivePanel] = useState<'none' | 'ai' | 'collezione' | 'decant'>('none');
 
@@ -244,9 +153,16 @@ export default function BoutiqueHomePage() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-6xl mx-auto w-full">
-      {/* HEADER SOLO CON LOGO LG E TITOLO PRIVATE OLFACTORY */}
+      {/* HEADER CON IL TUO VERO LOGO QUADRATO E TITOLO PRIVATE OLFACTORY */}
       <header className="flex items-center gap-4 pb-6 border-b border-[#F7E7CE]/15">
-        <LogoLG className="w-14 h-14 shrink-0" />
+        <img
+          src={logoSrc}
+          alt="Private Olfactory Logo"
+          onError={() => {
+            if (logoSrc === '/logo.png') setLogoSrc('/logo.jpg');
+          }}
+          className="w-14 h-14 rounded-2xl object-cover border border-[#C5A059]/40 shadow-sm shrink-0"
+        />
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#C5A059]">
             Archive
@@ -534,7 +450,7 @@ export default function BoutiqueHomePage() {
         </div>
       </section>
 
-      {/* I 3 MODULI PRINCIPALI (CON CONTEGGIO DINAMICO E ICONA BOCCETTA PROFUMO NEL BOX 01) */}
+      {/* I 3 MODULI PRINCIPALI */}
       <section className="mt-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
