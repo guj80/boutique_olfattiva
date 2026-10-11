@@ -1,30 +1,9 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Playfair_Display, JetBrains_Mono } from 'next/font/google';
-import { AuthProvider } from '@/components/auth-provider';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
-  weight: ['400', '500', '600', '700'],
-});
-const jetbrains = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains',
-  weight: ['400', '500'],
-});
 
 export const metadata: Metadata = {
-  title: 'Boutique Olfattiva — Diario Olfattivo',
-  description:
-    'Il tuo diario olfattivo personale di lusso. Scansiona, analizza e colleziona i tuoi profumi.',
-  themeColor: '#0a0a0a',
-  openGraph: {
-    title: 'Boutique Olfattiva — Diario Olfattivo',
-    description:
-      'Il tuo diario olfattivo personale di lusso. Scansiona, analizza e colleziona i tuoi profumi.',
-  },
+  title: 'Boutique Olfattiva di Luca — Private Olfactory Archive & AI Sommelier',
+  description: 'Private Olfactory Vault, Dual-Test Radar (Mouche vs Pelle) & AI Sommelier per profumeria artistica e di nicchia.',
 };
 
 export default function RootLayout({
@@ -33,11 +12,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="it" className="dark" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${playfair.variable} ${jetbrains.variable} font-sans antialiased`}
-      >
-        <AuthProvider>{children}</AuthProvider>
+    <html lang="it" className="dark">
+      <body className="min-h-screen bg-[#08080A] text-white antialiased selection:bg-[#C5A059]/30 selection:text-[#F7E7CE]">
+        <div className="fixed inset-0 bg-obsidian-radial pointer-events-none z-0" />
+        <div className="relative z-10 min-h-screen flex flex-col">
+          {children}
+        </div>
       </body>
     </html>
   );
