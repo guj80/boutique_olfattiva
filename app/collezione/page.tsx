@@ -19,7 +19,6 @@ import {
   List,
   FlaskConical,
   Globe,
-  Image as ImageIcon,
 } from 'lucide-react';
 import {
   supabase,
@@ -37,36 +36,41 @@ function CollezioneContent() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [loading, setLoading] = useState(true);
   const [vista, setVista] = useState<'collezione' | 'radar'>(initialVista);
-
-  // Modalità di visualizzazione: 'dettagli' (default) oppure 'vetrina' (stile E-Commerce)
   const [layoutMode, setLayoutMode] = useState<'dettagli' | 'vetrina'>('dettagli');
 
-  // Ricerca Istantanea & AI
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiRecommendedIds, setAiRecommendedIds] = useState<string[] | null>(null);
   const [aiMotivazioni, setAiMotivazioni] = useState<Record<string, string>>({});
 
-  // Stato per aggiornamento AI su card singola
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
 
-  // Modale Scheda Tecnica / Dual-Test
   const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
   const [officialUrlInput, setOfficialUrlInput] = useState('');
   const [modalExtracting, setModalExtracting] = useState(false);
   const [savingDetail, setSavingDetail] = useState(false);
 
-  // Modale Scent Tracker ("Indossa")
   const [wearProfumo, setWearProfumo] = useState<Profumo | null>(null);
   const [momentoGiornata, setMomentoGiornata] = useState<'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte'>('Mattina');
   const [contestoOutfit, setContestoOutfit] = useState('Ufficio');
   const [noteGiorno, setNoteGiorno] = useState('');
   const [savingWear, setSavingWear] = useState(false);
 
-  // Modale Eliminazione
   const [deleteTarget, setDeleteTarget] = useState<Profumo | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    const savedLayout = localStorage.getItem('boutique_layout_mode');
+    if (savedLayout === 'vetrina' || savedLayout === 'dettagli') {
+      setLayoutMode(savedLayout);
+    }
+  }, []);
+
+  function changeLayoutMode(mode: 'dettagli' | 'vetrina') {
+    setLayoutMode(mode);
+    localStorage.setItem('boutique_layout_mode', mode);
+  }
 
   useEffect(() => {
     const v = searchParams.get('vista');
@@ -166,7 +170,6 @@ function CollezioneContent() {
     setAiMotivazioni({});
   }
 
-  // Aggiornamento AI dalla Card (con Google Search Grounding e correzione nome errato es. Artisano -> Tremonte)
   async function handleEnrichWithAI(p: Profumo) {
     setEnrichingId(p.id);
     try {
@@ -218,18 +221,15 @@ function CollezioneContent() {
       setProfumi((prev) =>
         prev.map((item) => (item.id === p.id ? { ...item, ...updatePayload } : item))
       );
-      setStatusBanner(
-        `Scheda verificata e aggiornata: ${updatePayload.brand} — ${updatePayload.nome}`
-      );
-      setTimeout(() => setStatusBanner(null), 4000);
+      setStatusBanner(`Aggiornato: ${updatePayload.brand} — ${updatePayload.nome}`);
+      setTimeout(() => setStatusBanner(null), 3500);
     } catch (err: any) {
-      alert(err?.message || 'Errore durante la verifica AI.');
+      alert(err?.message || 'Errore verifica AI.');
     } finally {
       setEnrichingId(null);
     }
   }
 
-  // Aggiornamento dentro la Modale Scheda (da Link Sito Ufficiale oppure da Nome Corretto su Google)
   async function handleModalExtractFromOfficial() {
     if (!selectedProfumo) return;
     setModalExtracting(true);
@@ -268,7 +268,7 @@ function CollezioneContent() {
       });
       setOfficialUrlInput('');
     } catch (err: any) {
-      alert(err?.message || 'Impossibile estrarre i dati dal sito.');
+      alert(err?.message || 'Impossibile estrarre i dati.');
     } finally {
       setModalExtracting(false);
     }
@@ -317,8 +317,8 @@ function CollezioneContent() {
         )
       );
       setSelectedProfumo(null);
-      setStatusBanner(`Modifiche salvate per ${payload.brand} — ${payload.nome}`);
-      setTimeout(() => setStatusBanner(null), 3500);
+      setStatusBanner(`Salvato: ${payload.brand} — ${payload.nome}`);
+      setTimeout(() => setStatusBanner(null), 3000);
     } catch (err: any) {
       alert(`Errore salvataggio: ${err?.message}`);
     } finally {
@@ -340,10 +340,10 @@ function CollezioneContent() {
       );
       setSelectedProfumo(null);
       setVista('collezione');
-      setStatusBanner(`${p.nome} (${p.brand}) spostato in Collezione Privata.`);
-      setTimeout(() => setStatusBanner(null), 4000);
+      setStatusBanner(`${p.nome} spostato in Collezione.`);
+      setTimeout(() => setStatusBanner(null), 3500);
     } catch (err: any) {
-      alert(err?.message || 'Errore durante lo spostamento.');
+      alert(err?.message || 'Errore spostamento.');
     }
   }
 
@@ -364,12 +364,12 @@ function CollezioneContent() {
 
       if (error) throw error;
 
-      setStatusBanner(`Indosso registrato: ${wearProfumo.nome} (${momentoGiornata}).`);
+      setStatusBanner(`Indosso registrato: ${wearProfumo.nome}`);
       setWearProfumo(null);
       setNoteGiorno('');
-      setTimeout(() => setStatusBanner(null), 3500);
+      setTimeout(() => setStatusBanner(null), 3000);
     } catch (err: any) {
-      alert(`Errore registrazione indosso: ${err?.message}`);
+      alert(`Errore registrazione: ${err?.message}`);
     } finally {
       setSavingWear(false);
     }
@@ -392,13 +392,13 @@ function CollezioneContent() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-7xl mx-auto w-full">
-      {/* TOP BAR: SWITCHER COLLEZIONE/RADAR + SWITCHER VISTA (DETTAGLI vs VETRINA E-COMMERCE) */}
+      {/* TOP BAR */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15">
         <div className="flex items-center gap-4">
           <Link
             href="/"
             className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] hover:border-[#F7E7CE]/40 transition"
-            title="Torna alla Home"
+            title="Home"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -415,37 +415,35 @@ function CollezioneContent() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Selettore Layout: Vista Dettagli vs Vista Vetrina (E-Commerce) */}
+          {/* Selettore Vista: Dettagli vs Vetrina */}
           <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20">
             <button
               type="button"
-              onClick={() => setLayoutMode('dettagli')}
+              onClick={() => changeLayoutMode('dettagli')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
                 layoutMode === 'dettagli'
                   ? 'bg-[#F7E7CE]/20 text-[#F7E7CE] border border-[#F7E7CE]/30 font-medium'
                   : 'text-zinc-400 hover:text-white'
               }`}
-              title="Vista con scheda dettagli e miniatura"
             >
               <List className="w-3.5 h-3.5" />
               <span>Dettagli</span>
             </button>
             <button
               type="button"
-              onClick={() => setLayoutMode('vetrina')}
+              onClick={() => changeLayoutMode('vetrina')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
                 layoutMode === 'vetrina'
                   ? 'bg-[#F7E7CE]/20 text-[#F7E7CE] border border-[#F7E7CE]/30 font-medium'
                   : 'text-zinc-400 hover:text-white'
               }`}
-              title="Vista Vetrina E-Commerce (Solo Immagine, Brand e Nome)"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Vetrina</span>
             </button>
           </div>
 
-          {/* Switcher Collezione vs Radar */}
+          {/* Switcher Collezione vs Testing */}
           <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20">
             <button
               type="button"
@@ -489,9 +487,8 @@ function CollezioneContent() {
         </div>
       </div>
 
-      {/* BANNER DI CONFERMA */}
       {statusBanner && (
-        <div className="mt-5 p-3.5 rounded-xl bg-[#C5A059]/20 border border-[#F7E7CE]/40 text-[#F7E7CE] flex items-center justify-between text-xs font-mono">
+        <div className="mt-5 p-3 rounded-xl bg-[#C5A059]/20 border border-[#F7E7CE]/40 text-[#F7E7CE] flex items-center justify-between text-xs font-mono">
           <span>{statusBanner}</span>
           <button onClick={() => setStatusBanner(null)}>
             <X className="w-4 h-4" />
@@ -516,7 +513,7 @@ function CollezioneContent() {
                   handleAskSommelier();
                 }
               }}
-              placeholder="Filtra per nome, brand, famiglia o nota, oppure scrivi una richiesta per l'AI..."
+              placeholder="Cerca profumo, brand, nota o chiedi all'AI..."
               className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#F7E7CE]"
             />
             {searchQuery && (
@@ -540,7 +537,7 @@ function CollezioneContent() {
             {aiLoading ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Ricerca AI...</span>
+                <span>Ricerca...</span>
               </>
             ) : (
               <>
@@ -569,7 +566,7 @@ function CollezioneContent() {
         )}
       </section>
 
-      {/* GRIGLIA FRAGRANZE: MODALITÀ VETRINA (E-COMMERCE) vs MODALITÀ DETTAGLI */}
+      {/* GRIGLIA FRAGRANZE */}
       <section className="mt-6">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -578,16 +575,10 @@ function CollezioneContent() {
             ))}
           </div>
         ) : filteredList.length === 0 ? (
-          <div className="boutique-glass rounded-2xl p-12 text-center space-y-3">
+          <div className="boutique-glass rounded-2xl p-12 text-center">
             <p className="font-serif text-xl text-white">Nessun profumo trovato</p>
-            <p className="text-xs text-zinc-400">
-              Modifica i termini di ricerca o aggiungi una nuova referenza.
-            </p>
           </div>
         ) : layoutMode === 'vetrina' ? (
-          /* =================================================================
-             MODALITÀ 1: VISTA VETRINA (STILE E-COMMERCE — SOLO FOTO, BRAND, NOME)
-             ================================================================= */
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
             {filteredList.map((p) => {
               const imgUrl = p.url_foto_vetrina || p.immagine_url;
@@ -605,14 +596,14 @@ function CollezioneContent() {
                       <img
                         src={imgUrl}
                         alt={p.nome}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        }}
                         className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-300"
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center text-zinc-600 group-hover:text-[#C5A059] transition">
                         <FlaskConical className="w-10 h-10 stroke-[1.2]" />
-                        <span className="font-mono text-[9px] uppercase tracking-widest mt-2">
-                          {p.concentrazione || 'Flacone'}
-                        </span>
                       </div>
                     )}
                     {p.prezzo_stimato_euro && (
@@ -637,9 +628,6 @@ function CollezioneContent() {
             })}
           </div>
         ) : (
-          /* =================================================================
-             MODALITÀ 2: VISTA DETTAGLI (MINIATURA + PIRAMIDE — SENZA BARRE MONOCROME)
-             ================================================================= */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredList.map((p) => {
               const unifiedNotes = getUnifiedNotes(p);
@@ -653,7 +641,6 @@ function CollezioneContent() {
                   className="boutique-glass boutique-glass-hover rounded-2xl p-5 flex flex-col justify-between relative group"
                 >
                   <div>
-                    {/* Header con eventuale Miniatura Flacone a sinistra */}
                     <div className="flex items-start gap-3.5">
                       {imgUrl && (
                         <div
@@ -666,6 +653,9 @@ function CollezioneContent() {
                           <img
                             src={imgUrl}
                             alt={p.nome}
+                            onError={(e) => {
+                              (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
+                            }}
                             className="w-full h-full object-contain p-1"
                           />
                         </div>
@@ -698,7 +688,6 @@ function CollezioneContent() {
                       </div>
                     </div>
 
-                    {/* Badge Famiglia & Stagione */}
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {p.famiglia_olfattiva && (
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#F7E7CE]/10 text-[#F7E7CE] border border-[#F7E7CE]/20">
@@ -718,7 +707,6 @@ function CollezioneContent() {
                       </div>
                     )}
 
-                    {/* Piramide Olfattiva */}
                     <div className="mt-3.5 text-xs">
                       {p.note_testa || p.note_cuore || p.note_fondo ? (
                         <div className="space-y-1 bg-[#08080A]/60 p-3 rounded-xl border border-[#F7E7CE]/10">
@@ -754,14 +742,9 @@ function CollezioneContent() {
                           </span>
                           {unifiedNotes}
                         </p>
-                      ) : (
-                        <p className="text-zinc-500 italic py-2">
-                          Piramide olfattiva mancante. Premi &ldquo;AI&rdquo; per verificarla su Google.
-                        </p>
-                      )}
+                      ) : null}
                     </div>
 
-                    {/* Note Mouche vs Pelle (solo se presenti o in vista Radar) */}
                     {(vista === 'radar' || p.note_mouche || p.note_pelle) && (
                       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                         <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-[#F7E7CE]/15">
@@ -784,14 +767,12 @@ function CollezioneContent() {
                     )}
                   </div>
 
-                  {/* AZIONI CARD (UNA SOLA ICONA AI, PULITA) */}
                   <div className="mt-4 pt-3 border-t border-[#F7E7CE]/15 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => handleEnrichWithAI(p)}
                         disabled={isEnriching}
-                        title="Verifica e aggiorna note reali con Google + AI"
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#C5A059]/15 hover:bg-[#C5A059]/30 text-[#F7E7CE] border border-[#F7E7CE]/25 font-mono text-[11px] transition"
                       >
                         {isEnriching ? (
@@ -799,7 +780,7 @@ function CollezioneContent() {
                         ) : (
                           <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
                         )}
-                        <span>{isEnriching ? 'Verifica...' : 'AI'}</span>
+                        <span>{isEnriching ? '...' : 'AI'}</span>
                       </button>
 
                       <button
@@ -811,7 +792,7 @@ function CollezioneContent() {
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] transition"
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5 text-[#C5A059]" />
-                        <span>Scheda / Test</span>
+                        <span>Scheda</span>
                       </button>
 
                       <button
@@ -840,7 +821,7 @@ function CollezioneContent() {
         )}
       </section>
 
-      {/* MODALE 1: SCHEDA TECNICA, AGGIORNAMENTO SITO UFFICIALE & METRICHE SEGMENTATE */}
+      {/* MODALE 1: SCHEDA TECNICA (MINIMALISTA, SENZA SPIEGONI) */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-[#F7E7CE]/30 my-8 max-h-[92vh] overflow-y-auto">
@@ -850,12 +831,15 @@ function CollezioneContent() {
                   <img
                     src={selectedProfumo.url_foto_vetrina}
                     alt={selectedProfumo.nome}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
                     className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#F7E7CE]/25 object-contain p-1"
                   />
                 )}
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                    Scheda Tecnica &amp; Revisione Dati
+                    Scheda Tecnica
                   </p>
                   <h3 className="font-serif text-2xl text-white mt-0.5">
                     {selectedProfumo.nome} — {selectedProfumo.brand}
@@ -870,17 +854,17 @@ function CollezioneContent() {
               </button>
             </div>
 
-            {/* BOX AGGIORNAMENTO DA SITO UFFICIALE O RICERCA GOOGLE */}
-            <div className="mt-4 p-3.5 rounded-xl bg-[#08080A] border border-[#C5A059]/35 space-y-2">
-              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#F7E7CE]">
-                🔗 Aggiorna da Sito Ufficiale o Verifica su Google (Zero Invenzioni)
+            {/* BARRA AGGIORNAMENTO COMPATTE (SENZA SPIEGONI) */}
+            <div className="mt-4 p-3 rounded-xl bg-[#08080A] border border-[#C5A059]/30">
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1.5">
+                Aggiorna da Link
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={officialUrlInput}
                   onChange={(e) => setOfficialUrlInput(e.target.value)}
-                  placeholder="Incolla link sito ufficiale (opzionale) oppure lascia vuoto per cercare Brand+Nome su Google..."
+                  placeholder="URL pagina prodotto..."
                   className="flex-1 rounded-lg bg-[#0D0D11] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white placeholder:text-zinc-500"
                 />
                 <button
@@ -892,26 +876,23 @@ function CollezioneContent() {
                   {modalExtracting ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Verifica in corso...</span>
+                      <span>...</span>
                     </>
                   ) : (
                     <>
                       <Globe className="w-3.5 h-3.5" />
-                      <span>Estrai Dati Reali</span>
+                      <span>Estrai</span>
                     </>
                   )}
                 </button>
               </div>
-              <p className="text-[11px] text-zinc-400">
-                Se il nome del profumo è sbagliato (es. &ldquo;Artisano&rdquo; invece di &ldquo;Tremonte&rdquo;), correggilo nella casella qui sotto o premi direttamente &ldquo;Estrai Dati Reali&rdquo;.
-              </p>
             </div>
 
             <form onSubmit={handleSaveDetails} className="space-y-4 mt-4">
               {isRadarProfumo(selectedProfumo) && (
-                <div className="p-3.5 rounded-xl bg-[#C5A059]/15 border border-[#F7E7CE]/35 flex items-center justify-between gap-3">
+                <div className="p-3 rounded-xl bg-[#C5A059]/15 border border-[#F7E7CE]/35 flex items-center justify-between gap-3">
                   <span className="text-xs font-mono text-[#F7E7CE]">
-                    Attualmente in Radar Testing
+                    In Testing
                   </span>
                   <button
                     type="button"
@@ -923,11 +904,10 @@ function CollezioneContent() {
                 </div>
               )}
 
-              {/* Brand, Nome, Prezzo */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Brand / Maison
+                    Brand
                   </label>
                   <input
                     type="text"
@@ -940,7 +920,7 @@ function CollezioneContent() {
                 </div>
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Nome Profumo
+                    Nome
                   </label>
                   <input
                     type="text"
@@ -953,7 +933,7 @@ function CollezioneContent() {
                 </div>
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Prezzo Stimato (€)
+                    Prezzo (€)
                   </label>
                   <input
                     type="text"
@@ -969,7 +949,6 @@ function CollezioneContent() {
                 </div>
               </div>
 
-              {/* Famiglia, Concentrazione, Posizione */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
@@ -988,351 +967,4 @@ function CollezioneContent() {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Concentrazione
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.concentrazione || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        concentrazione: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Archivio
-                  </label>
-                  <select
-                    value={isRadarProfumo(selectedProfumo) ? 'radar' : 'collezione'}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, stato: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  >
-                    <option value="collezione">Collezione Privata</option>
-                    <option value="radar">Radar - Testing</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* URL Immagine Flacone (Per Vista Vetrina e Miniatura) */}
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  URL Immagine Flacone (Per Vista Vetrina &amp; Miniatura personale)
-                </label>
-                <input
-                  type="text"
-                  value={selectedProfumo.url_foto_vetrina || ''}
-                  onChange={(e) =>
-                    setSelectedProfumo({
-                      ...selectedProfumo,
-                      url_foto_vetrina: e.target.value,
-                    })
-                  }
-                  placeholder="https://... (incolla indirizzo immagine del flacone)"
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                />
-              </div>
-
-              {/* Piramide Olfattiva Editabile */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Testa
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_testa || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_testa: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Cuore
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_cuore || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_cuore: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Fondo
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_fondo || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_fondo: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-              </div>
-
-              {/* DUAL-TESTING: MOUCHE VS PELLE */}
-              <div className="p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/25 space-y-3">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#F7E7CE]">
-                  Dual-Testing: Impressione su Mouche vs. Evoluzione su Pelle
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Mouche (Cartoncino — Apertura Tecnica)
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_mouche || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_mouche: e.target.value,
-                        })
-                      }
-                      placeholder="Impressione iniziale, pulizia delle note di testa..."
-                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Pelle (Drydown — Reazione col tuo pH)
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_pelle || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_pelle: e.target.value,
-                        })
-                      }
-                      placeholder="Come evolve col calore della tua pelle..."
-                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* METRICHE TECNICHE A 10 TACCHE CLICCABILI ("DURATA" AL POSTO DI "LONGEVITÀ") */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-[#08080A]/70 border border-[#F7E7CE]/15">
-                {[
-                  { key: 'voto_longevita', label: 'Durata' },
-                  { key: 'voto_scia', label: 'Scia (Sillage)' },
-                  { key: 'voto_proiezione', label: 'Proiezione' },
-                  { key: 'voto_complessita', label: 'Complessità' },
-                ].map(({ key, label }) => {
-                  const val = Number((selectedProfumo as any)[key] ?? 8);
-                  return (
-                    <div key={key}>
-                      <div className="flex justify-between text-xs font-mono mb-1.5">
-                        <span className="text-zinc-300">{label}</span>
-                        <span className="text-[#F7E7CE] font-semibold">{val}/10</span>
-                      </div>
-                      <div className="grid grid-cols-10 gap-1">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) => (
-                          <button
-                            key={step}
-                            type="button"
-                            onClick={() =>
-                              setSelectedProfumo({
-                                ...selectedProfumo,
-                                [key]: step,
-                              })
-                            }
-                            className={`h-2.5 rounded-sm transition ${
-                              step <= val
-                                ? step >= 8
-                                  ? 'bg-[#F7E7CE]'
-                                  : 'bg-[#C5A059]'
-                                : 'bg-zinc-800 hover:bg-zinc-700'
-                            }`}
-                            title={`${label}: ${step}/10`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#F7E7CE]/15">
-                <button
-                  type="button"
-                  onClick={() => setSelectedProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingDetail}
-                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase shadow-champagne-glow"
-                >
-                  {savingDetail ? 'Salvataggio...' : 'Salva Scheda'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODALE 2: SCENT TRACKER ("INDOSSA") */}
-      {wearProfumo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#F7E7CE]/30 space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                  Diario Olfattivo
-                </p>
-                <h3 className="font-serif text-2xl text-white mt-0.5">
-                  {wearProfumo.nome}
-                </h3>
-              </div>
-              <button
-                onClick={() => setWearProfumo(null)}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordWear} className="space-y-4">
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1.5">
-                  Momento della Giornata
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const).map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      onClick={() => setMomentoGiornata(m)}
-                      className={`py-2 rounded-xl font-mono text-xs border transition ${
-                        momentoGiornata === m
-                          ? 'bg-[#F7E7CE] text-[#08080A] border-[#F7E7CE] font-semibold'
-                          : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Contesto
-                </label>
-                <select
-                  value={contestoOutfit}
-                  onChange={(e) => setContestoOutfit(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                >
-                  <option value="Ufficio">Ufficio</option>
-                  <option value="Aperitivo">Aperitivo</option>
-                  <option value="Cena">Cena</option>
-                  <option value="Serata">Serata</option>
-                  <option value="Evento">Evento</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Note del Giorno
-                </label>
-                <textarea
-                  rows={2}
-                  value={noteGiorno}
-                  onChange={(e) => setNoteGiorno(e.target.value)}
-                  placeholder="Annotazioni personali..."
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setWearProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingWear}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold"
-                >
-                  {savingWear ? 'Salvataggio...' : 'Conferma Indosso'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODALE 3: CONFERMA ELIMINAZIONE */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4">
-            <h3 className="font-serif text-xl text-white">
-              Rimuovere &ldquo;{deleteTarget.nome}&rdquo;?
-            </h3>
-            <p className="text-xs text-zinc-400">
-              Stai per eliminare definitivamente <strong>{deleteTarget.nome}</strong> ({deleteTarget.brand}).
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-semibold"
-              >
-                Elimina
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
-
-export default function CollezionePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-[#F7E7CE] font-mono text-xs">
-          Caricamento Archivio...
-        </div>
-      }
-    >
-      <CollezioneContent />
-    </Suspense>
-  );
-}
+                  <label className
