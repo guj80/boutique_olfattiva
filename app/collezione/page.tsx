@@ -1,836 +1,346 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
+  Link2,
+  Camera,
   Sparkles,
-  Search,
-  ScanLine,
-  SlidersHorizontal,
-  Clock,
-  Trash2,
   RefreshCw,
-  Compass,
+  CheckCircle2,
   ShieldCheck,
-  X,
-  LayoutGrid,
-  List,
-  FlaskConical,
-  Globe,
+  Compass,
+  Upload,
 } from 'lucide-react';
-import {
-  supabase,
-  Profumo,
-  isCollezioneProfumo,
-  isRadarProfumo,
-  getUnifiedNotes,
-} from '@/lib/supabase';
+import { supabase, Profumo } from '@/lib/supabase';
 
-function CollezioneContent() {
-  const searchParams = useSearchParams();
-  const initialVista = searchParams.get('vista') === 'radar' ? 'radar' : 'collezione';
-  const initialSearch = searchParams.get('search') || '';
+export default function ScannerPage() {
+  const router = useRouter();
+  const [mode, setMode] = useState<'url' | 'photo' | 'name'>('url');
 
-  const [profumi, setProfumi] = useState<Profumo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [vista, setVista] = useState<'collezione' | 'radar'>(initialVista);
-  const [layoutMode, setLayoutMode] = useState<'dettagli' | 'vetrina'>('dettagli');
+  const [inputUrl, setInputUrl] = useState('');
+  const [inputName, setInputName] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageMime, setImageMime] = useState<string>('image/jpeg');
 
-  const [searchQuery, setSearchQuery] = useState(initialSearch);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
-  const [aiRecommendedIds, setAiRecommendedIds] = useState<string[] | null>(null);
-  const [aiMotivazioni, setAiMotivazioni] = useState<Record<string, string>>({});
+  const [extracting, setExtracting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [enrichingId, setEnrichingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Partial<Profumo> | null>(null);
+  const [targetStato, setTargetStato] = useState<'collezione' | 'radar'>('collezione');
 
-  const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
-  const [officialUrlInput, setOfficialUrlInput] = useState('');
-  const [modalExtracting, setModalExtracting] = useState(false);
-  const [savingDetail, setSavingDetail] = useState(false);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const [wearProfumo, setWearProfumo] = useState<Profumo | null>(null);
-  const [momentoGiornata, setMomentoGiornata] = useState<'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte'>('Mattina');
-  const [contestoOutfit, setContestoOutfit] = useState('Ufficio');
-  const [noteGiorno, setNoteGiorno] = useState('');
-  const [savingWear, setSavingWear] = useState(false);
-
-  const [deleteTarget, setDeleteTarget] = useState<Profumo | null>(null);
-  const [statusBanner, setStatusBanner] = useState<string | null>(null);
-
-  useEffect(() => {
-    const savedLayout = localStorage.getItem('boutique_layout_mode');
-    if (savedLayout === 'vetrina' || savedLayout === 'dettagli') {
-      setLayoutMode(savedLayout);
-    }
-  }, []);
-
-  function changeLayoutMode(mode: 'dettagli' | 'vetrina') {
-    setLayoutMode(mode);
-    localStorage.setItem('boutique_layout_mode', mode);
-  }
-
-  useEffect(() => {
-    const v = searchParams.get('vista');
-    if (v === 'radar') setVista('radar');
-    else if (v === 'collezione') setVista('collezione');
-  }, [searchParams]);
-
-  useEffect(() => {
-    fetchProfumi();
-  }, []);
-
-  async function fetchProfumi() {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('profumi')
-        .select('*')
-        .order('brand', { ascending: true });
-
-      if (error) throw error;
-      setProfumi((data || []) as Profumo[]);
-    } catch (err) {
-      console.error('Errore caricamento collezione:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const collezioneList = useMemo(() => profumi.filter(isCollezioneProfumo), [profumi]);
-  const radarList = useMemo(() => profumi.filter(isRadarProfumo), [profumi]);
-  const activeList = vista === 'collezione' ? collezioneList : radarList;
-
-  const filteredList = useMemo(() => {
-    const base = activeList;
-
-    if (aiRecommendedIds && aiRecommendedIds.length > 0) {
-      const map = new Map(base.map((p) => [p.id, p]));
-      const ordered = aiRecommendedIds.map((id) => map.get(id)).filter(Boolean) as Profumo[];
-      if (ordered.length > 0) return ordered;
-    }
-
-    if (!searchQuery.trim()) return base;
-    const q = searchQuery.toLowerCase().trim();
-    return base.filter((p) => {
-      const haystack = [
-        p.nome,
-        p.brand,
-        p.famiglia_olfattiva,
-        p.note_testa,
-        p.note_cuore,
-        p.note_fondo,
-        p.note_olfattive,
-        p.stagione_ideale,
-        p.occasione_ideale,
-        p.note_mouche,
-        p.note_pelle,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [activeList, searchQuery, aiRecommendedIds]);
-
-  async function handleAskSommelier() {
-    if (!searchQuery.trim()) return;
-    setAiLoading(true);
-    setAiAdvice(null);
-    setAiRecommendedIds(null);
-    setAiMotivazioni({});
-
-    try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: searchQuery,
-          profumi: activeList,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Errore ricerca AI');
-
-      setAiAdvice(data.sommelierAdvice || null);
-      setAiRecommendedIds(data.recommendedIds || []);
-      setAiMotivazioni(data.motivazioniPerProfumo || {});
-    } catch (err: any) {
-      alert(err?.message || 'Errore durante la consultazione AI.');
-    } finally {
-      setAiLoading(false);
-    }
-  }
-
-  function resetAiFilter() {
-    setAiAdvice(null);
-    setAiRecommendedIds(null);
-    setAiMotivazioni({});
-  }
-
-  async function handleEnrichWithAI(p: Profumo) {
-    setEnrichingId(p.id);
-    try {
-      const res = await fetch('/api/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand: p.brand, nome: p.nome }),
-      });
-      const aiData = await res.json();
-      if (!res.ok) throw new Error(aiData.error || 'Errore verifica AI');
-
-      const updatePayload: Partial<Profumo> = {
-        nome: aiData.nome || p.nome,
-        brand: aiData.brand || p.brand,
-        concentrazione: aiData.concentrazione || p.concentrazione,
-        famiglia_olfattiva: aiData.famiglia_olfattiva || p.famiglia_olfattiva,
-        note_testa: aiData.note_testa || p.note_testa,
-        note_cuore: aiData.note_cuore || p.note_cuore,
-        note_fondo: aiData.note_fondo || p.note_fondo,
-        note_olfattive: aiData.note_olfattive || p.note_olfattive,
-        descrizione_ai: aiData.descrizione_ai || p.descrizione_ai,
-        prezzo_stimato_euro: aiData.prezzo_stimato_euro || p.prezzo_stimato_euro,
-        stagione_ideale: aiData.stagione_ideale || p.stagione_ideale,
-        occasione_ideale: aiData.occasione_ideale || p.occasione_ideale,
-        url_foto_vetrina: p.url_foto_vetrina || aiData.url_foto_vetrina || null,
-        voto_longevita: p.voto_longevita ?? aiData.voto_longevita,
-        voto_scia: p.voto_scia ?? aiData.voto_scia,
-        voto_proiezione: p.voto_proiezione ?? aiData.voto_proiezione,
-        voto_complessita: p.voto_complessita ?? aiData.voto_complessita,
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 1100;
+        let w = img.width;
+        let h = img.height;
+        if (w > h && w > maxDim) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else if (h > maxDim) {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, w, h);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        setImagePreview(compressedDataUrl);
+        setImageMime('image/jpeg');
       };
-
-      const { error } = await supabase
-        .from('profumi')
-        .update(updatePayload)
-        .eq('id', p.id);
-
-      if (error) {
-        await supabase
-          .from('profumi')
-          .update({
-            nome: updatePayload.nome,
-            brand: updatePayload.brand,
-            famiglia_olfattiva: updatePayload.famiglia_olfattiva,
-            note_olfattive: updatePayload.note_olfattive,
-          })
-          .eq('id', p.id);
-      }
-
-      setProfumi((prev) =>
-        prev.map((item) => (item.id === p.id ? { ...item, ...updatePayload } : item))
-      );
-      setStatusBanner(`Aggiornato: ${updatePayload.brand} — ${updatePayload.nome}`);
-      setTimeout(() => setStatusBanner(null), 3500);
-    } catch (err: any) {
-      alert(err?.message || 'Errore verifica AI.');
-    } finally {
-      setEnrichingId(null);
-    }
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   }
 
-  async function handleModalExtractFromOfficial() {
-    if (!selectedProfumo) return;
-    setModalExtracting(true);
+  async function handleExtract(e: React.FormEvent) {
+    e.preventDefault();
+    setExtracting(true);
+    setDraft(null);
+
     try {
-      const payload = officialUrlInput.trim().startsWith('http')
-        ? { url: officialUrlInput.trim() }
-        : { brand: selectedProfumo.brand, nome: selectedProfumo.nome };
+      const payload: Record<string, any> = {};
+      if (mode === 'url') {
+        if (!inputUrl.trim()) throw new Error('Inserisci un URL valido.');
+        payload.url = inputUrl.trim();
+      } else if (mode === 'name') {
+        if (!inputName.trim()) throw new Error('Inserisci Brand e Nome.');
+        payload.queryName = inputName.trim();
+      } else if (mode === 'photo') {
+        if (!imagePreview) throw new Error('Seleziona una foto.');
+        payload.imageBase64 = imagePreview;
+        payload.mimeType = imageMime;
+      }
 
       const res = await fetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const aiData = await res.json();
-      if (!res.ok) throw new Error(aiData.error || 'Errore estrazione dati');
 
-      setSelectedProfumo({
-        ...selectedProfumo,
-        nome: aiData.nome || selectedProfumo.nome,
-        brand: aiData.brand || selectedProfumo.brand,
-        concentrazione: aiData.concentrazione || selectedProfumo.concentrazione,
-        famiglia_olfattiva: aiData.famiglia_olfattiva || selectedProfumo.famiglia_olfattiva,
-        note_testa: aiData.note_testa || selectedProfumo.note_testa,
-        note_cuore: aiData.note_cuore || selectedProfumo.note_cuore,
-        note_fondo: aiData.note_fondo || selectedProfumo.note_fondo,
-        note_olfattive: aiData.note_olfattive || selectedProfumo.note_olfattive,
-        descrizione_ai: aiData.descrizione_ai || selectedProfumo.descrizione_ai,
-        prezzo_stimato_euro: aiData.prezzo_stimato_euro || selectedProfumo.prezzo_stimato_euro,
-        stagione_ideale: aiData.stagione_ideale || selectedProfumo.stagione_ideale,
-        occasione_ideale: aiData.occasione_ideale || selectedProfumo.occasione_ideale,
-        url_foto_vetrina: aiData.url_foto_vetrina || selectedProfumo.url_foto_vetrina,
-        voto_longevita: aiData.voto_longevita ?? selectedProfumo.voto_longevita,
-        voto_scia: aiData.voto_scia ?? selectedProfumo.voto_scia,
-        voto_proiezione: aiData.voto_proiezione ?? selectedProfumo.voto_proiezione,
-        voto_complessita: aiData.voto_complessita ?? selectedProfumo.voto_complessita,
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Errore estrazione AI');
+
+      setDraft({
+        nome: data.nome || '',
+        brand: data.brand || '',
+        concentrazione: data.concentrazione || 'Extrait de Parfum',
+        famiglia_olfattiva: data.famiglia_olfattiva || '',
+        note_testa: data.note_testa || '',
+        note_cuore: data.note_cuore || '',
+        note_fondo: data.note_fondo || '',
+        note_olfattive: data.note_olfattive || '',
+        descrizione_ai: data.descrizione_ai || '',
+        prezzo_stimato_euro: data.prezzo_stimato_euro || '€180',
+        url_foto_vetrina: data.url_foto_vetrina || '',
+        stagione_ideale: data.stagione_ideale || '',
+        occasione_ideale: data.occasione_ideale || '',
+        voto_longevita: Number(data.voto_longevita) || 8,
+        voto_scia: Number(data.voto_scia) || 8,
+        voto_proiezione: Number(data.voto_proiezione) || 8,
+        voto_complessita: Number(data.voto_complessita) || 8,
+        note_mouche: '',
+        note_pelle: '',
       });
-      setOfficialUrlInput('');
     } catch (err: any) {
       alert(err?.message || 'Impossibile estrarre i dati.');
     } finally {
-      setModalExtracting(false);
+      setExtracting(false);
     }
   }
 
-  async function handleSaveDetails(e: React.FormEvent) {
+  async function handleSaveToVault(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedProfumo) return;
-    setSavingDetail(true);
+    if (!draft?.nome || !draft?.brand) {
+      alert('Brand e Nome sono obbligatori.');
+      return;
+    }
 
+    setSaving(true);
     try {
-      const payload = {
-        nome: selectedProfumo.nome,
-        brand: selectedProfumo.brand,
-        concentrazione: selectedProfumo.concentrazione,
-        famiglia_olfattiva: selectedProfumo.famiglia_olfattiva,
-        note_testa: selectedProfumo.note_testa,
-        note_cuore: selectedProfumo.note_cuore,
-        note_fondo: selectedProfumo.note_fondo,
-        note_olfattive:
-          selectedProfumo.note_olfattive || getUnifiedNotes(selectedProfumo),
-        descrizione_ai: selectedProfumo.descrizione_ai,
-        prezzo_stimato_euro: selectedProfumo.prezzo_stimato_euro,
-        url_foto_vetrina: selectedProfumo.url_foto_vetrina || null,
-        stato: selectedProfumo.stato || 'collezione',
-        note_mouche: selectedProfumo.note_mouche,
-        note_pelle: selectedProfumo.note_pelle,
-        voto_longevita: selectedProfumo.voto_longevita,
-        voto_scia: selectedProfumo.voto_scia,
-        voto_proiezione: selectedProfumo.voto_proiezione,
-        voto_complessita: selectedProfumo.voto_complessita,
-        stagione_ideale: selectedProfumo.stagione_ideale,
-        occasione_ideale: selectedProfumo.occasione_ideale,
+      const unified =
+        draft.note_olfattive ||
+        [draft.note_testa, draft.note_cuore, draft.note_fondo]
+          .filter(Boolean)
+          .join(', ');
+
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id || undefined;
+
+      const fullPayload: Record<string, any> = {
+        nome: draft.nome,
+        brand: draft.brand,
+        concentrazione: draft.concentrazione,
+        famiglia_olfattiva: draft.famiglia_olfattiva,
+        note_testa: draft.note_testa,
+        note_cuore: draft.note_cuore,
+        note_fondo: draft.note_fondo,
+        note_olfattive: unified,
+        descrizione_ai: draft.descrizione_ai,
+        prezzo_stimato_euro: draft.prezzo_stimato_euro,
+        url_foto_vetrina: draft.url_foto_vetrina || null,
+        stagione_ideale: draft.stagione_ideale,
+        occasione_ideale: draft.occasione_ideale,
+        voto_longevita: draft.voto_longevita,
+        voto_scia: draft.voto_scia,
+        voto_proiezione: draft.voto_proiezione,
+        voto_complessita: draft.voto_complessita,
+        note_mouche: draft.note_mouche || null,
+        note_pelle: draft.note_pelle || null,
+        stato: targetStato,
+        ...(userId ? { user_id: userId } : {}),
       };
 
-      const { error } = await supabase
-        .from('profumi')
-        .update(payload)
-        .eq('id', selectedProfumo.id);
+      const { error } = await supabase.from('profumi').insert([fullPayload]);
 
-      if (error) throw error;
+      if (error) {
+        const minimalPayload: Record<string, any> = {
+          nome: draft.nome,
+          brand: draft.brand,
+          famiglia_olfattiva: draft.famiglia_olfattiva,
+          note_olfattive: unified,
+          ...(userId ? { user_id: userId } : {}),
+        };
+        const { error: fallbackErr } = await supabase
+          .from('profumi')
+          .insert([minimalPayload]);
+        if (fallbackErr) throw fallbackErr;
+      }
 
-      setProfumi((prev) =>
-        prev.map((item) =>
-          item.id === selectedProfumo.id ? { ...item, ...payload } : item
-        )
+      router.push(
+        targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione'
       );
-      setSelectedProfumo(null);
-      setStatusBanner(`Salvato: ${payload.brand} — ${payload.nome}`);
-      setTimeout(() => setStatusBanner(null), 3000);
     } catch (err: any) {
       alert(`Errore salvataggio: ${err?.message}`);
     } finally {
-      setSavingDetail(false);
-    }
-  }
-
-  async function handlePromoteToCollection(p: Profumo) {
-    try {
-      const { error } = await supabase
-        .from('profumi')
-        .update({ stato: 'collezione' })
-        .eq('id', p.id);
-
-      if (error) throw error;
-
-      setProfumi((prev) =>
-        prev.map((item) => (item.id === p.id ? { ...item, stato: 'collezione' } : item))
-      );
-      setSelectedProfumo(null);
-      setVista('collezione');
-      setStatusBanner(`${p.nome} spostato in Collezione.`);
-      setTimeout(() => setStatusBanner(null), 3500);
-    } catch (err: any) {
-      alert(err?.message || 'Errore spostamento.');
-    }
-  }
-
-  async function handleRecordWear(e: React.FormEvent) {
-    e.preventDefault();
-    if (!wearProfumo) return;
-    setSavingWear(true);
-
-    try {
-      const { error } = await supabase.from('indossi').insert([
-        {
-          profumo_id: wearProfumo.id,
-          momento_giornata: momentoGiornata,
-          contesto_outfit: contestoOutfit || null,
-          note_giorno: noteGiorno || null,
-        },
-      ]);
-
-      if (error) throw error;
-
-      setStatusBanner(`Indosso registrato: ${wearProfumo.nome}`);
-      setWearProfumo(null);
-      setNoteGiorno('');
-      setTimeout(() => setStatusBanner(null), 3000);
-    } catch (err: any) {
-      alert(`Errore registrazione: ${err?.message}`);
-    } finally {
-      setSavingWear(false);
-    }
-  }
-
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    try {
-      const { error } = await supabase
-        .from('profumi')
-        .delete()
-        .eq('id', deleteTarget.id);
-      if (error) throw error;
-      setProfumi((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      setDeleteTarget(null);
-    } catch (err: any) {
-      alert(err?.message || 'Errore eliminazione.');
+      setSaving(false);
     }
   }
 
   return (
-    <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-7xl mx-auto w-full">
-      {/* TOP BAR */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] hover:border-[#F7E7CE]/40 transition"
-            title="Home"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#C5A059]">
-              Boutique Olfattiva di Luca
-            </p>
-            <h1 className="font-serif text-2xl sm:text-3xl text-white">
-              {vista === 'collezione'
-                ? `Collezione Privata (${collezioneList.length})`
-                : `Radar - Testing (${radarList.length})`}
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Selettore Vista: Dettagli vs Vetrina */}
-          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20">
-            <button
-              type="button"
-              onClick={() => changeLayoutMode('dettagli')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
-                layoutMode === 'dettagli'
-                  ? 'bg-[#F7E7CE]/20 text-[#F7E7CE] border border-[#F7E7CE]/30 font-medium'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>Dettagli</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => changeLayoutMode('vetrina')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
-                layoutMode === 'vetrina'
-                  ? 'bg-[#F7E7CE]/20 text-[#F7E7CE] border border-[#F7E7CE]/30 font-medium'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Vetrina</span>
-            </button>
-          </div>
-
-          {/* Switcher Collezione vs Testing */}
-          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20">
-            <button
-              type="button"
-              onClick={() => {
-                setVista('collezione');
-                resetAiFilter();
-              }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
-                vista === 'collezione'
-                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Collezione ({collezioneList.length})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setVista('radar');
-                resetAiFilter();
-              }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition ${
-                vista === 'radar'
-                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Testing ({radarList.length})</span>
-            </button>
-          </div>
-
-          <Link
-            href="/scanner"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold text-xs font-mono uppercase tracking-wider shadow-champagne-glow hover:opacity-95 transition"
-          >
-            <ScanLine className="w-3.5 h-3.5" />
-            <span>+ Aggiungi</span>
-          </Link>
+    <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-4xl mx-auto w-full">
+      {/* HEADER */}
+      <div className="flex items-center gap-4 pb-6 border-b border-[#F7E7CE]/15">
+        <Link
+          href="/"
+          className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] hover:border-[#F7E7CE]/40 transition"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#C5A059]">
+            Boutique Olfattiva di Luca
+          </p>
+          <h1 className="font-serif text-2xl sm:text-3xl text-white">
+            AI Scanner &amp; Estrattore
+          </h1>
         </div>
       </div>
 
-      {statusBanner && (
-        <div className="mt-5 p-3 rounded-xl bg-[#C5A059]/20 border border-[#F7E7CE]/40 text-[#F7E7CE] flex items-center justify-between text-xs font-mono">
-          <span>{statusBanner}</span>
-          <button onClick={() => setStatusBanner(null)}>
-            <X className="w-4 h-4" />
+      {/* SELETTORE 3 MODALITÀ COMPATTO */}
+      <section className="mt-6 boutique-glass rounded-2xl p-6">
+        <div className="grid grid-cols-3 gap-2.5 mb-5">
+          <button
+            type="button"
+            onClick={() => setMode('url')}
+            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-mono text-xs uppercase tracking-wider border transition ${
+              mode === 'url'
+                ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold border-transparent'
+                : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20 hover:text-white'
+            }`}
+          >
+            <Link2 className="w-3.5 h-3.5" />
+            <span>Link Web</span>
           </button>
-        </div>
-      )}
-
-      {/* BARRA DI RICERCA */}
-      <section className="mt-6 boutique-glass rounded-2xl p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#C5A059] absolute left-4 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                if (!e.target.value.trim()) resetAiFilter();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchQuery.split(' ').length >= 3) {
-                  handleAskSommelier();
-                }
-              }}
-              placeholder="Cerca profumo, brand, nota o chiedi all'AI..."
-              className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#F7E7CE]"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  resetAiFilter();
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
 
           <button
-            onClick={handleAskSommelier}
-            disabled={aiLoading || !searchQuery.trim()}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase tracking-wider hover:opacity-95 transition disabled:opacity-40 shrink-0"
+            type="button"
+            onClick={() => setMode('photo')}
+            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-mono text-xs uppercase tracking-wider border transition ${
+              mode === 'photo'
+                ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold border-transparent'
+                : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20 hover:text-white'
+            }`}
           >
-            {aiLoading ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Ricerca...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi all&apos;AI</span>
-              </>
-            )}
+            <Camera className="w-3.5 h-3.5" />
+            <span>Fotocamera</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode('name')}
+            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-mono text-xs uppercase tracking-wider border transition ${
+              mode === 'name'
+                ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-semibold border-transparent'
+                : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Nome</span>
           </button>
         </div>
 
-        {aiAdvice && (
-          <div className="mt-4 p-4 rounded-xl bg-[#08080A]/95 border border-[#C5A059]/40 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059]">
-                Selezione AI
-              </span>
-              <button
-                onClick={resetAiFilter}
-                className="text-xs font-mono text-zinc-400 hover:text-[#F7E7CE]"
-              >
-                Mostra tutti ({activeList.length})
-              </button>
+        <form onSubmit={handleExtract} className="space-y-4">
+          {mode === 'url' && (
+            <div>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1.5">
+                URL Pagina Prodotto
+              </label>
+              <input
+                type="url"
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/25 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#F7E7CE]"
+              />
             </div>
-            <p className="text-xs text-[#F7E7CE] leading-relaxed">{aiAdvice}</p>
-          </div>
-        )}
-      </section>
+          )}
 
-      {/* GRIGLIA FRAGRANZE */}
-      <section className="mt-6">
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-64 rounded-2xl boutique-glass animate-pulse p-6" />
-            ))}
-          </div>
-        ) : filteredList.length === 0 ? (
-          <div className="boutique-glass rounded-2xl p-12 text-center">
-            <p className="font-serif text-xl text-white">Nessun profumo trovato</p>
-          </div>
-        ) : layoutMode === 'vetrina' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {filteredList.map((p) => {
-              const imgUrl = p.url_foto_vetrina || p.immagine_url;
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => {
-                    setSelectedProfumo({ ...p });
-                    setOfficialUrlInput('');
-                  }}
-                  className="boutique-glass boutique-glass-hover rounded-2xl p-4 cursor-pointer flex flex-col justify-between group text-center"
-                >
-                  <div className="w-full aspect-square rounded-xl bg-[#08080A] border border-[#F7E7CE]/10 flex items-center justify-center overflow-hidden relative mb-4">
-                    {imgUrl ? (
-                      <img
-                        src={imgUrl}
-                        alt={p.nome}
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = 'none';
-                        }}
-                        className="w-full h-full object-contain p-3 group-hover:scale-105 transition duration-300"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-zinc-600 group-hover:text-[#C5A059] transition">
-                        <FlaskConical className="w-10 h-10 stroke-[1.2]" />
-                      </div>
-                    )}
-                    {p.prezzo_stimato_euro && (
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded font-mono text-[10px] bg-[#08080A]/90 text-[#F7E7CE] border border-[#F7E7CE]/20">
-                        {String(p.prezzo_stimato_euro).startsWith('€')
-                          ? p.prezzo_stimato_euro
-                          : `€${p.prezzo_stimato_euro}`}
-                      </span>
-                    )}
-                  </div>
+          {mode === 'name' && (
+            <div>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1.5">
+                Brand e Nome Fragranza
+              </label>
+              <input
+                type="text"
+                value={inputName}
+                onChange={(e) => setInputName(e.target.value)}
+                placeholder="Es. Lorenzo Pazzaglia Carbonara"
+                className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/25 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#F7E7CE]"
+              />
+            </div>
+          )}
 
-                  <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
-                      {p.brand}
-                    </p>
-                    <h2 className="font-serif text-lg text-white font-medium mt-0.5 line-clamp-1">
-                      {p.nome}
-                    </h2>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredList.map((p) => {
-              const unifiedNotes = getUnifiedNotes(p);
-              const aiReason = aiMotivazioni[p.id];
-              const isEnriching = enrichingId === p.id;
-              const imgUrl = p.url_foto_vetrina || p.immagine_url;
+          {mode === 'photo' && (
+            <div className="space-y-3">
+              <label className="flex flex-col items-center justify-center border border-dashed border-[#F7E7CE]/30 rounded-2xl p-6 cursor-pointer hover:border-[#F7E7CE] transition bg-[#08080A]/60">
+                <Upload className="w-6 h-6 text-[#C5A059] mb-1.5" />
+                <span className="text-xs font-mono uppercase tracking-wider text-[#F7E7CE]">
+                  Scatta foto o carica immagine
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
 
-              return (
-                <article
-                  key={p.id}
-                  className="boutique-glass boutique-glass-hover rounded-2xl p-5 flex flex-col justify-between relative group"
-                >
-                  <div>
-                    <div className="flex items-start gap-3.5">
-                      {imgUrl && (
-                        <div
-                          onClick={() => {
-                            setSelectedProfumo({ ...p });
-                            setOfficialUrlInput('');
-                          }}
-                          className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 shrink-0 overflow-hidden flex items-center justify-center cursor-pointer"
-                        >
-                          <img
-                            src={imgUrl}
-                            alt={p.nome}
-                            onError={(e) => {
-                              (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
-                            }}
-                            className="w-full h-full object-contain p-1"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
-                            {p.brand || 'Maison'}
-                          </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {p.concentrazione && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 text-zinc-300 border border-white/10">
-                                {p.concentrazione}
-                              </span>
-                            )}
-                            {p.prezzo_stimato_euro && (
-                              <span className="px-2 py-0.5 rounded font-mono text-xs bg-[#C5A059]/20 text-[#F7E7CE] border border-[#F7E7CE]/25">
-                                {String(p.prezzo_stimato_euro).startsWith('€')
-                                  ? p.prezzo_stimato_euro
-                                  : `€${p.prezzo_stimato_euro}`}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <h2 className="font-serif text-xl sm:text-2xl text-white font-semibold mt-1 tracking-tight">
-                          {p.nome}
-                        </h2>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      {p.famiglia_olfattiva && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#F7E7CE]/10 text-[#F7E7CE] border border-[#F7E7CE]/20">
-                          {p.famiglia_olfattiva}
-                        </span>
-                      )}
-                      {p.stagione_ideale && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-zinc-900 text-zinc-400 border border-white/10">
-                          {p.stagione_ideale}
-                        </span>
-                      )}
-                    </div>
-
-                    {aiReason && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/40 text-xs text-[#F7E7CE]">
-                        {aiReason}
-                      </div>
-                    )}
-
-                    <div className="mt-3.5 text-xs">
-                      {p.note_testa || p.note_cuore || p.note_fondo ? (
-                        <div className="space-y-1 bg-[#08080A]/60 p-3 rounded-xl border border-[#F7E7CE]/10">
-                          {p.note_testa && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                                Testa:
-                              </span>
-                              {p.note_testa}
-                            </p>
-                          )}
-                          {p.note_cuore && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                                Cuore:
-                              </span>
-                              {p.note_cuore}
-                            </p>
-                          )}
-                          {p.note_fondo && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                                Fondo:
-                              </span>
-                              {p.note_fondo}
-                            </p>
-                          )}
-                        </div>
-                      ) : unifiedNotes ? (
-                        <p className="text-zinc-300 bg-[#08080A]/60 p-3 rounded-xl border border-[#F7E7CE]/10 line-clamp-3">
-                          <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                            Note:
-                          </span>
-                          {unifiedNotes}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    {(vista === 'radar' || p.note_mouche || p.note_pelle) && (
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-[#F7E7CE]/15">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
-                            Su Mouche
-                          </span>
-                          <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_mouche || '—'}
-                          </p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-[#F7E7CE]/15">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
-                            Su Pelle
-                          </span>
-                          <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_pelle || '—'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-[#F7E7CE]/15 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleEnrichWithAI(p)}
-                        disabled={isEnriching}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#C5A059]/15 hover:bg-[#C5A059]/30 text-[#F7E7CE] border border-[#F7E7CE]/25 font-mono text-[11px] transition"
-                      >
-                        {isEnriching ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
-                        )}
-                        <span>{isEnriching ? '...' : 'AI'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedProfumo({ ...p });
-                          setOfficialUrlInput('');
-                        }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] transition"
-                      >
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-[#C5A059]" />
-                        <span>Scheda</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setWearProfumo(p)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] transition"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-[#C5A059]" />
-                        <span>Indossa</span>
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(p)}
-                      title="Elimina"
-                      className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* MODALE 1: SCHEDA TECNICA (MINIMALISTA, SENZA SPIEGONI) */}
-      {selectedProfumo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-[#F7E7CE]/30 my-8 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#F7E7CE]/15">
-              <div className="flex items-center gap-3.5">
-                {selectedProfumo.url_foto_vetrina && (
+              {imagePreview && (
+                <div className="flex justify-center">
                   <img
-                    src={selectedProfumo.url_foto_vetrina}
-                    alt={selectedProfumo.nome}
+                    src={imagePreview}
+                    alt="Anteprima"
+                    className="max-h-48 rounded-xl border border-[#F7E7CE]/30 object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={extracting}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase tracking-wider shadow-champagne-glow hover:opacity-95 transition disabled:opacity-50"
+            >
+              {extracting ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Estrazione...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Estrai Scheda</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* SCHEDA DI ANTEPRIMA EDITABILE */}
+      {draft && (
+        <section className="mt-6 boutique-glass rounded-2xl p-6 border-[#C5A059]/40">
+          <form onSubmit={handleSaveToVault} className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#F7E7CE]/15">
+              <div className="flex items-center gap-3.5">
+                {draft.url_foto_vetrina && (
+                  <img
+                    src={draft.url_foto_vetrina}
+                    alt={draft.nome}
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).style.display = 'none';
                     }}
@@ -838,469 +348,183 @@ function CollezioneContent() {
                   />
                 )}
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                    Scheda Tecnica
-                  </p>
-                  <h3 className="font-serif text-2xl text-white mt-0.5">
-                    {selectedProfumo.nome} — {selectedProfumo.brand}
-                  </h3>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedProfumo(null)}
-                className="p-2 rounded-lg text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* BARRA AGGIORNAMENTO COMPATTE (SENZA SPIEGONI) */}
-            <div className="mt-4 p-3 rounded-xl bg-[#08080A] border border-[#C5A059]/30">
-              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1.5">
-                Aggiorna da Link
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  value={officialUrlInput}
-                  onChange={(e) => setOfficialUrlInput(e.target.value)}
-                  placeholder="URL pagina prodotto..."
-                  className="flex-1 rounded-lg bg-[#0D0D11] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white placeholder:text-zinc-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleModalExtractFromOfficial}
-                  disabled={modalExtracting}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold hover:bg-[#C5A059] transition shrink-0"
-                >
-                  {modalExtracting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>Estrai</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleSaveDetails} className="space-y-4 mt-4">
-              {isRadarProfumo(selectedProfumo) && (
-                <div className="p-3 rounded-xl bg-[#C5A059]/15 border border-[#F7E7CE]/35 flex items-center justify-between gap-3">
-                  <span className="text-xs font-mono text-[#F7E7CE]">
-                    In Testing
+                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059]">
+                    Anteprima Scheda
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handlePromoteToCollection(selectedProfumo)}
-                    className="px-3.5 py-1.5 rounded-lg bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold uppercase"
-                  >
-                    Sposta in Collezione
-                  </button>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Brand
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.brand || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, brand: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Nome
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.nome || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, nome: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Prezzo (€)
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.prezzo_stimato_euro || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        prezzo_stimato_euro: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs font-mono text-white"
-                  />
+                  <h2 className="font-serif text-2xl text-white mt-0.5">
+                    {draft.nome} — <span className="text-[#C5A059]">{draft.brand}</span>
+                  </h2>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Famiglia Olfattiva
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.famiglia_olfattiva || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        famiglia_olfattiva: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Concentrazione
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.concentrazione || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        concentrazione: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Archivio
-                  </label>
-                  <select
-                    value={isRadarProfumo(selectedProfumo) ? 'radar' : 'collezione'}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, stato: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  >
-                    <option value="collezione">Collezione Privata</option>
-                    <option value="radar">Radar - Testing</option>
-                  </select>
-                </div>
+              <div className="inline-flex p-1 rounded-xl bg-[#08080A] border border-[#F7E7CE]/25 shrink-0 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setTargetStato('collezione')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs uppercase transition ${
+                    targetStato === 'collezione'
+                      ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
+                      : 'text-zinc-400'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Collezione</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetStato('radar')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs uppercase transition ${
+                    targetStato === 'radar'
+                      ? 'bg-[#F7E7CE] text-[#08080A] font-semibold'
+                      : 'text-zinc-400'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>Testing</span>
+                </button>
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  URL Immagine
+                  Brand
                 </label>
                 <input
                   type="text"
-                  value={selectedProfumo.url_foto_vetrina || ''}
-                  onChange={(e) =>
-                    setSelectedProfumo({
-                      ...selectedProfumo,
-                      url_foto_vetrina: e.target.value,
-                    })
-                  }
-                  placeholder="https://..."
+                  value={draft.brand || ''}
+                  onChange={(e) => setDraft({ ...draft, brand: e.target.value })}
                   className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
                 />
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Testa
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_testa || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_testa: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Cuore
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_cuore || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_cuore: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Fondo
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.note_fondo || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_fondo: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/25 space-y-3">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#F7E7CE]">
-                  Test Olfattivo
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Mouche
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_mouche || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_mouche: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Pelle
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_pelle || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_pelle: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-[#08080A]/70 border border-[#F7E7CE]/15">
-                {[
-                  { key: 'voto_longevita', label: 'Durata' },
-                  { key: 'voto_scia', label: 'Scia' },
-                  { key: 'voto_proiezione', label: 'Proiezione' },
-                  { key: 'voto_complessita', label: 'Complessità' },
-                ].map(({ key, label }) => {
-                  const val = Number((selectedProfumo as any)[key] ?? 8);
-                  return (
-                    <div key={key}>
-                      <div className="flex justify-between text-xs font-mono mb-1.5">
-                        <span className="text-zinc-300">{label}</span>
-                        <span className="text-[#F7E7CE] font-semibold">{val}/10</span>
-                      </div>
-                      <div className="grid grid-cols-10 gap-1">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) => (
-                          <button
-                            key={step}
-                            type="button"
-                            onClick={() =>
-                              setSelectedProfumo({
-                                ...selectedProfumo,
-                                [key]: step,
-                              })
-                            }
-                            className={`h-2.5 rounded-sm transition ${
-                              step <= val
-                                ? step >= 8
-                                  ? 'bg-[#F7E7CE]'
-                                  : 'bg-[#C5A059]'
-                                : 'bg-zinc-800 hover:bg-zinc-700'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#F7E7CE]/15">
-                <button
-                  type="button"
-                  onClick={() => setSelectedProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingDetail}
-                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase shadow-champagne-glow"
-                >
-                  {savingDetail ? '...' : 'Salva'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODALE 2: SCENT TRACKER */}
-      {wearProfumo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#F7E7CE]/30 space-y-4">
-            <div className="flex items-start justify-between">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                  Indosso
-                </p>
-                <h3 className="font-serif text-2xl text-white mt-0.5">
-                  {wearProfumo.nome}
-                </h3>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Nome
+                </label>
+                <input
+                  type="text"
+                  value={draft.nome || ''}
+                  onChange={(e) => setDraft({ ...draft, nome: e.target.value })}
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                />
               </div>
-              <button
-                onClick={() => setWearProfumo(null)}
-                className="text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Famiglia Olfattiva
+                </label>
+                <input
+                  type="text"
+                  value={draft.famiglia_olfattiva || ''}
+                  onChange={(e) =>
+                    setDraft({ ...draft, famiglia_olfattiva: e.target.value })
+                  }
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Prezzo (€)
+                </label>
+                <input
+                  type="text"
+                  value={draft.prezzo_stimato_euro || ''}
+                  onChange={(e) =>
+                    setDraft({ ...draft, prezzo_stimato_euro: e.target.value })
+                  }
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs font-mono text-white"
+                />
+              </div>
             </div>
 
-            <form onSubmit={handleRecordWear} className="space-y-4">
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1.5">
-                  Momento
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const).map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      onClick={() => setMomentoGiornata(m)}
-                      className={`py-2 rounded-xl font-mono text-xs border transition ${
-                        momentoGiornata === m
-                          ? 'bg-[#F7E7CE] text-[#08080A] border-[#F7E7CE] font-semibold'
-                          : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                URL Immagine
+              </label>
+              <input
+                type="text"
+                value={draft.url_foto_vetrina || ''}
+                onChange={(e) =>
+                  setDraft({ ...draft, url_foto_vetrina: e.target.value })
+                }
+                placeholder="https://..."
+                className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+              />
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Contesto
-                </label>
-                <select
-                  value={contestoOutfit}
-                  onChange={(e) => setContestoOutfit(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                >
-                  <option value="Ufficio">Ufficio</option>
-                  <option value="Aperitivo">Aperitivo</option>
-                  <option value="Cena">Cena</option>
-                  <option value="Serata">Serata</option>
-                  <option value="Evento">Evento</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Note
+                  Note di Testa
                 </label>
                 <textarea
                   rows={2}
-                  value={noteGiorno}
-                  onChange={(e) => setNoteGiorno(e.target.value)}
+                  value={draft.note_testa || ''}
+                  onChange={(e) => setDraft({ ...draft, note_testa: e.target.value })}
                   className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
                 />
               </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setWearProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingWear}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold"
-                >
-                  {savingWear ? '...' : 'Conferma'}
-                </button>
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Note di Cuore
+                </label>
+                <textarea
+                  rows={2}
+                  value={draft.note_cuore || ''}
+                  onChange={(e) => setDraft({ ...draft, note_cuore: e.target.value })}
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                />
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Note di Fondo
+                </label>
+                <textarea
+                  rows={2}
+                  value={draft.note_fondo || ''}
+                  onChange={(e) => setDraft({ ...draft, note_fondo: e.target.value })}
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                />
+              </div>
+            </div>
 
-      {/* MODALE 3: ELIMINAZIONE */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4">
-            <h3 className="font-serif text-xl text-white">
-              Eliminare {deleteTarget.nome}?
-            </h3>
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-[#08080A]/80 border border-[#F7E7CE]/15">
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Su Mouche
+                </label>
+                <textarea
+                  rows={2}
+                  value={draft.note_mouche || ''}
+                  onChange={(e) => setDraft({ ...draft, note_mouche: e.target.value })}
+                  className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Su Pelle
+                </label>
+                <textarea
+                  rows={2}
+                  value={draft.note_pelle || ''}
+                  onChange={(e) => setDraft({ ...draft, note_pelle: e.target.value })}
+                  className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
               <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
+                type="submit"
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase tracking-wider shadow-champagne-glow hover:opacity-95 transition"
               >
-                Annulla
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-semibold"
-              >
-                Elimina
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{saving ? '...' : 'Salva'}</span>
               </button>
             </div>
-          </div>
-        </div>
+          </form>
+        </section>
       )}
     </main>
-  );
-}
-
-export default function CollezionePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-[#F7E7CE] font-mono text-xs">
-          Caricamento...
-        </div>
-      }
-    >
-      <CollezioneContent />
-    </Suspense>
   );
 }
