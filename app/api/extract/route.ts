@@ -3,7 +3,7 @@ import { callGeminiWithFallback, extractJsonFromAiText, GeminiPart } from '@/lib
 
 export const dynamic = 'force-dynamic';
 
-export const PURE_FAMILIES = [
+const PURE_FAMILIES = [
   'Agrumata',
   'Aromatica',
   'Marina',
@@ -167,7 +167,7 @@ VIETATO INVENTARE NOTE OLFATTIVE.
 ${contextSource}
 
 REGOLA TASSATIVA PER "famiglia_olfattiva":
-Devi scegliere ESCLUSIVAMENTE UNA SOLA PARola tra queste 12 Famiglie Olfattive Pure Ufficiali:
+Devi scegliere ESCLUSIVAMENTE UNA SOLA PAROLA tra queste 12 Famiglie Olfattive Pure Ufficiali:
 "Agrumata", "Aromatica", "Marina", "Floreale", "Fruttata", "Verde", "Speziata", "Legnosa", "Ambrata", "Gourmand", "Cuoiata", "Muschiata".
 (Vietato usare doppie parole come "Agrumato Aromatico" o "Ambrato Floreale": scegli solo la famiglia pura dominante!).
 
@@ -211,7 +211,7 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido:
 
     const parsed = extractJsonFromAiText<Record<string, any>>(text);
 
-    const pureFamily = PURE_FAMILIES.includes(parsed.famiglia_olfattiva)
+    const pureFamily = (PURE_FAMILIES as readonly string[]).includes(parsed.famiglia_olfattiva)
       ? parsed.famiglia_olfattiva
       : normalizeFamilyServer(parsed.famiglia_olfattiva);
 
