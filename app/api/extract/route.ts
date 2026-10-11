@@ -26,10 +26,11 @@ async function fetchWebMetadataWithBypass(url: string): Promise<{
   textSnippet: string;
   ogImage: string | null;
 }> {
-  // Tentativo 1: Fetch diretto (perfetto per siti ufficiali come lorenzopazzaglia.com, xerjoff.com, ecc.)
+  let foundOgImage: string | null = null;
+
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 4500);
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -51,26 +52,27 @@ async function fetchWebMetadataWithBypass(url: string): Promise<{
         html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
         html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
 
+      foundOgImage = ogImgMatch?.[1] || null;
+
       const strippedBody = html
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
         .replace(/<style[\s\S]*?<\/style>/gi, ' ')
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 4500);
+        .slice(0, 5000);
 
       if (strippedBody.length > 200 && !strippedBody.includes('Just a moment...')) {
         return {
-          textSnippet: `Titolo: ${titleMatch?.[1]?.trim() || ''}\nDescrizione: ${descMatch?.[1]?.trim() || ''}\nContenuto Pagina Reale: ${strippedBody}`,
-          ogImage: ogImgMatch?.[1] || null,
+          textSnippet: `Titolo Pagina: ${titleMatch?.[1]?.trim() || ''}\nMeta Description: ${descMatch?.[1]?.trim() || ''}\nTesto Reale Pagina Ufficiale: ${strippedBody}`,
+          ogImage: foundOgImage,
         };
       }
     }
   } catch {
-    // Passa al tentativo 2
+    // Passa al reader
   }
 
-  // Tentativo 2: Bypass Reader per pagine con Cloudflare (es. Fragrantica)
   try {
     const controller2 = new AbortController();
     const timer2 = setTimeout(() => controller2.abort(), 5000);
@@ -82,21 +84,21 @@ async function fetchWebMetadataWithBypass(url: string): Promise<{
     clearTimeout(timer2);
 
     if (readerRes.ok) {
-      const readerText = (await readerRes.text()).slice(0, 4500);
+      const readerText = (await readerRes.text()).slice(0, 5000);
       if (readerText.length > 150 && !readerText.includes('Enable JavaScript and cookies')) {
         return {
-          textSnippet: `Contenuto estratto tramite Reader:\n${readerText}`,
-          ogImage: null,
+          textSnippet: `Testo pagina estratto tramite Reader:\n${readerText}`,
+          ogImage: foundOgImage,
         };
       }
     }
   } catch {
-    // Continua
+    // Continua col Grounding Google
   }
 
   return {
-    textSnippet: `ATTENZIONE: Il sito web ha bloccato la lettura automatica (Cloudflare). NON INVENTARE NOTE A CASO: usa solo le note ufficiali reali che conosci con certezza per questa fragranza.`,
-    ogImage: null,
+    textSnippet: `La pagina web diretta ha protezione anti-bot. Usa la Ricerca Google (Google Search Grounding) per verificare la piramide olfattiva UFFICIALE esatta di questo profumo.`,
+    ogImage: foundOgImage,
   };
 }
 
@@ -109,16 +111,17 @@ export async function POST(req: Request) {
     let discoveredImage: string | null = null;
     const parts: GeminiPart[] = [];
 
-    if (url && typeof url === 'string') {
+    if (url && typeof url === 'string' && url.trim().startsWith('http')) {
       const slugInfo = parseUrlSlugInfo(url.trim());
       const webData = await fetchWebMetadataWithBypass(url.trim());
       discoveredImage = webData.ogImage;
-      contextSource = `MODALITÀ: Estrazione da Link Web.\nURL: ${url}\n${slugInfo}\n${webData.textSnippet}`;
+      contextSource = `MODALITÀ: Estrazione da Link Ufficiale/Web.\nURL: ${url}\n${slugInfo}\n${webData.textSnippet}`;
     } else if (brand || nome || queryName) {
       const target = queryName || `${brand || ''} ${nome || ''}`.trim();
-      contextSource = `MODALITÀ: Scheda Tecnica Enciclopedica per la fragranza: "${target}".`;
+      contextSource = `MODALITÀ: Verifica e Correzione da Catalogo Ufficiale / Google per: "${target}".
+ATTENZIONE CRITICA: Se il nome "${target}" contiene un refuso o errore di battitura nel database (es. "Artisano" di "Botanicae" che in realtà nel catalogo reale di Botanicae si chiama "Tremonte"), CORREGGI il campo "nome" e "brand" con il vero nome ufficiale del profumo esistente e riporta le sue VERE note olfattive ufficiali senza MAI inventare nulla!`;
     } else if (imageBase64) {
-      contextSource = `MODALITÀ: Analisi Visiva Flacone / Campioncino. Leggi brand e nome dall'immagine allegata e compila la piramide olfattiva ufficiale.`;
+      contextSource = `MODALITÀ: Analisi Visiva Flacone / Campioncino. Leggi con attenzione brand e nome dall'immagine allegata, cerca la piramide olfattiva ufficiale reale e restituisci i dati verificati.`;
     } else {
       return NextResponse.json(
         { error: 'Fornisci un URL, una foto o il nome del profumo.' },
@@ -126,23 +129,29 @@ export async function POST(req: Request) {
       );
     }
 
-    const systemPrompt = `Sei un esperto catalogatore tecnico di profumeria artistica e di nicchia.
+    const systemPrompt = `Sei un rigoroso catalogatore tecnico di profumeria artistica e selettiva.
+VIETATO INVENTARE O ALLUCINARE NOTE OLFATTIVE.
+
 ${contextSource}
 
-Se nel testo sopra sono presenti le note della pagina web (es. Note di testa, Note di cuore, Note di base), COPIALE FEDELMENTE senza inventare nulla.
-Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
+Istruzioni Tassative:
+1. Verifica la piramide olfattiva reale (Note di Testa, Note di Cuore, Note di Fondo) dal testo della pagina fornito oppure tramite la ricerca web ufficiale del brand.
+2. Se il nome del profumo fornito dall'utente aveva un errore di battitura (es. "Artisano" anziché "Tremonte"), restituisci nel campo "nome" il NOME UFFICIALE CORRETTO.
+3. Se conosci o trovi l'URL diretto di un'immagine pubblica del flacone (e non è già presente in url_foto_vetrina), inseriscilo in "url_foto_vetrina", altrimenti lascia quello trovato.
+
+Restituisci ESCLUSIVAMENTE un oggetto JSON valido (nessun testo fuori dal JSON):
 {
-  "nome": "Nome esatto del profumo (senza brand)",
+  "nome": "Nome ufficiale esatto e corretto del profumo (senza brand)",
   "brand": "Nome ufficiale del Brand",
-  "concentrazione": "Es. Extrait de Parfum, Eau de Parfum",
-  "famiglia_olfattiva": "Es. Agrumato Marino, Ambrato Legnoso, Gourmand Speziato",
-  "note_testa": "Note di testa reali separate da virgola",
-  "note_cuore": "Note di cuore reali separate da virgola",
-  "note_fondo": "Note di fondo reali separate da virgola",
-  "note_olfattive": "Tutte le note principali separate da virgola",
-  "descrizione_ai": "Descrizione tecnica ed essenziale del profilo olfattivo (max 2 frasi sobrie)",
+  "concentrazione": "Es. Extrait de Parfum, Eau de Parfum, Eau de Toilette",
+  "famiglia_olfattiva": "Es. Agrumato Marino, Ambrato Legnoso, Speziato Orientale",
+  "note_testa": "Note di testa ufficiali separate da virgola (in italiano)",
+  "note_cuore": "Note di cuore ufficiali separate da virgola (in italiano)",
+  "note_fondo": "Note di fondo ufficiali separate da virgola (in italiano)",
+  "note_olfattive": "Elenco completo delle note separate da virgola",
+  "descrizione_ai": "Sintesi tecnica sobria del carattere olfattivo (max 2 frasi)",
   "prezzo_stimato_euro": "Prezzo di listino in Euro nel formato €XXX",
-  "formato_ml": 50,
+  "formato_ml": 100,
   "stagione_ideale": "Es. Primavera / Estate, oppure Autunno / Inverno",
   "occasione_ideale": "Es. Ufficio, Aperitivo, Cena, Serata, Evento",
   "voto_longevita": 8,
@@ -163,9 +172,11 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       });
     }
 
+    // Attiviamo useGoogleSearch (se non c'è un'immagine Base64) per interrogare Google in tempo reale!
     const { text, modelUsed } = await callGeminiWithFallback(parts, {
       temperature: 0.1,
       jsonMode: true,
+      useGoogleSearch: !imageBase64,
     });
 
     const parsed = extractJsonFromAiText<Record<string, any>>(text);
@@ -179,15 +190,15 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
     return NextResponse.json({
       nome: parsed.nome || nome || 'Fragranza',
       brand: parsed.brand || brand || 'Brand',
-      concentrazione: parsed.concentrazione || 'Extrait de Parfum',
+      concentrazione: parsed.concentrazione || 'Eau de Parfum',
       famiglia_olfattiva: parsed.famiglia_olfattiva || '',
       note_testa: parsed.note_testa || '',
       note_cuore: parsed.note_cuore || '',
       note_fondo: parsed.note_fondo || '',
       note_olfattive: unifiedNotes,
       descrizione_ai: parsed.descrizione_ai || '',
-      prezzo_stimato_euro: parsed.prezzo_stimato_euro || '€160',
-      formato_ml: Number(parsed.formato_ml) || 50,
+      prezzo_stimato_euro: parsed.prezzo_stimato_euro || '€150',
+      formato_ml: Number(parsed.formato_ml) || 100,
       stagione_ideale: parsed.stagione_ideale || '',
       occasione_ideale: parsed.occasione_ideale || 'Serata',
       voto_longevita: Number(parsed.voto_longevita) || 8,
