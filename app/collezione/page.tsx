@@ -967,4 +967,340 @@ function CollezioneContent() {
                   />
                 </div>
                 <div>
-                  <label className
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                    Concentrazione
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProfumo.concentrazione || ''}
+                    onChange={(e) =>
+                      setSelectedProfumo({
+                        ...selectedProfumo,
+                        concentrazione: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                    Archivio
+                  </label>
+                  <select
+                    value={isRadarProfumo(selectedProfumo) ? 'radar' : 'collezione'}
+                    onChange={(e) =>
+                      setSelectedProfumo({ ...selectedProfumo, stato: e.target.value })
+                    }
+                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                  >
+                    <option value="collezione">Collezione Privata</option>
+                    <option value="radar">Radar - Testing</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  URL Immagine
+                </label>
+                <input
+                  type="text"
+                  value={selectedProfumo.url_foto_vetrina || ''}
+                  onChange={(e) =>
+                    setSelectedProfumo({
+                      ...selectedProfumo,
+                      url_foto_vetrina: e.target.value,
+                    })
+                  }
+                  placeholder="https://..."
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                    Note di Testa
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProfumo.note_testa || ''}
+                    onChange={(e) =>
+                      setSelectedProfumo({
+                        ...selectedProfumo,
+                        note_testa: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                    Note di Cuore
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProfumo.note_cuore || ''}
+                    onChange={(e) =>
+                      setSelectedProfumo({
+                        ...selectedProfumo,
+                        note_cuore: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                    Note di Fondo
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProfumo.note_fondo || ''}
+                    onChange={(e) =>
+                      setSelectedProfumo({
+                        ...selectedProfumo,
+                        note_fondo: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/25 space-y-3">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-[#F7E7CE]">
+                  Test Olfattivo
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
+                      Su Mouche
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={selectedProfumo.note_mouche || ''}
+                      onChange={(e) =>
+                        setSelectedProfumo({
+                          ...selectedProfumo,
+                          note_mouche: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
+                      Su Pelle
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={selectedProfumo.note_pelle || ''}
+                      onChange={(e) =>
+                        setSelectedProfumo({
+                          ...selectedProfumo,
+                          note_pelle: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-xl bg-[#0D0D11] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-[#08080A]/70 border border-[#F7E7CE]/15">
+                {[
+                  { key: 'voto_longevita', label: 'Durata' },
+                  { key: 'voto_scia', label: 'Scia' },
+                  { key: 'voto_proiezione', label: 'Proiezione' },
+                  { key: 'voto_complessita', label: 'Complessità' },
+                ].map(({ key, label }) => {
+                  const val = Number((selectedProfumo as any)[key] ?? 8);
+                  return (
+                    <div key={key}>
+                      <div className="flex justify-between text-xs font-mono mb-1.5">
+                        <span className="text-zinc-300">{label}</span>
+                        <span className="text-[#F7E7CE] font-semibold">{val}/10</span>
+                      </div>
+                      <div className="grid grid-cols-10 gap-1">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) => (
+                          <button
+                            key={step}
+                            type="button"
+                            onClick={() =>
+                              setSelectedProfumo({
+                                ...selectedProfumo,
+                                [key]: step,
+                              })
+                            }
+                            className={`h-2.5 rounded-sm transition ${
+                              step <= val
+                                ? step >= 8
+                                  ? 'bg-[#F7E7CE]'
+                                  : 'bg-[#C5A059]'
+                                : 'bg-zinc-800 hover:bg-zinc-700'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-[#F7E7CE]/15">
+                <button
+                  type="button"
+                  onClick={() => setSelectedProfumo(null)}
+                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDetail}
+                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold uppercase shadow-champagne-glow"
+                >
+                  {savingDetail ? '...' : 'Salva'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE 2: SCENT TRACKER */}
+      {wearProfumo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#F7E7CE]/30 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
+                  Indosso
+                </p>
+                <h3 className="font-serif text-2xl text-white mt-0.5">
+                  {wearProfumo.nome}
+                </h3>
+              </div>
+              <button
+                onClick={() => setWearProfumo(null)}
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRecordWear} className="space-y-4">
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1.5">
+                  Momento
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const).map((m) => (
+                    <button
+                      type="button"
+                      key={m}
+                      onClick={() => setMomentoGiornata(m)}
+                      className={`py-2 rounded-xl font-mono text-xs border transition ${
+                        momentoGiornata === m
+                          ? 'bg-[#F7E7CE] text-[#08080A] border-[#F7E7CE] font-semibold'
+                          : 'bg-[#08080A] text-zinc-400 border-[#F7E7CE]/20'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Contesto
+                </label>
+                <select
+                  value={contestoOutfit}
+                  onChange={(e) => setContestoOutfit(e.target.value)}
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
+                >
+                  <option value="Ufficio">Ufficio</option>
+                  <option value="Aperitivo">Aperitivo</option>
+                  <option value="Cena">Cena</option>
+                  <option value="Serata">Serata</option>
+                  <option value="Evento">Evento</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                  Note
+                </label>
+                <textarea
+                  rows={2}
+                  value={noteGiorno}
+                  onChange={(e) => setNoteGiorno(e.target.value)}
+                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 p-2.5 text-xs text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setWearProfumo(null)}
+                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingWear}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-semibold"
+                >
+                  {savingWear ? '...' : 'Conferma'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE 3: ELIMINAZIONE */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4">
+            <h3 className="font-serif text-xl text-white">
+              Eliminare {deleteTarget.nome}?
+            </h3>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-semibold"
+              >
+                Elimina
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+export default function CollezionePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-[#F7E7CE] font-mono text-xs">
+          Caricamento...
+        </div>
+      }
+    >
+      <CollezioneContent />
+    </Suspense>
+  );
+}
