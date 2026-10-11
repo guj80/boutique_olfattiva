@@ -208,7 +208,7 @@ export default function BoutiqueHomePage() {
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi a AI</span>
+                <span>Chiedi all'IA</span>
               </button>
 
               <button
