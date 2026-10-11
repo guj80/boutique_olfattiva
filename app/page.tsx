@@ -11,7 +11,6 @@ import {
   Droplets,
   FlaskConical,
   RefreshCw,
-  Check,
   X,
 } from 'lucide-react';
 import {
@@ -41,7 +40,7 @@ export default function BoutiqueHomePage() {
   } | null>(null);
 
   const [selectedQuickProfumoId, setSelectedQuickProfumoId] = useState('');
-  const [quickMomento, setQuickMomento] = useState('Mattina');
+  const [quickMomento] = useState('Mattina');
   const [quickContesto, setQuickContesto] = useState('Ufficio');
   const [savingQuickWear, setSavingQuickWear] = useState(false);
 
@@ -167,7 +166,6 @@ export default function BoutiqueHomePage() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-6xl mx-auto w-full">
-      {/* 1. HEADER MINIMALISTA */}
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F7E7CE] to-[#C5A059] p-[1px]">
@@ -196,7 +194,6 @@ export default function BoutiqueHomePage() {
         </Link>
       </header>
 
-      {/* 2. BARRA COMPATTE SOTD & 3 PULSANTI TECNICI */}
       <section className="mt-6">
         <div className="boutique-glass rounded-2xl p-5 sm:p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -224,7 +221,6 @@ export default function BoutiqueHomePage() {
               )}
             </div>
 
-            {/* I 3 TASTI COMPATTI E TECNICI */}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -269,7 +265,6 @@ export default function BoutiqueHomePage() {
             </div>
           </div>
 
-          {/* PANNELLO 1: CHIEDI ALL'AI (CON NUOVO ELENCO CONTESTO SOBRIO) */}
           {activePanel === 'ai' && (
             <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -381,7 +376,6 @@ export default function BoutiqueHomePage() {
             </div>
           )}
 
-          {/* PANNELLO 2: SCEGLI DA COLLEZIONE */}
           {activePanel === 'collezione' && (
             <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
               <div className="sm:col-span-2">
@@ -426,7 +420,6 @@ export default function BoutiqueHomePage() {
             </div>
           )}
 
-          {/* PANNELLO 3: IN PROVA / DECANT (CAMPIONCINI / RADAR) */}
           {activePanel === 'decant' && (
             <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               {radar.length > 0 ? (
@@ -436,211 +429,4 @@ export default function BoutiqueHomePage() {
                       Decant / Campioncini in Test ({radar.length})
                     </label>
                     <select
-                      onChange={(e) => setSelectedQuickProfumoId(e.target.value)}
-                      defaultValue={radar[0]?.id}
-                      className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                    >
-                      {radar.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.brand} — {p.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    onClick={() =>
-                      handleQuickWearSave(selectedQuickProfumoId || radar[0]?.id)
-                    }
-                    className="px-4 py-2 rounded-xl bg-[#F7E7CE] text-[#08080A] font-mono text-xs font-semibold"
-                  >
-                    Indossa Decant Oggi
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-400">
-                  Nessun campioncino o profumo attualmente nel Radar Testing.
-                </p>
-              )}
-              <Link
-                href="/collezione?vista=radar"
-                className="inline-flex items-center gap-1.5 font-mono text-xs text-[#F7E7CE] hover:underline shrink-0"
-              >
-                <span>Apri Laboratorio Testing</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* 3. IL CUORE DELL'APP (IN MEZZO — SENZA SPIEGAZIONI PROLISSE) */}
-      <section className="mt-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 01 / PRIVATE */}
-          <Link
-            href="/collezione"
-            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                01 / PRIVATE
-              </span>
-              <FlaskConical className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
-            </div>
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
-              Collezione Privata
-            </h3>
-            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
-              <span>APRI COLLEZIONE</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </Link>
-
-          {/* 02 / ZERO-CLICK NEURAL ENGINE */}
-          <Link
-            href="/scanner"
-            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                02 / ZERO-CLICK NEURAL ENGINE
-              </span>
-              <ScanLine className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
-            </div>
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
-              AI Scanner &amp; Estrattore
-            </h3>
-            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
-              <span>AVVIA ACQUISIZIONE</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </Link>
-        </div>
-
-        {/* 03 / LABORATORIO DI VALUTAZIONE */}
-        <Link
-          href="/collezione?vista=radar"
-          className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-[#C5A059]/30 block"
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-[#C5A059]" />
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                03 / LABORATORIO DI VALUTAZIONE
-              </span>
-            </div>
-            <h3 className="font-serif text-2xl text-white mt-2">
-              RADAR - TESTING
-            </h3>
-          </div>
-
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/25 font-mono text-xs uppercase tracking-wider text-[#F7E7CE] self-start sm:self-center">
-            <span>{stats.radarCount} IN OSSERVAZIONE</span>
-            <ChevronRight className="w-4 h-4" />
-          </div>
-        </Link>
-      </section>
-
-      {/* 4. STATISTICHE COMPATTE IN BASSO (1 RIGA A 2 BOX CLICCABILI) */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-        {/* Box 1 Cliccabile -> Va alla Collezione */}
-        <Link
-          href="/collezione"
-          className="boutique-glass boutique-glass-hover rounded-2xl p-5 flex items-center justify-between group"
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#C5A059]" />
-              <span className="font-mono text-[11px] uppercase tracking-widest text-zinc-400">
-                Collezione Privata
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-3">
-              <span className="font-mono text-3xl font-semibold text-[#F7E7CE]">
-                {loading ? '...' : stats.totalFlaconi}
-              </span>
-              <span className="text-xs font-mono text-zinc-400">
-                Flaconi &bull;{' '}
-                <span className="text-[#C5A059]">
-                  Valore stimato: €{stats.totalEuro.toLocaleString('it-IT')}
-                </span>
-              </span>
-            </div>
-          </div>
-          <ChevronRight className="w-5 h-5 text-zinc-500 group-hover:text-[#F7E7CE] transition" />
-        </Link>
-
-        {/* Box 2 Cliccabile -> Apre la Modale con TUTTE le Famiglie Olfattive */}
-        <button
-          type="button"
-          onClick={() => setShowAllFamiliesModal(true)}
-          className="boutique-glass boutique-glass-hover rounded-2xl p-5 flex items-center justify-between text-left group w-full"
-        >
-          <div className="min-w-0 pr-3">
-            <div className="flex items-center gap-2">
-              <Droplets className="w-4 h-4 text-[#C5A059]" />
-              <span className="font-mono text-[11px] uppercase tracking-widest text-zinc-400">
-                Famiglie Olfattive
-              </span>
-            </div>
-            <div className="mt-2 flex flex-wrap items-baseline gap-2.5">
-              <span className="font-mono text-3xl font-semibold text-[#F7E7CE]">
-                {loading ? '...' : stats.uniqueFamiliesCount}
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {stats.topFamilies.map(([fam, count]) => (
-                  <span
-                    key={fam}
-                    className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#C5A059]/15 text-[#F7E7CE] border border-[#F7E7CE]/20"
-                  >
-                    {fam} ({count})
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-          <ChevronRight className="w-5 h-5 text-zinc-500 group-hover:text-[#F7E7CE] transition shrink-0" />
-        </button>
-      </section>
-
-      {/* MODALE CON TUTTE LE FAMIGLIE OLFATTIVE CLICCABILI */}
-      {showAllFamiliesModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="boutique-glass rounded-2xl max-w-lg w-full p-6 border border-[#F7E7CE]/30 space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-[#F7E7CE]/15">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                  Mappa Olfattiva del Vault
-                </p>
-                <h3 className="font-serif text-2xl text-white">
-                  Tutte le Famiglie Olfattive ({stats.uniqueFamiliesCount})
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowAllFamiliesModal(false)}
-                className="p-1.5 text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto space-y-2 pr-1">
-              {stats.allFamiliesSorted.map(([fam, count]) => (
-                <Link
-                  key={fam}
-                  href={`/collezione?search=${encodeURIComponent(fam)}`}
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#08080A] border border-[#F7E7CE]/15 hover:border-[#F7E7CE]/45 transition"
-                >
-                  <span className="text-sm text-white font-medium">{fam}</span>
-                  <span className="px-2.5 py-0.5 rounded-full font-mono text-xs bg-[#C5A059]/20 text-[#F7E7CE]">
-                    {count} {count === 1 ? 'flacone' : 'flaconi'} &rarr;
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
+                      onChange={(e) => setSelectedQuickProfumoId(e.
