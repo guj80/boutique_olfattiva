@@ -307,7 +307,7 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
     }
 
     // LIVELLO 3: Giudice Anti-Allucinazione OpenRouter (se configurato) quando c'è un record certificato
-    if (dbVerifiedRecord && process.env.OPENROUTER_API_KEY) {
+   if (dbVerifiedRecord && (process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY)) {
       const judgePrompt = `Confronta i DATI_ORIGINALI_DB (in inglese) con il JSON_ITALIANO.
 Assicurati che in note_testa, note_cuore, note_fondo e note_olfattive del JSON_ITALIANO non sia stata inventata nessuna nota assente nei DATI_ORIGINALI_DB.
 Se trovi una nota inventata, rimuovila subito. Restituisci SOLO l'oggetto JSON corretto completo.
