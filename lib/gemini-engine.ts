@@ -18,13 +18,14 @@ export interface GeminiCallOptions {
   useGoogleSearch?: boolean;
 }
 
-const FALLBACK_2026_MODELS = [
-  'gemini-3.1-flash-lite-preview',
+// Ordine di priorità aggiornato: i modelli più precisi e gratuiti in cima
+const FALLBACK_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
   'gemini-3-flash-preview',
-  'gemini-flash-lite-latest',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.0-flash',
   'gemini-flash-latest',
-  'gemini-3-pro-preview',
-  'gemini-3.1-pro-preview',
   'gemini-pro-latest',
 ];
 
@@ -72,12 +73,9 @@ function isModelNameAllowed(rawName: string): boolean {
     'learnlm',
     'gemma',
     '1.0',
-    '1.5',
-    '2.0',
-    '2.5',
+    '1.5-flash-8b',
     'thinking',
     'customtools',
-    'exp',
   ];
 
   return !excludedKeywords.some((kw) => name.includes(kw));
@@ -85,14 +83,15 @@ function isModelNameAllowed(rawName: string): boolean {
 
 function scoreModelPriority(modelName: string): number {
   if (lastWorkingModel && modelName === lastWorkingModel) return 0;
-  if (modelName === 'gemini-3.1-flash-lite-preview') return 1;
-  if (modelName === 'gemini-flash-lite-latest') return 2;
+  if (modelName === 'gemini-2.5-flash') return 1;
+  if (modelName === 'gemini-2.5-pro') return 2;
   if (modelName === 'gemini-3-flash-preview') return 3;
-  if (modelName === 'gemini-flash-latest') return 4;
-  if (modelName.includes('lite')) return 5;
-  if (modelName.includes('flash')) return 6;
-  if (modelName === 'gemini-pro-latest') return 7;
-  if (modelName.includes('3') && modelName.includes('pro')) return 8;
+  if (modelName === 'gemini-3.1-flash-lite-preview') return 4;
+  if (modelName === 'gemini-2.0-flash') return 5;
+  if (modelName === 'gemini-flash-latest') return 6;
+  if (modelName.includes('2.5')) return 7;
+  if (modelName.includes('flash')) return 8;
+  if (modelName.includes('pro')) return 9;
   return 15;
 }
 
@@ -151,6 +150,60 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
   return [];
 }
 
+// Chiamata di emergenza o revisione tramite OpenRouter (Modelli Open Source/Cinesi Gratuiti)
+export async function callOpenRouterFree(
+  prompt: string,
+  systemInstruction?: string
+): Promise<{ text: string; modelUsed: string } | null> {
+  const orKey = (process.env.OPENROUTER_API_KEY || '').trim();
+  if (!orKey || orKey === 'undefined') return null;
+
+  const freeModels = [
+    'openrouter/free',
+    'deepseek/deepseek-chat:free',
+    'qwen/qwen-2.5-72b-instruct:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+  ];
+
+  for (const model of freeModels) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      const messages: any[] = [];
+      if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+      }
+      messages.push({ role: 'user', content: prompt });
+
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${orKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.0,
+          messages,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content?.trim();
+        if (content && content.length > 5) {
+          return { text: content, modelUsed: `openrouter:${model}` };
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 export async function callGeminiWithFallback(
   parts: GeminiPart[],
   options?: GeminiCallOptions
@@ -168,9 +221,10 @@ export async function callGeminiWithFallback(
     );
   }
 
-  const temperature = options?.temperature ?? 0.15;
+  const temperature = options?.temperature ?? 0.0;
   const jsonMode = options?.jsonMode ?? false;
-  const perAttemptTimeoutMs = options?.timeoutMs ?? 15000;
+  const useGoogleSearch = options?.useGoogleSearch ?? false;
+  const perAttemptTimeoutMs = options?.timeoutMs ?? 16000;
   const errors: string[] = [];
 
   const discoveredModels = await getActiveModelsForKey(apiKey, errors);
@@ -178,7 +232,7 @@ export async function callGeminiWithFallback(
   const rawQueue = Array.from(
     new Set([
       ...(lastWorkingModel ? [lastWorkingModel] : []),
-      ...FALLBACK_2026_MODELS,
+      ...FALLBACK_MODELS,
       ...discoveredModels,
     ])
   ).filter((m) => !deadModelsForKey.has(m));
@@ -195,7 +249,10 @@ export async function callGeminiWithFallback(
   ];
 
   for (const model of rawQueue) {
-    for (const useStrictJsonConfig of jsonMode ? [true, false] : [false]) {
+    // Nota: Google Search Grounding non può essere usato contemporaneamente a responseMimeType: application/json
+    const jsonAttempts = useGoogleSearch ? [false] : jsonMode ? [true, false] : [false];
+
+    for (const useStrictJsonConfig of jsonAttempts) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), perAttemptTimeoutMs);
 
@@ -217,6 +274,10 @@ export async function callGeminiWithFallback(
           payload.systemInstruction = {
             parts: [{ text: options.systemInstruction }],
           };
+        }
+
+        if (useGoogleSearch) {
+          payload.tools = [{ google_search: {} }];
         }
 
         const res = await fetch(url, {
@@ -243,7 +304,7 @@ export async function callGeminiWithFallback(
 
           if (text.length > 0) {
             lastWorkingModel = model;
-            return { text, modelUsed: model };
+            return { text, modelUsed: useGoogleSearch ? `${model}+google_search` : model };
           } else {
             const blockReason =
               candidate?.finishReason ||
@@ -259,6 +320,11 @@ export async function callGeminiWithFallback(
             throw new Error(
               'La tua GEMINI_API_KEY non è valida. Verifica di averla copiata correttamente su Vercel.'
             );
+          }
+
+          // Se il modello non supporta google_search, riprova subito senza google_search
+          if (res.status === 400 && useGoogleSearch) {
+            break;
           }
 
           if (res.status === 404 || res.status === 403) {
@@ -290,10 +356,18 @@ export async function callGeminiWithFallback(
     }
   }
 
+  // Fallback finale su OpenRouter Free se tutti i modelli Gemini sono in rate-limit
+  const promptTextOnly = normalizedParts
+    .map((p) => p.text || '')
+    .filter(Boolean)
+    .join('\n');
+  if (promptTextOnly) {
+    const orResult = await callOpenRouterFree(promptTextOnly, options?.systemInstruction);
+    if (orResult) return orResult;
+  }
+
   throw new Error(
-    `Nessun modello Gemini ha risposto. Dettagli: ${errors
-      .slice(0, 5)
-      .join(' | ')}`
+    `Nessun modello AI ha risposto. Dettagli: ${errors.slice(0, 5).join(' | ')}`
   );
 }
 
