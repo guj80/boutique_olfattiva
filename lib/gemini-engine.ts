@@ -18,7 +18,6 @@ export interface GeminiCallOptions {
   useGoogleSearch?: boolean;
 }
 
-// Ordine di priorità aggiornato: i modelli più precisi e gratuiti in cima
 const FALLBACK_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.5-pro',
@@ -150,57 +149,107 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
   return [];
 }
 
-// Chiamata di emergenza o revisione tramite OpenRouter (Modelli Open Source/Cinesi Gratuiti)
+// Giudice / Motore Secondario Ultraveloce Gratuito (Groq Llama-3.3-70B + Qwen / DeepSeek)
 export async function callOpenRouterFree(
   prompt: string,
   systemInstruction?: string
 ): Promise<{ text: string; modelUsed: string } | null> {
+  const groqKey = (process.env.GROQ_API_KEY || '').trim();
   const orKey = (process.env.OPENROUTER_API_KEY || '').trim();
-  if (!orKey || orKey === 'undefined') return null;
 
-  const freeModels = [
-    'openrouter/free',
-    'deepseek/deepseek-chat:free',
-    'qwen/qwen-2.5-72b-instruct:free',
-    'meta-llama/llama-3.3-70b-instruct:free',
-  ];
+  // 1. PRIORITÀ ASSOLUTA: GROQ (Latenza ~0.2s, JSON Mode nativo, 14.400 req/giorno gratis)
+  if (groqKey && groqKey !== 'undefined') {
+    const groqModels = [
+      'llama-3.3-70b-versatile',
+      'qwen-qwq-32b',
+      'llama-3.1-8b-instant',
+    ];
 
-  for (const model of freeModels) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
-      const messages: any[] = [];
-      if (systemInstruction) {
-        messages.push({ role: 'system', content: systemInstruction });
-      }
-      messages.push({ role: 'user', content: prompt });
-
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${orKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          temperature: 0.0,
-          messages,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content?.trim();
-        if (content && content.length > 5) {
-          return { text: content, modelUsed: `openrouter:${model}` };
+    for (const model of groqModels) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const messages: any[] = [];
+        if (systemInstruction) {
+          messages.push({ role: 'system', content: systemInstruction });
         }
+        messages.push({ role: 'user', content: prompt });
+
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${groqKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.0,
+            response_format: { type: 'json_object' },
+            messages,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data?.choices?.[0]?.message?.content?.trim();
+          if (content && content.length > 5) {
+            return { text: content, modelUsed: `groq:${model}` };
+          }
+        }
+      } catch {
+        continue;
       }
-    } catch {
-      continue;
     }
   }
+
+  // 2. FALLBACK SECONDARIO: OPENROUTER FREE (se presente)
+  if (orKey && orKey !== 'undefined') {
+    const freeModels = [
+      'openrouter/free',
+      'deepseek/deepseek-chat:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+    ];
+
+    for (const model of freeModels) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10000);
+        const messages: any[] = [];
+        if (systemInstruction) {
+          messages.push({ role: 'system', content: systemInstruction });
+        }
+        messages.push({ role: 'user', content: prompt });
+
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${orKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.0,
+            messages,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          const data = await res.json();
+          const content = data?.choices?.[0]?.message?.content?.trim();
+          if (content && content.length > 5) {
+            return { text: content, modelUsed: `openrouter:${model}` };
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -249,7 +298,6 @@ export async function callGeminiWithFallback(
   ];
 
   for (const model of rawQueue) {
-    // Nota: Google Search Grounding non può essere usato contemporaneamente a responseMimeType: application/json
     const jsonAttempts = useGoogleSearch ? [false] : jsonMode ? [true, false] : [false];
 
     for (const useStrictJsonConfig of jsonAttempts) {
@@ -322,7 +370,6 @@ export async function callGeminiWithFallback(
             );
           }
 
-          // Se il modello non supporta google_search, riprova subito senza google_search
           if (res.status === 400 && useGoogleSearch) {
             break;
           }
@@ -356,14 +403,14 @@ export async function callGeminiWithFallback(
     }
   }
 
-  // Fallback finale su OpenRouter Free se tutti i modelli Gemini sono in rate-limit
+  // Se tutti i modelli Gemini sono in rate-limit, interviene Groq Llama-3.3-70B in 0.2 secondi
   const promptTextOnly = normalizedParts
     .map((p) => p.text || '')
     .filter(Boolean)
     .join('\n');
   if (promptTextOnly) {
-    const orResult = await callOpenRouterFree(promptTextOnly, options?.systemInstruction);
-    if (orResult) return orResult;
+    const backupResult = await callOpenRouterFree(promptTextOnly, options?.systemInstruction);
+    if (backupResult) return backupResult;
   }
 
   throw new Error(
