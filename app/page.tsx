@@ -202,7 +202,6 @@ export default function BoutiqueHomePage() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-6xl mx-auto w-full">
-      {/* HERO HEADER MONUMENTALE CON VALORIZZAZIONE LOGO /logo.jpg */}
       <header className="relative rounded-3xl boutique-glass border border-[#C5A059]/30 p-6 sm:p-8 overflow-hidden animate-fade-in">
         <div
           className="pointer-events-none absolute -top-24 -left-24 w-72 h-72 rounded-full opacity-25 blur-3xl"
@@ -212,7 +211,6 @@ export default function BoutiqueHomePage() {
         />
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 text-center sm:text-left">
-            {/* MEDAGLIONE LOGO SENZA TAGLI */}
             <div className="relative group shrink-0">
               <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-tr from-[#C5A059]/60 via-[#F7E7CE]/40 to-[#C5A059]/60 opacity-75 blur-md group-hover:opacity-100 transition duration-500" />
               <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#0B0A09] border-2 border-[#C5A059]/70 shadow-[0_0_40px_rgba(197,160,89,0.25)] p-2 flex items-center justify-center overflow-hidden">
@@ -249,7 +247,6 @@ export default function BoutiqueHomePage() {
         </div>
       </header>
 
-      {/* SCENT OF THE DAY */}
       <section className="mt-6 animate-fade-in">
         <div className="boutique-glass rounded-2xl p-5 sm:p-6 border border-[#F7E7CE]/15">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -571,7 +568,6 @@ export default function BoutiqueHomePage() {
         </div>
       </section>
 
-      {/* I 3 MODULI PRINCIPALI */}
       <section className="mt-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
@@ -583,4 +579,65 @@ export default function BoutiqueHomePage() {
                 <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
                   01 / PRIVATE VAULT
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/2
+                <span className="px-2.5 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/25 font-mono text-[11px] text-[#F7E7CE]">
+                  {loading ? '...' : `${collezione.length} FLACONI`}
+                </span>
+              </div>
+              <PerfumeBottleIcon className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
+            </div>
+
+            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
+              Collezione Privata
+            </h3>
+
+            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
+              <span>APRI COLLEZIONE</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </Link>
+
+          <Link
+            href="/scanner"
+            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group hover:scale-[1.015] transition-all duration-300 animate-fade-in"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
+                02 / ZERO-CLICK NEURAL ENGINE
+              </span>
+              <ScanLine className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
+            </div>
+            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
+              IA Scanner e Estrattore
+            </h3>
+            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
+              <span>AVVIA ACQUISIZIONE</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </Link>
+        </div>
+
+        <Link
+          href="/collezione?vista=radar"
+          className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-[#C5A059]/30 block hover:scale-[1.01] transition-all duration-300 animate-fade-in"
+        >
+          <div>
+            <div className="flex items-center gap-2">
+              <Compass className="w-4 h-4 text-[#C5A059]" />
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
+                03 / LABORATORIO DI VALUTAZIONE
+              </span>
+            </div>
+            <h3 className="font-serif text-2xl text-white mt-2">
+              RADAR - TESTING
+            </h3>
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/25 font-mono text-xs uppercase tracking-wider text-[#F7E7CE] self-start sm:self-center">
+            <span>{loading ? '...' : radar.length} IN OSSERVAZIONE</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        </Link>
+      </section>
+    </main>
+  );
+}
