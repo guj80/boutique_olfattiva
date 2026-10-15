@@ -5,6 +5,8 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+export type Momento = 'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte';
+
 export interface Profumo {
   id: string;
   nome: string;
