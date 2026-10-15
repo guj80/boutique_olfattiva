@@ -121,7 +121,7 @@ async function fetchWebMetadataWithBypass(url: string): Promise<{
 
   try {
     const controller2 = new AbortController();
-    const timer2 = setTimeout(() => controller2.abort(), 5500);
+    const timer2 = setTimeout(() => controller2.abort(), 5000);
     const readerUrl = `https://r.jina.ai/${url}`;
     const readerRes = await fetch(readerUrl, {
       signal: controller2.signal,
@@ -148,27 +148,40 @@ async function fetchWebMetadataWithBypass(url: string): Promise<{
   };
 }
 
-// Ricerca Web live automatica per profumi non ancora presenti nel DB locale
+// Ricerca Web Gratuita Senza API Key (DuckDuckGo HTML Lite) per profumi di nicchia e nuove uscite
 async function searchLiveWebForPerfume(targetQuery: string): Promise<string> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5500);
-    const searchUrl = `https://s.jina.ai/${encodeURIComponent(
-      `${targetQuery} perfume fragrantica parfumo notes pyramid top middle base`
-    )}`;
-    const res = await fetch(searchUrl, {
+    const timer = setTimeout(() => controller.abort(), 4500);
+    const q = encodeURIComponent(`${targetQuery} perfume notes top middle base fragrantica parfumo`);
+    const ddgUrl = `https://html.duckduckgo.com/html/?q=${q}`;
+
+    const res = await fetch(ddgUrl, {
       signal: controller.signal,
-      headers: { Accept: 'text/plain' },
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
     });
     clearTimeout(timer);
+
     if (res.ok) {
-      const txt = (await res.text()).slice(0, 4500);
-      if (txt.length > 200) {
-        return `\nDATI REALI ESTRATTI DAL WEB PER "${targetQuery}":\n${txt}`;
+      const html = await res.text();
+      const snippets = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 4500);
+
+      if (snippets.length > 250) {
+        return `\nRISULTATI WEB IN TEMPO REALE PER "${targetQuery}":\n${snippets}`;
       }
     }
   } catch {
-    // Fallback su Google Search Grounding di Gemini
+    // Continua senza bloccare
   }
   return '';
 }
@@ -187,29 +200,44 @@ export async function POST(req: Request) {
 
     const searchTarget = (queryName || `${brand || ''} ${nome || ''}`).trim();
 
-    // LIVELLO 1: Cerca prima nei 59.325 profumi certificati su Supabase
-    if (supabase && searchTarget.length >= 2 && !imageBase64) {
+    // LIVELLO 1: Cerca nei 59.325+ profumi su Supabase (ma SOLO se la somiglianza del nome è altissima per non confondere i profumi di nicchia!)
+    if (supabase && searchTarget.length >= 2 && !imageBase64 && !url) {
       try {
         const { data: matches } = await supabase.rpc('search_perfume_exact', {
           search_query: searchTarget,
         });
 
         if (matches && matches.length > 0) {
-          dbVerifiedRecord = matches[0];
+          const topMatch = matches[0];
+          const fullDbName = `${topMatch.brand || ''} ${topMatch.name || ''}`.toLowerCase();
+          const targetWords = searchTarget
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w: string) => w.length > 2);
 
-          // Se abbiamo già la risposta verificata in cache su Supabase, restituiscila in 0.02 secondi!
-          if (dbVerifiedRecord.cached_ai_data && !url) {
-            return NextResponse.json({
-              ...dbVerifiedRecord.cached_ai_data,
-              _modelUsed: 'supabase-verified-cache',
-            });
+          // Verifica che almeno le parole chiave del profumo cercato siano davvero nel risultato del DB
+          const isTrueMatch =
+            targetWords.length === 0 ||
+            targetWords.every((w: string) => fullDbName.includes(w)) ||
+            fullDbName.includes( (nome || searchTarget).toLowerCase().trim() );
+
+          if (isTrueMatch) {
+            dbVerifiedRecord = topMatch;
+
+            if (dbVerifiedRecord.cached_ai_data) {
+              return NextResponse.json({
+                ...dbVerifiedRecord.cached_ai_data,
+                _modelUsed: 'supabase-verified-cache',
+              });
+            }
           }
         }
       } catch {
-        // Continua se la funzione RPC o il seed non sono ancora stati completati
+        // Se non trova su Supabase, passa subito al Livello 2 (Web + Nicchia) senza mai dare errore!
       }
     }
 
+    // LIVELLO 2: Costruzione Contesto (Link Ufficiale, DB Certificato, oppure Nicchia/Nuova Uscita via Web)
     if (url && typeof url === 'string' && url.trim().startsWith('http')) {
       const slugInfo = parseUrlSlugInfo(url.trim());
       const webData = await fetchWebMetadataWithBypass(url.trim());
@@ -229,13 +257,14 @@ Ecco i dati UFFICIALI CERTIFICATI estratti dal database per questo profumo:
 - Note di Cuore Ufficiali (Middle Notes): ${dbVerifiedRecord.middle_notes || 'Non dichiarate'}
 - Note di Fondo Ufficiali (Base Notes): ${dbVerifiedRecord.base_notes || 'Non dichiarate'}
 
-ORDINE TASSATIVO: Traduci fedelmente in italiano le note di testa, cuore e fondo qui sopra SENZA AGGIUNGERE NESSUNA NOTA NON PRESENTE NELLA SCHEDA CERTIFICATA. Se la scheda ha solo un elenco unico in Top Notes e vuoto in Middle/Base, mantieni esattamente quelle note senza inventarne altre.`;
+ORDINE TASSATIVO: Traduci fedelmente in italiano le note di testa, cuore e fondo qui sopra SENZA AGGIUNGERE NESSUNA NOTA NON PRESENTE NELLA SCHEDA CERTIFICATA.`;
     } else if (searchTarget) {
+      // PROFUMO DI NICCHIA O NUOVA USCITA NON PRESENTE NEL DB: Ricerca Web Live + Google Search Grounding
       const liveWebSnippet = await searchLiveWebForPerfume(searchTarget);
-      if (!liveWebSnippet) needsGoogleSearchGrounding = true;
-      contextSource = `MODALITA: Verifica rigorosa da Catalogo Ufficiale per: "${searchTarget}".
+      needsGoogleSearchGrounding = true;
+      contextSource = `MODALITA: Profumo di Nicchia / Nuova Uscita ("${searchTarget}").
 ${liveWebSnippet}
-Riporta ESCLUSIVAMENTE la piramide olfattiva UFFICIALE reale di "${searchTarget}". È severamente vietato indovinare o aggiungere note verosimili non presenti nella scheda tecnica ufficiale del brand.`;
+Estrai la piramide olfattiva UFFICIALE reale di "${searchTarget}" basandoti sui risultati web qui sopra e sulla tua conoscenza verificata del catalogo ufficiale del brand.`;
     } else if (imageBase64) {
       contextSource = `MODALITA: Analisi Visiva Flacone / Campioncino. Leggi brand e nome dall'immagine allegata e restituisci la piramide olfattiva ufficiale esatta.`;
     } else {
@@ -245,7 +274,7 @@ Riporta ESCLUSIVAMENTE la piramide olfattiva UFFICIALE reale di "${searchTarget}
       );
     }
 
-    const systemPrompt = `Sei un catalogatore tecnico di profumeria artistica con obbligo di precisione assoluta (0% allucinazioni).
+    const systemPrompt = `Sei un catalogatore tecnico di profumeria artistica e di nicchia con obbligo di precisione assoluta.
 VIETATO INVENTARE NOTE OLFATTIVE. Non usare toni poetici o da sommelier: sii oggettivo, tecnico e rigoroso.
 
 ${contextSource}
@@ -289,7 +318,7 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
 
     let { text, modelUsed } = await callGeminiWithFallback(parts, {
       temperature: 0.0,
-      jsonMode: !needsGoogleSearchGrounding,
+      jsonMode: true,
       useGoogleSearch: needsGoogleSearchGrounding,
     });
 
@@ -297,26 +326,19 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
     try {
       parsed = extractJsonFromAiText<Record<string, any>>(text);
     } catch {
-      // Se Google Search Grounding ha restituito testo non JSON, forziamo la conversione JSON a Temperatura 0
       const retry = await callGeminiWithFallback(
-        [{ text: `${systemPrompt}\n\nDATI RACCOLTI:\n${text}` }],
-        { temperature: 0.0, jsonMode: true }
+        [{ text: `${systemPrompt}\n\nConverti in JSON valido:\n${text}` }],
+        { temperature: 0.0, jsonMode: true, useGoogleSearch: false }
       );
       parsed = extractJsonFromAiText<Record<string, any>>(retry.text);
       modelUsed = retry.modelUsed;
     }
 
-    // LIVELLO 3: Giudice Anti-Allucinazione OpenRouter (se configurato) quando c'è un record certificato
-   if (dbVerifiedRecord && (process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY)) {
-      const judgePrompt = `Confronta i DATI_ORIGINALI_DB (in inglese) con il JSON_ITALIANO.
-Assicurati che in note_testa, note_cuore, note_fondo e note_olfattive del JSON_ITALIANO non sia stata inventata nessuna nota assente nei DATI_ORIGINALI_DB.
-Se trovi una nota inventata, rimuovila subito. Restituisci SOLO l'oggetto JSON corretto completo.
-
-DATI_ORIGINALI_DB:
-Top: ${dbVerifiedRecord.top_notes || 'N/A'} | Middle: ${dbVerifiedRecord.middle_notes || 'N/A'} | Base: ${dbVerifiedRecord.base_notes || 'N/A'} | Accords: ${dbVerifiedRecord.main_accords || 'N/A'}
-
-JSON_ITALIANO:
-${JSON.stringify(parsed)}`;
+    // LIVELLO 3: Giudice Anti-Allucinazione Groq Llama 3.3 70B (sia per DB che per Nicchia!)
+    if (process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY) {
+      const judgePrompt = dbVerifiedRecord
+        ? `Confronta DATI_ORIGINALI_DB con JSON_ITALIANO. Assicurati che non sia stata aggiunta nessuna nota olfattiva inesistente nei DATI_ORIGINALI_DB. Se trovi una nota inventata, rimuovila. Restituisci SOLO il JSON completo.\nDATI_ORIGINALI_DB: Top: ${dbVerifiedRecord.top_notes || 'N/A'} | Middle: ${dbVerifiedRecord.middle_notes || 'N/A'} | Base: ${dbVerifiedRecord.base_notes || 'N/A'}\nJSON_ITALIANO: ${JSON.stringify(parsed)}`
+        : `Sei un revisore esperto di profumeria di nicchia e artistica. Verifica la scheda JSON generata per il profumo "${searchTarget}". Controlla che brand, nome e piramide olfattiva siano reali e privi di allucinazioni. Restituisci SOLO l'oggetto JSON completo con le stesse identiche chiavi.\nJSON_DA_VERIFICARE: ${JSON.stringify(parsed)}`;
 
       const judgeRes = await callOpenRouterFree(judgePrompt);
       if (judgeRes) {
@@ -327,7 +349,7 @@ ${JSON.stringify(parsed)}`;
             modelUsed = `${modelUsed}+verified_by_${judgeRes.modelUsed}`;
           }
         } catch {
-          // Mantiene il risultato di Gemini a temperatura 0.0
+          // Mantiene il risultato di Gemini
         }
       }
     }
@@ -342,7 +364,6 @@ ${JSON.stringify(parsed)}`;
         .filter(Boolean)
         .join(', ');
 
-    // Sovrascrittura deterministica di Nome, Brand e Concentrazione se presenti nel DB Supabase
     const finalPayload = {
       nome: dbVerifiedRecord?.name || parsed.nome || nome || 'Fragranza',
       brand: dbVerifiedRecord?.brand || parsed.brand || brand || 'Brand',
@@ -362,16 +383,34 @@ ${JSON.stringify(parsed)}`;
       voto_proiezione: Number(parsed.voto_proiezione) || 8,
       voto_complessita: Number(parsed.voto_complessita) || 8,
       url_foto_vetrina: parsed.url_foto_vetrina || discoveredImage || null,
-      _modelUsed: dbVerifiedRecord ? `supabase_db+${modelUsed}` : modelUsed,
+      _modelUsed: dbVerifiedRecord ? `supabase_db+${modelUsed}` : `web_niche+${modelUsed}`,
     };
 
-    // Salva nella cache di Supabase per risposte future istantanee (0.02s)
-    if (supabase && dbVerifiedRecord?.id && !url && !imageBase64) {
-      supabase
-        .from('perfumes')
-        .update({ cached_ai_data: finalPayload })
-        .eq('id', dbVerifiedRecord.id)
-        .then();
+    // AUTO-APPRENDIMENTO DEL DATABASE:
+    // 1. Se era già nel DB, salva la risposta in cache.
+    // 2. Se era un profumo di NICCHIA / NUOVA USCITA non presente nel DB, lo aggiunge automaticamente al catalogo Supabase!
+    if (supabase && !imageBase64) {
+      if (dbVerifiedRecord?.id) {
+        supabase
+          .from('perfumes')
+          .update({ cached_ai_data: finalPayload })
+          .eq('id', dbVerifiedRecord.id)
+          .then();
+      } else if (finalPayload.nome && finalPayload.brand && finalPayload.note_olfattive) {
+        supabase
+          .from('perfumes')
+          .insert({
+            name: finalPayload.nome,
+            brand: finalPayload.brand,
+            concentration: finalPayload.concentrazione,
+            main_accords: finalPayload.famiglia_olfattiva,
+            top_notes: finalPayload.note_testa,
+            middle_notes: finalPayload.note_cuore,
+            base_notes: finalPayload.note_fondo,
+            cached_ai_data: finalPayload,
+          })
+          .then();
+      }
     }
 
     return NextResponse.json(finalPayload);
