@@ -27,8 +27,6 @@ export type Momento = 'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte' | string;
 
 export interface Profumo {
   id: string;
-  user_id?: string | null;
-  created_at?: string;
   nome: string;
   brand: string;
   concentrazione?: string | null;
@@ -39,21 +37,20 @@ export interface Profumo {
   note_olfattive?: string | null;
   descrizione_ai?: string | null;
   prezzo_stimato_euro?: string | null;
-  prezzo?: number | string | null;
   formato_ml?: number | null;
   url_foto_vetrina?: string | null;
   immagine_url?: string | null;
-  stato?: 'collezione' | 'radar' | string | null;
+  stato?: string | null;
   note_mouche?: string | null;
   note_pelle?: string | null;
-  note_personali?: string | null;
   voto_longevita?: number | null;
   voto_scia?: number | null;
   voto_proiezione?: number | null;
   voto_complessita?: number | null;
-  valutazione_stelle?: number | null;
   stagione_ideale?: string | null;
   occasione_ideale?: string | null;
+  naso?: string | null; // <--- AGGIUNTO QUI
+  created_at?: string;
 }
 
 export interface Indosso {
