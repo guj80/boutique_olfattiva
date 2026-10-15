@@ -40,8 +40,11 @@ export interface Indosso {
   id: string;
   profumo_id: string;
   momento_giornata?: string | null;
+  momento?: string | null;
   contesto_outfit?: string | null;
   note_giorno?: string | null;
+  note?: string | null;
+  data_indosso?: string | null;
   created_at?: string;
   profumi?: Profumo | null;
 }
