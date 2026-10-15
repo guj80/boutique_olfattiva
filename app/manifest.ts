@@ -2,30 +2,25 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Private Olfactory',
-    short_name: 'Olfactory',
-    description: 'Private Olfactory Archive',
+    name: 'Boutique Olfattiva',
+    short_name: 'Boutique Olfattiva',
+    description: 'La tua collezione olfattiva personale e consulente IA di alta profumeria',
     start_url: '/',
     display: 'standalone',
-    background_color: '#08080A',
-    theme_color: '#08080A',
+    background_color: '#0c0a09',
+    theme_color: '#d4af37',
+    orientation: 'portrait',
     icons: [
       {
-        src: '/logo.jpg',
-        sizes: '192x192',
-        type: 'image/jpeg',
+        src: '/icon',
+        sizes: '512x512',
+        type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/logo.jpg',
+        src: '/icon',
         sizes: '512x512',
-        type: 'image/jpeg',
-        purpose: 'any',
-      },
-      {
-        src: '/logo.jpg',
-        sizes: '512x512',
-        type: 'image/jpeg',
+        type: 'image/png',
         purpose: 'maskable',
       },
     ],
