@@ -234,13 +234,10 @@ export default function BoutiqueHomePage() {
               <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white">
                 BOUTIQUE OLFATTIVA
               </h1>
-              <p className="font-mono text-xs text-[#C5A059] tracking-[0.18em] uppercase mt-1.5">
-                Private Olfactory Vault • Zero-Hallucination DB
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-center sm:self-end">
+          <div className="flex items-center gap-2.5 self-center sm:self-center">
             <Link
               href="/diario"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/35 text-[#F7E7CE] hover:border-[#F7E7CE] font-mono text-xs uppercase tracking-wider transition-all hover:scale-[1.02]"
@@ -586,65 +583,4 @@ export default function BoutiqueHomePage() {
                 <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
                   01 / PRIVATE VAULT
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/25 font-mono text-[11px] text-[#F7E7CE]">
-                  {loading ? '...' : `${collezione.length} FLACONI`}
-                </span>
-              </div>
-              <PerfumeBottleIcon className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
-            </div>
-
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
-              Collezione Privata
-            </h3>
-
-            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
-              <span>APRI COLLEZIONE</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </Link>
-
-          <Link
-            href="/scanner"
-            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group hover:scale-[1.015] transition-all duration-300 animate-fade-in"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                02 / ZERO-CLICK NEURAL ENGINE
-              </span>
-              <ScanLine className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
-            </div>
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
-              IA Scanner e Estrattore
-            </h3>
-            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
-              <span>AVVIA ACQUISIZIONE</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </Link>
-        </div>
-
-        <Link
-          href="/collezione?vista=radar"
-          className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-[#C5A059]/30 block hover:scale-[1.01] transition-all duration-300 animate-fade-in"
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-[#C5A059]" />
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                03 / LABORATORIO DI VALUTAZIONE
-              </span>
-            </div>
-            <h3 className="font-serif text-2xl text-white mt-2">
-              RADAR - TESTING
-            </h3>
-          </div>
-
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/25 font-mono text-xs uppercase tracking-wider text-[#F7E7CE] self-start sm:self-center">
-            <span>{loading ? '...' : radar.length} IN OSSERVAZIONE</span>
-            <ChevronRight className="w-4 h-4" />
-          </div>
-        </Link>
-      </section>
-    </main>
-  );
-}
+                <span className="px-2.5 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/2
