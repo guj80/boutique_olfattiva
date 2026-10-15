@@ -4,6 +4,10 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Boutique Olfattiva — Private Olfactory Archive',
   description: 'Private Olfactory Vault & Neural Fragrance Engine.',
+  icons: {
+    icon: '/logo.jpg',
+    apple: '/logo.jpg',
+  },
 };
 
 export default function RootLayout({
