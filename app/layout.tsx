@@ -1,30 +1,9 @@
 import './globals.css';
-import type { Metadata, Viewport } from 'next';
-
-export const viewport: Viewport = {
-  themeColor: '#08080A',
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-};
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Boutique Olfattiva — Private Olfactory Archive',
   description: 'Private Olfactory Vault & Neural Fragrance Engine.',
-  manifest: '/manifest.webmanifest',
-  icons: {
-    icon: [
-      { url: '/logo.jpg', sizes: '512x512', type: 'image/jpeg' },
-    ],
-    apple: [
-      { url: '/logo.jpg', sizes: '512x512', type: 'image/jpeg' },
-    ],
-  },
-  appleWebApp: {
-    capable: true,
-    title: 'Boutique Olfattiva',
-    statusBarStyle: 'black-translucent',
-  },
 };
 
 export default function RootLayout({
