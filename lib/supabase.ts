@@ -1,29 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-function getCleanSupabaseUrl(): string {
-  const rawUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    'https://xmkpldgaawwsafbsjmhz.supabase.co';
-  return rawUrl
-    .trim()
-    .replace(/\/rest\/v1\/?$/i, '')
-    .replace(/\/+$/, '');
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-const supabaseUrl = getCleanSupabaseUrl();
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  '';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
-
-export type Momento = 'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte' | string;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface Profumo {
   id: string;
@@ -37,6 +17,7 @@ export interface Profumo {
   note_olfattive?: string | null;
   descrizione_ai?: string | null;
   prezzo_stimato_euro?: string | null;
+  prezzo?: string | number | null;
   formato_ml?: number | null;
   url_foto_vetrina?: string | null;
   immagine_url?: string | null;
@@ -49,31 +30,37 @@ export interface Profumo {
   voto_complessita?: number | null;
   stagione_ideale?: string | null;
   occasione_ideale?: string | null;
-  naso?: string | null; // <--- AGGIUNTO QUI
+  naso?: string | null;
   created_at?: string;
 }
 
 export interface Indosso {
   id: string;
   profumo_id: string;
-  user_id?: string | null;
-  data_indosso?: string;
-  created_at?: string;
-  momento?: Momento | null;
-  momento_giornata?: Momento | null;
+  momento_giornata?: string | null;
   contesto_outfit?: string | null;
-  note?: string | null;
   note_giorno?: string | null;
-  complimenti_ricevuti?: number | null;
+  created_at?: string;
   profumi?: Profumo | null;
 }
 
-export function isRadarProfumo(p: Profumo): boolean {
-  return (p.stato || '').trim().toLowerCase() === 'radar';
+export function isCollezioneProfumo(p: Profumo): boolean {
+  const st = (p.stato || '').toLowerCase().trim();
+  return st === 'collezione' || st === '';
 }
 
-export function isCollezioneProfumo(p: Profumo): boolean {
-  return !isRadarProfumo(p);
+export function isRadarProfumo(p: Profumo): boolean {
+  const st = (p.stato || '').toLowerCase().trim();
+  return st === 'radar' || st === 'testing';
+}
+
+export function getUnifiedNotes(p: Profumo): string {
+  if (p.note_olfattive && p.note_olfattive.trim()) {
+    return p.note_olfattive.trim();
+  }
+  return [p.note_testa, p.note_cuore, p.note_fondo]
+    .filter(Boolean)
+    .join(', ');
 }
 
 export function parsePrezzoEuro(p: Profumo): number {
@@ -82,10 +69,4 @@ export function parsePrezzoEuro(p: Profumo): number {
   const cleaned = String(raw).replace(/[^0-9.,]/g, '').replace(',', '.');
   const val = parseFloat(cleaned);
   return isNaN(val) ? 0 : val;
-}
-
-export function getUnifiedNotes(p: Profumo): string {
-  const parts = [p.note_testa, p.note_cuore, p.note_fondo].filter(Boolean);
-  if (parts.length > 0) return parts.join(' • ');
-  return p.note_olfattive || '';
 }
