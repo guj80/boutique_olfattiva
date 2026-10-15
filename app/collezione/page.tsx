@@ -72,13 +72,8 @@ function normalizeToPureFamily(raw?: string | null): string {
   return 'Legnosa';
 }
 
-/**
- * 1. MOTORE DI PULIZIA E UNIFICAZIONE MARCHI (BRAND)
- */
 function normalizeBrandName(raw?: string | null): string {
-  const cleaned = (raw || '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const cleaned = (raw || '').replace(/\s+/g, ' ').trim();
   if (!cleaned) return 'Maison';
 
   const low = cleaned
@@ -155,9 +150,6 @@ function normalizeBrandName(raw?: string | null): string {
     .replace(/^([a-z])/, (m) => m.toUpperCase());
 }
 
-/**
- * 2. MOTORE DI RAZIONALIZZAZIONE NOTE OLFATTIVE (IT / EN & SINONIMI)
- */
 function canonicalizeNote(rawNote: string): string | null {
   let s = rawNote
     .toLowerCase()
@@ -312,11 +304,8 @@ function SmartBottleImage({
       decoding="async"
       className={className}
       onError={() => {
-        if (stage === 'direct') {
-          setStage('proxy');
-        } else {
-          setStage('failed');
-        }
+        if (stage === 'direct') setStage('proxy');
+        else setStage('failed');
       }}
     />
   );
@@ -332,7 +321,6 @@ function CollezioneContent() {
   const [vista, setVista] = useState<'collezione' | 'radar'>(initialVista);
   const [layoutMode, setLayoutMode] = useState<'dettagli' | 'vetrina'>('dettagli');
 
-  // STATI DI SELEZIONE FILTRI & ORDINAMENTO
   const [selectedBrand, setSelectedBrand] = useState<string>('Tutti');
   const [selectedFamily, setSelectedFamily] = useState<string>('Tutte');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
@@ -340,7 +328,6 @@ function CollezioneContent() {
   const [noteFilterSearch, setNoteFilterSearch] = useState('');
   const [sortBy, setSortBy] = useState<'nome_asc' | 'nome_desc' | 'brand_asc'>('nome_asc');
 
-  // STATI PER ESPANDERE / COMPRIMERE LE 3 CATEGORIE
   const [openBrandPanel, setOpenBrandPanel] = useState(false);
   const [openFamilyPanel, setOpenFamilyPanel] = useState(true);
   const [openNotesPanel, setOpenNotesPanel] = useState(false);
@@ -565,6 +552,7 @@ function CollezioneContent() {
           p.occasione_ideale,
           p.note_mouche,
           p.note_pelle,
+          p.naso,
         ]
           .filter(Boolean)
           .join(' ')
@@ -663,6 +651,7 @@ function CollezioneContent() {
         prezzo_stimato_euro: aiData.prezzo_stimato_euro || p.prezzo_stimato_euro,
         stagione_ideale: aiData.stagione_ideale || p.stagione_ideale,
         occasione_ideale: aiData.occasione_ideale || p.occasione_ideale,
+        naso: aiData.naso || p.naso || null,
         url_foto_vetrina: p.url_foto_vetrina || aiData.url_foto_vetrina || null,
         voto_longevita: p.voto_longevita ?? aiData.voto_longevita,
         voto_scia: p.voto_scia ?? aiData.voto_scia,
@@ -733,6 +722,7 @@ function CollezioneContent() {
         prezzo_stimato_euro: aiData.prezzo_stimato_euro || selectedProfumo.prezzo_stimato_euro,
         stagione_ideale: aiData.stagione_ideale || selectedProfumo.stagione_ideale,
         occasione_ideale: aiData.occasione_ideale || selectedProfumo.occasione_ideale,
+        naso: aiData.naso || selectedProfumo.naso || null,
         url_foto_vetrina: aiData.url_foto_vetrina || selectedProfumo.url_foto_vetrina,
         voto_longevita: aiData.voto_longevita ?? selectedProfumo.voto_longevita,
         voto_scia: aiData.voto_scia ?? selectedProfumo.voto_scia,
@@ -780,6 +770,7 @@ function CollezioneContent() {
         voto_complessita: selectedProfumo.voto_complessita,
         stagione_ideale: selectedProfumo.stagione_ideale,
         occasione_ideale: selectedProfumo.occasione_ideale,
+        naso: selectedProfumo.naso || null,
       };
 
       const { error } = await supabase
@@ -1028,7 +1019,7 @@ function CollezioneContent() {
                   handleAskAiEngine();
                 }
               }}
-              placeholder="Cerca profumo, marchio, nota o chiedi all'IA..."
+              placeholder="Cerca profumo, marchio, nota, naso o chiedi all'IA..."
               className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C5A059] transition-all"
             />
             {searchQuery && (
@@ -1502,6 +1493,14 @@ function CollezioneContent() {
                       )}
                     </div>
 
+                    {/* BADGE NASO PROFUMIERE (PUNTO 3) */}
+                    {p.naso && (
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#C5A059]/15 border border-[#C5A059]/40 text-[11px] font-mono text-[#F7E7CE]">
+                        <span className="text-[#C5A059]">👃 Naso:</span>
+                        <span>{p.naso}</span>
+                      </div>
+                    )}
+
                     {aiReason && (
                       <div className="mt-3 p-2.5 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/40 text-xs text-[#F7E7CE] animate-fade-in">
                         {aiReason}
@@ -1806,22 +1805,41 @@ function CollezioneContent() {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  URL Immagine Flacone
-                </label>
-                <input
-                  type="text"
-                  value={selectedProfumo.url_foto_vetrina || ''}
-                  onChange={(e) =>
-                    setSelectedProfumo({
-                      ...selectedProfumo,
-                      url_foto_vetrina: e.target.value,
-                    })
-                  }
-                  placeholder="https://..."
-                  className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white font-mono focus:border-[#C5A059] transition-all"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                    URL Immagine Flacone
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProfumo.url_foto_vetrina || ''}
+                    onChange={(e) =>
+                      setSelectedProfumo({
+                        ...selectedProfumo,
+                        url_foto_vetrina: e.target.value,
+                      })
+                    }
+                    placeholder="https://..."
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white font-mono focus:border-[#C5A059] transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
+                    👃 Naso Profumiere Ufficiale
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProfumo.naso || ''}
+                    onChange={(e) =>
+                      setSelectedProfumo({
+                        ...selectedProfumo,
+                        naso: e.target.value,
+                      })
+                    }
+                    placeholder="Es. Quentin Bisch, Alberto Morillas..."
+                    className="w-full rounded-xl bg-[#08080A] border border-[#C5A059]/40 px-3 py-2 text-xs text-[#F7E7CE] focus:border-[#C5A059] transition-all"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
