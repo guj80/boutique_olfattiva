@@ -20,10 +20,10 @@ export interface GeminiCallOptions {
 
 const FALLBACK_MODELS = [
   'gemini-2.5-flash',
+  'gemini-2.0-flash',
   'gemini-2.5-pro',
   'gemini-3-flash-preview',
   'gemini-3.1-flash-lite-preview',
-  'gemini-2.0-flash',
   'gemini-flash-latest',
   'gemini-pro-latest',
 ];
@@ -83,10 +83,10 @@ function isModelNameAllowed(rawName: string): boolean {
 function scoreModelPriority(modelName: string): number {
   if (lastWorkingModel && modelName === lastWorkingModel) return 0;
   if (modelName === 'gemini-2.5-flash') return 1;
-  if (modelName === 'gemini-2.5-pro') return 2;
-  if (modelName === 'gemini-3-flash-preview') return 3;
-  if (modelName === 'gemini-3.1-flash-lite-preview') return 4;
-  if (modelName === 'gemini-2.0-flash') return 5;
+  if (modelName === 'gemini-2.0-flash') return 2;
+  if (modelName === 'gemini-2.5-pro') return 3;
+  if (modelName === 'gemini-3-flash-preview') return 4;
+  if (modelName === 'gemini-3.1-flash-lite-preview') return 5;
   if (modelName === 'gemini-flash-latest') return 6;
   if (modelName.includes('2.5')) return 7;
   if (modelName.includes('flash')) return 8;
@@ -149,7 +149,6 @@ async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<
   return [];
 }
 
-// Giudice / Motore Secondario Ultraveloce Gratuito (Groq Llama-3.3-70B + Qwen / DeepSeek)
 export async function callOpenRouterFree(
   prompt: string,
   systemInstruction?: string
@@ -157,23 +156,21 @@ export async function callOpenRouterFree(
   const groqKey = (process.env.GROQ_API_KEY || '').trim();
   const orKey = (process.env.OPENROUTER_API_KEY || '').trim();
 
-  // 1. PRIORITÀ ASSOLUTA: GROQ (Latenza ~0.2s, JSON Mode nativo, 14.400 req/giorno gratis)
   if (groqKey && groqKey !== 'undefined') {
     const groqModels = [
       'llama-3.3-70b-versatile',
-      'qwen-qwq-32b',
       'llama-3.1-8b-instant',
     ];
 
     for (const model of groqModels) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
+        const timer = setTimeout(() => controller.abort(), 9000);
         const messages: any[] = [];
         if (systemInstruction) {
           messages.push({ role: 'system', content: systemInstruction });
         }
-        messages.push({ role: 'user', content: prompt });
+        messages.push({ role: 'user', content: `${prompt}\n\nRespond ONLY with a valid JSON object.` });
 
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -204,7 +201,6 @@ export async function callOpenRouterFree(
     }
   }
 
-  // 2. FALLBACK SECONDARIO: OPENROUTER FREE (se presente)
   if (orKey && orKey !== 'undefined') {
     const freeModels = [
       'openrouter/free',
@@ -264,153 +260,152 @@ export async function callGeminiWithFallback(
     ''
   ).trim();
 
-  if (!apiKey || apiKey === 'undefined') {
-    throw new Error(
-      'Chiave API Gemini mancante! Configura GEMINI_API_KEY nelle Environment Variables di Vercel.'
-    );
-  }
-
   const temperature = options?.temperature ?? 0.0;
   const jsonMode = options?.jsonMode ?? false;
-  const useGoogleSearch = options?.useGoogleSearch ?? false;
-  const perAttemptTimeoutMs = options?.timeoutMs ?? 16000;
+  const perAttemptTimeoutMs = options?.timeoutMs ?? 15000;
   const errors: string[] = [];
 
-  const discoveredModels = await getActiveModelsForKey(apiKey, errors);
-
-  const rawQueue = Array.from(
-    new Set([
-      ...(lastWorkingModel ? [lastWorkingModel] : []),
-      ...FALLBACK_MODELS,
-      ...discoveredModels,
-    ])
-  ).filter((m) => !deadModelsForKey.has(m));
-
-  rawQueue.sort((a, b) => scoreModelPriority(a) - scoreModelPriority(b));
-
   const normalizedParts = normalizeParts(parts);
+  const hasInlineImage = normalizedParts.some((p) => p.inlineData);
 
-  const safetySettings = [
-    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-  ];
+  if (apiKey && apiKey !== 'undefined') {
+    const discoveredModels = await getActiveModelsForKey(apiKey, errors);
 
-  for (const model of rawQueue) {
-    const jsonAttempts = useGoogleSearch ? [false] : jsonMode ? [true, false] : [false];
+    const rawQueue = Array.from(
+      new Set([
+        ...(lastWorkingModel ? [lastWorkingModel] : []),
+        ...FALLBACK_MODELS,
+        ...discoveredModels,
+      ])
+    ).filter((m) => !deadModelsForKey.has(m));
 
-    for (const useStrictJsonConfig of jsonAttempts) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), perAttemptTimeoutMs);
+    rawQueue.sort((a, b) => scoreModelPriority(a) - scoreModelPriority(b));
 
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const safetySettings = [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    ];
 
-        const generationConfig: Record<string, any> = { temperature };
-        if (useStrictJsonConfig) {
-          generationConfig.responseMimeType = 'application/json';
-        }
+    for (const model of rawQueue) {
+      // Se useGoogleSearch è richiesto, prova PRIMA con googleSearch e SUBITO DOPO in JSON puro sullo stesso modello (non salta mai il modello!)
+      const attemptModes: Array<{ search: boolean; strictJson: boolean }> = [];
+      if (options?.useGoogleSearch && !hasInlineImage) {
+        attemptModes.push({ search: true, strictJson: false });
+      }
+      if (jsonMode) {
+        attemptModes.push({ search: false, strictJson: true });
+      }
+      attemptModes.push({ search: false, strictJson: false });
 
-        const payload: Record<string, any> = {
-          contents: [{ role: 'user', parts: normalizedParts }],
-          generationConfig,
-          safetySettings,
-        };
+      for (const mode of attemptModes) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), perAttemptTimeoutMs);
 
-        if (options?.systemInstruction) {
-          payload.systemInstruction = {
-            parts: [{ text: options.systemInstruction }],
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+          const generationConfig: Record<string, any> = { temperature };
+          if (mode.strictJson) {
+            generationConfig.responseMimeType = 'application/json';
+          }
+
+          const payload: Record<string, any> = {
+            contents: [{ role: 'user', parts: normalizedParts }],
+            generationConfig,
+            safetySettings,
           };
-        }
 
-        if (useGoogleSearch) {
-          payload.tools = [{ google_search: {} }];
-        }
+          if (options?.systemInstruction) {
+            payload.systemInstruction = {
+              parts: [{ text: options.systemInstruction }],
+            };
+          }
 
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        clearTimeout(timer);
+          if (mode.search) {
+            payload.tools = [{ googleSearch: {} }];
+          }
 
-        if (res.ok) {
-          const data = await res.json();
-          const candidate = data?.candidates?.[0];
-          const rawParts: any[] = candidate?.content?.parts || [];
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+            cache: 'no-store',
+          });
+          clearTimeout(timer);
 
-          const nonThoughtParts = rawParts.filter((p) => !p?.thought);
-          const partsToRead = nonThoughtParts.length > 0 ? nonThoughtParts : rawParts;
+          if (res.ok) {
+            const data = await res.json();
+            const candidate = data?.candidates?.[0];
+            const rawParts: any[] = candidate?.content?.parts || [];
 
-          const text = partsToRead
-            .map((p: { text?: string }) => p?.text || '')
-            .join('')
-            .trim();
+            const nonThoughtParts = rawParts.filter((p) => !p?.thought);
+            const partsToRead = nonThoughtParts.length > 0 ? nonThoughtParts : rawParts;
 
-          if (text.length > 0) {
-            lastWorkingModel = model;
-            return { text, modelUsed: useGoogleSearch ? `${model}+google_search` : model };
+            const text = partsToRead
+              .map((p: { text?: string }) => p?.text || '')
+              .join('')
+              .trim();
+
+            if (text.length > 0) {
+              lastWorkingModel = model;
+              return { text, modelUsed: mode.search ? `${model}+googleSearch` : model };
+            } else {
+              errors.push(`${model}: risposta vuota`);
+              continue;
+            }
           } else {
-            const blockReason =
-              candidate?.finishReason ||
-              data?.promptFeedback?.blockReason ||
-              'EMPTY';
-            errors.push(`${model}: risposta vuota (${blockReason})`);
+            const errBody = await res.text();
+
+            if (res.status === 400 && errBody.includes('API_KEY_INVALID')) {
+              throw new Error(
+                'La tua GEMINI_API_KEY non è valida. Verifica di averla copiata correttamente su Vercel.'
+              );
+            }
+
+            if (res.status === 404 || res.status === 403) {
+              deadModelsForKey.add(model);
+              if (lastWorkingModel === model) lastWorkingModel = null;
+              errors.push(`${model} (${res.status}): escluso`);
+              break;
+            }
+
+            // Se fallisce mode.search o strictJson (es. 400), passa automaticamente al tentativo successivo sullo STESSO modello!
+            if (res.status === 400) {
+              continue;
+            }
+
+            errors.push(`${model} (${res.status}): ${errBody.slice(0, 70)}`);
             break;
           }
-        } else {
-          const errBody = await res.text();
-
-          if (res.status === 400 && errBody.includes('API_KEY_INVALID')) {
-            throw new Error(
-              'La tua GEMINI_API_KEY non è valida. Verifica di averla copiata correttamente su Vercel.'
-            );
+        } catch (err: any) {
+          clearTimeout(timer);
+          if (err?.message?.includes('GEMINI_API_KEY non è valida')) {
+            throw err;
           }
-
-          if (res.status === 400 && useGoogleSearch) {
-            break;
-          }
-
-          if (res.status === 404 || res.status === 403) {
-            deadModelsForKey.add(model);
-            if (lastWorkingModel === model) lastWorkingModel = null;
-            errors.push(`${model} (${res.status}): escluso`);
-            break;
-          }
-
-          if (res.status === 400 && useStrictJsonConfig) {
-            continue;
-          }
-
-          errors.push(`${model} (${res.status}): ${errBody.slice(0, 70)}`);
+          const msg =
+            err?.name === 'AbortError'
+              ? `Timeout (${perAttemptTimeoutMs}ms)`
+              : err?.message || 'Network error';
+          errors.push(`${model}: ${msg}`);
           break;
         }
-      } catch (err: any) {
-        clearTimeout(timer);
-        if (err?.message?.includes('GEMINI_API_KEY non è valida')) {
-          throw err;
-        }
-        const msg =
-          err?.name === 'AbortError'
-            ? `Timeout (${perAttemptTimeoutMs}ms)`
-            : err?.message || 'Network error';
-        errors.push(`${model}: ${msg}`);
-        break;
       }
     }
   }
 
-  // Se tutti i modelli Gemini sono in rate-limit, interviene Groq Llama-3.3-70B in 0.2 secondi
-  const promptTextOnly = normalizedParts
-    .map((p) => p.text || '')
-    .filter(Boolean)
-    .join('\n');
-  if (promptTextOnly) {
-    const backupResult = await callOpenRouterFree(promptTextOnly, options?.systemInstruction);
-    if (backupResult) return backupResult;
+  // Fallback immediato su Groq Llama 3.3 70B
+  if (!hasInlineImage) {
+    const promptTextOnly = normalizedParts
+      .map((p) => p.text || '')
+      .filter(Boolean)
+      .join('\n');
+    if (promptTextOnly) {
+      const backupResult = await callOpenRouterFree(promptTextOnly, options?.systemInstruction);
+      if (backupResult) return backupResult;
+    }
   }
 
   throw new Error(
