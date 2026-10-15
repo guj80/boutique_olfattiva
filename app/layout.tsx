@@ -14,10 +14,10 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [
-      { url: '/icon', sizes: '512x512', type: 'image/png' },
+      { url: '/logo.jpg', sizes: '512x512', type: 'image/jpeg' },
     ],
     apple: [
-      { url: '/icon', sizes: '512x512', type: 'image/png' },
+      { url: '/logo.jpg', sizes: '512x512', type: 'image/jpeg' },
     ],
   },
   appleWebApp: {
