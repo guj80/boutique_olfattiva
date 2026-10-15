@@ -1,9 +1,30 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+
+export const viewport: Viewport = {
+  themeColor: '#08080A',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 export const metadata: Metadata = {
-  title: 'Boutique Olfattiva di Luca — Private Olfactory Archive',
-  description: 'Private Olfactory Vault & AI Sommelier.',
+  title: 'Boutique Olfattiva — Private Olfactory Archive',
+  description: 'Private Olfactory Vault & Neural Fragrance Engine.',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/icon', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon', sizes: '512x512', type: 'image/png' },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Boutique Olfattiva',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 export default function RootLayout({
