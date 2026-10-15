@@ -340,7 +340,7 @@ function CollezioneContent() {
   const [noteFilterSearch, setNoteFilterSearch] = useState('');
   const [sortBy, setSortBy] = useState<'nome_asc' | 'nome_desc' | 'brand_asc'>('nome_asc');
 
-  // STATI PER ESPANDERE / COMPRIMERE LE 3 CATEGORIE (CON FRECCETTA v / ^)
+  // STATI PER ESPANDERE / COMPRIMERE LE 3 CATEGORIE
   const [openBrandPanel, setOpenBrandPanel] = useState(false);
   const [openFamilyPanel, setOpenFamilyPanel] = useState(true);
   const [openNotesPanel, setOpenNotesPanel] = useState(false);
@@ -601,7 +601,7 @@ function CollezioneContent() {
     sortBy,
   ]);
 
-  async function handleAskSommelier() {
+  async function handleAskAiEngine() {
     if (!searchQuery.trim()) return;
     setAiLoading(true);
     setAiAdvice(null);
@@ -890,18 +890,31 @@ function CollezioneContent() {
 
   return (
     <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-7xl mx-auto w-full">
+      {/* HEADER CON MEDAGLIONE LOGO E CONTROLLI */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15 animate-fade-in">
         <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] hover:border-[#F7E7CE]/40 hover:scale-105 active:scale-95 transition-all duration-200"
+            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] border border-[#C5A059]/30 hover:border-[#F7E7CE] hover:scale-105 active:scale-95 transition-all duration-200"
             title="Home"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
+
+          <Link
+            href="/"
+            className="w-12 h-12 rounded-xl bg-[#0B0A09] border border-[#C5A059]/60 p-1 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(197,160,89,0.2)] hover:scale-105 transition"
+          >
+            <img
+              src="/logo.jpg"
+              alt="Boutique Olfattiva"
+              className="w-full h-full object-contain rounded-lg"
+            />
+          </Link>
+
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#C5A059]">
-              Private Olfactory
+              Boutique Olfattiva
             </p>
             <div className="flex flex-wrap items-baseline gap-3">
               <h1 className="font-serif text-2xl sm:text-3xl text-white">
@@ -925,7 +938,7 @@ function CollezioneContent() {
               onClick={() => changeLayoutMode('dettagli')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 layoutMode === 'dettagli'
-                  ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/30 font-medium'
+                  ? 'bg-[#C5A059]/20 text-[#F7E7CE] border border-[#C5A059]/40 font-semibold'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -937,7 +950,7 @@ function CollezioneContent() {
               onClick={() => changeLayoutMode('vetrina')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 layoutMode === 'vetrina'
-                  ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/30 font-medium'
+                  ? 'bg-[#C5A059]/20 text-[#F7E7CE] border border-[#C5A059]/40 font-semibold'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -955,7 +968,7 @@ function CollezioneContent() {
               }}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 vista === 'collezione'
-                  ? 'bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-semibold'
+                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -970,7 +983,7 @@ function CollezioneContent() {
               }}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
                 vista === 'radar'
-                  ? 'bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-semibold'
+                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
@@ -981,7 +994,7 @@ function CollezioneContent() {
 
           <Link
             href="/scanner"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-semibold text-xs font-mono uppercase tracking-wider shadow-champagne-glow hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold text-xs font-mono uppercase tracking-wider shadow-sm hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
           >
             <ScanLine className="w-3.5 h-3.5" />
             <span>+ Aggiungi</span>
@@ -998,9 +1011,8 @@ function CollezioneContent() {
         </div>
       )}
 
-      {/* CONSOLE DI RICERCA & FILTRI PIEGHEVOLI (ACCORDION) */}
+      {/* CONSOLE DI RICERCA & FILTRI PIEGHEVOLI */}
       <section className="mt-6 boutique-glass rounded-2xl p-4 sm:p-5 space-y-3.5 animate-fade-in delay-75">
-        {/* RIGA 1: SOLO BARRA DI RICERCA + CHIEDI ALL'IA ALLO STESSO IDENTICO LIVELLO */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-[#C5A059] absolute left-4 top-1/2 -translate-y-1/2" />
@@ -1013,11 +1025,11 @@ function CollezioneContent() {
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && searchQuery.split(' ').length >= 3) {
-                  handleAskSommelier();
+                  handleAskAiEngine();
                 }
               }}
               placeholder="Cerca profumo, marchio, nota o chiedi all'IA..."
-              className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#FF2A95] transition-all"
+              className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C5A059] transition-all"
             />
             {searchQuery && (
               <button
@@ -1033,9 +1045,9 @@ function CollezioneContent() {
           </div>
 
           <button
-            onClick={handleAskSommelier}
+            onClick={handleAskAiEngine}
             disabled={aiLoading || !searchQuery.trim()}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 shrink-0"
           >
             {aiLoading ? (
               <>
@@ -1051,10 +1063,10 @@ function CollezioneContent() {
           </button>
         </div>
 
-        {/* RIGA 2: BARRA ORDINE ALFABETICO + PULIZIA DB */}
+        {/* BARRA ORDINE ALFABETICO + PULIZIA DB */}
         <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2 flex-wrap">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#08080A] border border-white/10 text-xs font-mono text-zinc-300">
-            <ArrowDownAZ className="w-3.5 h-3.5 text-[#1FE866]" />
+            <ArrowDownAZ className="w-3.5 h-3.5 text-[#C5A059]" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
@@ -1085,12 +1097,12 @@ function CollezioneContent() {
               ) : (
                 <Check className="w-3 h-3 text-[#C5A059]" />
               )}
-              <span>Pulisci Marchi & Famiglie nel DB</span>
+              <span>Pulisci Marchi &amp; Famiglie nel DB</span>
             </button>
           )}
         </div>
 
-        {/* CATEGORIA 1 (ESPANDIBILE / COMPRIMIBILE): MARCHIO */}
+        {/* CATEGORIA 1: MARCHIO */}
         {archiveStats.sortedBrands.length > 0 && (
           <div className="pt-2.5 border-t border-white/10">
             <button
@@ -1104,7 +1116,7 @@ function CollezioneContent() {
                   Marchio
                 </span>
                 {selectedBrand !== 'Tutti' && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#FF2A95]/20 border border-[#FF2A95]/40 font-mono text-[10px] text-[#FF4DA6]">
+                  <span className="px-2 py-0.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/50 font-mono text-[10px] text-[#F7E7CE]">
                     {selectedBrand}
                   </span>
                 )}
@@ -1126,7 +1138,7 @@ function CollezioneContent() {
                   onClick={() => setSelectedBrand('Tutti')}
                   className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
                     selectedBrand === 'Tutti'
-                      ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
+                      ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
                       : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
                   }`}
                 >
@@ -1142,8 +1154,8 @@ function CollezioneContent() {
                     }
                     className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
                       selectedBrand === brandName
-                        ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
-                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-zinc-600'
+                        ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
+                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#C5A059]/40'
                     }`}
                   >
                     {brandName}
@@ -1154,7 +1166,7 @@ function CollezioneContent() {
           </div>
         )}
 
-        {/* CATEGORIA 2 (ESPANDIBILE / COMPRIMIBILE): FAMIGLIE OLFATTIVE */}
+        {/* CATEGORIA 2: FAMIGLIE OLFATTIVE */}
         {archiveStats.sortedPureFamilies.length > 0 && (
           <div className="pt-2.5 border-t border-white/10">
             <button
@@ -1168,7 +1180,7 @@ function CollezioneContent() {
                   Famiglie Olfattive
                 </span>
                 {selectedFamily !== 'Tutte' && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#FF2A95]/20 border border-[#FF2A95]/40 font-mono text-[10px] text-[#FF4DA6]">
+                  <span className="px-2 py-0.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/50 font-mono text-[10px] text-[#F7E7CE]">
                     {selectedFamily}
                   </span>
                 )}
@@ -1190,7 +1202,7 @@ function CollezioneContent() {
                   onClick={() => setSelectedFamily('Tutte')}
                   className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
                     selectedFamily === 'Tutte'
-                      ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
+                      ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
                       : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
                   }`}
                 >
@@ -1206,8 +1218,8 @@ function CollezioneContent() {
                     }
                     className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
                       selectedFamily === fam
-                        ? 'bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/40 font-semibold shadow-sm'
-                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-zinc-600'
+                        ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
+                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#C5A059]/40'
                     }`}
                   >
                     {fam} ({count})
@@ -1218,7 +1230,7 @@ function CollezioneContent() {
           </div>
         )}
 
-        {/* CATEGORIA 3 (ESPANDIBILE / COMPRIMIBILE): NOTE OLFATTIVE (MULTI-SELEZIONE) */}
+        {/* CATEGORIA 3: NOTE OLFATTIVE (MULTI-SELEZIONE) */}
         {archiveStats.sortedNotes.length > 0 && (
           <div className="pt-2.5 border-t border-white/10">
             <button
@@ -1227,12 +1239,12 @@ function CollezioneContent() {
               className="w-full flex items-center justify-between py-1 text-left group"
             >
               <div className="flex items-center gap-2 flex-wrap">
-                <Filter className="w-3.5 h-3.5 text-[#1FE866]" />
-                <span className="font-mono text-[11px] uppercase tracking-wider text-[#1FE866] group-hover:text-white transition">
+                <Filter className="w-3.5 h-3.5 text-[#F7E7CE]" />
+                <span className="font-mono text-[11px] uppercase tracking-wider text-[#F7E7CE] group-hover:text-white transition">
                   Note Olfattive (Multi-Selezione)
                 </span>
                 {selectedNotes.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#1FE866]/20 border border-[#1FE866]/50 font-mono text-[10px] text-[#1FE866]">
+                  <span className="px-2 py-0.5 rounded-full bg-[#C5A059]/25 border border-[#F7E7CE]/50 font-mono text-[10px] text-[#F7E7CE]">
                     {selectedNotes.join(' + ')}
                   </span>
                 )}
@@ -1240,9 +1252,9 @@ function CollezioneContent() {
               <div className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 group-hover:text-white">
                 <span>{openNotesPanel ? 'Comprimi' : 'Espandi'}</span>
                 {openNotesPanel ? (
-                  <ChevronUp className="w-4 h-4 text-[#1FE866]" />
+                  <ChevronUp className="w-4 h-4 text-[#F7E7CE]" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-[#1FE866]" />
+                  <ChevronDown className="w-4 h-4 text-[#F7E7CE]" />
                 )}
               </div>
             </button>
@@ -1256,7 +1268,7 @@ function CollezioneContent() {
                       value={noteFilterSearch}
                       onChange={(e) => setNoteFilterSearch(e.target.value)}
                       placeholder="Filtra nota (es. Sandalo, Muschio, Oud)..."
-                      className="px-2.5 py-1 rounded-lg bg-[#08080A] border border-white/10 text-[11px] font-mono text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#1FE866] w-full sm:w-64"
+                      className="px-2.5 py-1 rounded-lg bg-[#08080A] border border-white/10 text-[11px] font-mono text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C5A059] w-full sm:w-64"
                     />
                     {selectedNotes.length > 0 && (
                       <button
@@ -1300,8 +1312,8 @@ function CollezioneContent() {
                         onClick={() => toggleNoteSelection(noteName)}
                         className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
                           isSelected
-                            ? 'bg-[#1FE866]/20 text-[#1FE866] border border-[#1FE866]/60 font-semibold shadow-sm'
-                            : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#1FE866]/40'
+                            ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold shadow-sm'
+                            : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#C5A059]/40'
                         }`}
                       >
                         {noteName} ({count})
@@ -1324,7 +1336,7 @@ function CollezioneContent() {
             <button
               type="button"
               onClick={resetAllFilters}
-              className="text-[#FF4DA6] hover:underline text-[11px]"
+              className="text-[#C5A059] hover:underline text-[11px]"
             >
               Resetta tutti i filtri
             </button>
@@ -1364,7 +1376,7 @@ function CollezioneContent() {
             <button
               type="button"
               onClick={resetAllFilters}
-              className="px-4 py-2 rounded-xl bg-white/5 text-xs font-mono text-[#FF4DA6] hover:bg-white/10 transition"
+              className="px-4 py-2 rounded-xl bg-white/5 text-xs font-mono text-[#F7E7CE] hover:bg-white/10 transition"
             >
               Mostra tutta la collezione
             </button>
@@ -1395,7 +1407,7 @@ function CollezioneContent() {
                       className="w-full h-full object-contain p-3 group-hover:scale-[1.04] transition duration-300"
                     />
                     {p.prezzo_stimato_euro && (
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded font-mono text-[10px] bg-[#08080A]/90 text-[#1FE866] border border-[#1FE866]/30">
+                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded font-mono text-[10px] bg-[#08080A]/90 text-[#F7E7CE] border border-[#C5A059]/40">
                         {String(p.prezzo_stimato_euro).startsWith('€')
                           ? p.prezzo_stimato_euro
                           : `€${p.prezzo_stimato_euro}`}
@@ -1404,7 +1416,7 @@ function CollezioneContent() {
                   </div>
 
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#FF4DA6] truncate">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
                       {cleanBrand}
                     </p>
                     <h2 className="font-serif text-lg text-white font-medium mt-0.5 line-clamp-1">
@@ -1454,7 +1466,7 @@ function CollezioneContent() {
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#FF4DA6] truncate">
+                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
                             {cleanBrand}
                           </span>
                           <div className="flex items-center gap-1.5 shrink-0">
@@ -1464,7 +1476,7 @@ function CollezioneContent() {
                               </span>
                             )}
                             {p.prezzo_stimato_euro && (
-                              <span className="px-2 py-0.5 rounded font-mono text-xs bg-[#1FE866]/10 text-[#1FE866] border border-[#1FE866]/30">
+                              <span className="px-2 py-0.5 rounded font-mono text-xs bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/35">
                                 {String(p.prezzo_stimato_euro).startsWith('€')
                                   ? p.prezzo_stimato_euro
                                   : `€${p.prezzo_stimato_euro}`}
@@ -1480,7 +1492,7 @@ function CollezioneContent() {
                     </div>
 
                     <div className="flex flex-wrap gap-1.5 mt-3">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-gradient-to-r from-[#FF2A95]/10 to-[#7B2CBF]/10 text-[#FF70B8] border border-[#FF2A95]/30">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/35">
                         {pureFamily}
                       </span>
                       {p.stagione_ideale && (
@@ -1501,7 +1513,7 @@ function CollezioneContent() {
                         <div className="space-y-1 bg-[#08080A]/60 p-3 rounded-xl border border-white/5">
                           {p.note_testa && (
                             <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#1FE866] mr-1.5">
+                              <span className="font-mono text-[10px] uppercase text-[#F7E7CE] mr-1.5">
                                 Testa:
                               </span>
                               {p.note_testa}
@@ -1509,7 +1521,7 @@ function CollezioneContent() {
                           )}
                           {p.note_cuore && (
                             <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#FF4DA6] mr-1.5">
+                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
                                 Cuore:
                               </span>
                               {p.note_cuore}
@@ -1517,7 +1529,7 @@ function CollezioneContent() {
                           )}
                           {p.note_fondo && (
                             <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#7B2CBF] mr-1.5">
+                              <span className="font-mono text-[10px] uppercase text-amber-500/90 mr-1.5">
                                 Fondo:
                               </span>
                               {p.note_fondo}
@@ -1526,7 +1538,7 @@ function CollezioneContent() {
                         </div>
                       ) : unifiedNotes ? (
                         <p className="text-zinc-300 bg-[#08080A]/60 p-3 rounded-xl border border-white/5 line-clamp-3">
-                          <span className="font-mono text-[10px] uppercase text-[#1FE866] mr-1.5">
+                          <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
                             Note:
                           </span>
                           {unifiedNotes}
@@ -1537,7 +1549,7 @@ function CollezioneContent() {
                     {(vista === 'radar' || p.note_mouche || p.note_pelle) && (
                       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                         <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-white/5">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#FF4DA6] block">
+                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
                             Su Mouche
                           </span>
                           <p className="text-zinc-300 line-clamp-2 mt-0.5">
@@ -1545,7 +1557,7 @@ function CollezioneContent() {
                           </p>
                         </div>
                         <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-white/5">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#FF4DA6] block">
+                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
                             Su Pelle
                           </span>
                           <p className="text-zinc-300 line-clamp-2 mt-0.5">
@@ -1562,12 +1574,12 @@ function CollezioneContent() {
                         type="button"
                         onClick={() => handleEnrichWithAI(p)}
                         disabled={isEnriching}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-[#FF2A95]/20 to-[#7B2CBF]/20 text-[#FF4DA6] border border-[#FF2A95]/30 font-mono text-[11px] hover:scale-105 active:scale-95 transition-all duration-200"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/35 font-mono text-[11px] hover:scale-105 active:scale-95 transition-all duration-200"
                       >
                         {isEnriching ? (
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                          <Sparkles className="w-3.5 h-3.5 text-[#FF2A95]" />
+                          <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
                         )}
                         <span>{isEnriching ? '...' : 'IA'}</span>
                       </button>
@@ -1584,7 +1596,7 @@ function CollezioneContent() {
                         }}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] hover:scale-105 active:scale-95 transition-all duration-200"
                       >
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-[#FF4DA6]" />
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-[#C5A059]" />
                         <span>Scheda</span>
                       </button>
 
@@ -1593,7 +1605,7 @@ function CollezioneContent() {
                         onClick={() => setWearProfumo(p)}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] hover:scale-105 active:scale-95 transition-all duration-200"
                       >
-                        <Clock className="w-3.5 h-3.5 text-[#FF4DA6]" />
+                        <Clock className="w-3.5 h-3.5 text-[#C5A059]" />
                         <span>Indossa</span>
                       </button>
                     </div>
@@ -1617,10 +1629,10 @@ function CollezioneContent() {
       {/* MODALE SCHEDA TECNICA */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-white/15 my-8 max-h-[92vh] overflow-y-auto animate-scale-up">
+          <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-[#C5A059]/30 my-8 max-h-[92vh] overflow-y-auto animate-scale-up">
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10">
               <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-xl bg-[#08080A] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                <div className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#C5A059]/30 overflow-hidden flex items-center justify-center shrink-0">
                   <SmartBottleImage
                     src={selectedProfumo.url_foto_vetrina || selectedProfumo.immagine_url}
                     alt={selectedProfumo.nome}
@@ -1629,7 +1641,7 @@ function CollezioneContent() {
                   />
                 </div>
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-[#FF4DA6]">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
                     Scheda Tecnica
                   </p>
                   <h3 className="font-serif text-2xl text-white mt-0.5">
@@ -1645,23 +1657,23 @@ function CollezioneContent() {
               </button>
             </div>
 
-            <div className="mt-4 p-3 rounded-xl bg-[#08080A] border border-[#FF2A95]/30">
-              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#FF4DA6] mb-1.5">
-                Aggiorna da Link
+            <div className="mt-4 p-3 rounded-xl bg-[#08080A] border border-[#C5A059]/30">
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1.5">
+                Aggiorna da Link o Verifica DB
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={officialUrlInput}
                   onChange={(e) => setOfficialUrlInput(e.target.value)}
-                  placeholder="URL pagina prodotto..."
-                  className="flex-1 rounded-lg bg-[#0D0D11] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-[#FF2A95] transition-all"
+                  placeholder="URL pagina prodotto (oppure lascia vuoto per ri-verificare nel DB)..."
+                  className="flex-1 rounded-lg bg-[#0D0D11] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-[#C5A059] transition-all"
                 />
                 <button
                   type="button"
                   onClick={handleModalExtractFromOfficial}
                   disabled={modalExtracting}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold hover:scale-102 transition-all shrink-0"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold hover:scale-102 transition-all shrink-0"
                 >
                   {modalExtracting ? (
                     <>
@@ -1680,14 +1692,14 @@ function CollezioneContent() {
 
             <form onSubmit={handleSaveDetails} className="space-y-4 mt-4">
               {isRadarProfumo(selectedProfumo) && (
-                <div className="p-3 rounded-xl bg-[#FF2A95]/15 border border-[#FF2A95]/30 flex items-center justify-between gap-3 animate-fade-in">
-                  <span className="text-xs font-mono text-[#FF70B8]">
+                <div className="p-3 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/40 flex items-center justify-between gap-3 animate-fade-in">
+                  <span className="text-xs font-mono text-[#F7E7CE]">
                     In Testing
                   </span>
                   <button
                     type="button"
                     onClick={() => handlePromoteToCollection(selectedProfumo)}
-                    className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold uppercase hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                    className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                   >
                     Sposta in Collezione
                   </button>
@@ -1696,7 +1708,7 @@ function CollezioneContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Marchio
                   </label>
                   <input
@@ -1705,11 +1717,11 @@ function CollezioneContent() {
                     onChange={(e) =>
                       setSelectedProfumo({ ...selectedProfumo, brand: e.target.value })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Nome
                   </label>
                   <input
@@ -1718,11 +1730,11 @@ function CollezioneContent() {
                     onChange={(e) =>
                       setSelectedProfumo({ ...selectedProfumo, nome: e.target.value })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Prezzo (€)
                   </label>
                   <input
@@ -1734,14 +1746,14 @@ function CollezioneContent() {
                         prezzo_stimato_euro: e.target.value,
                       })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs font-mono text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs font-mono text-white focus:border-[#C5A059] transition-all"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Famiglia Olfattiva (12 Pure)
                   </label>
                   <select
@@ -1752,7 +1764,7 @@ function CollezioneContent() {
                         famiglia_olfattiva: e.target.value,
                       })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   >
                     {PURE_FAMILIES.map((f) => (
                       <option key={f} value={f}>
@@ -1762,7 +1774,7 @@ function CollezioneContent() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Concentrazione
                   </label>
                   <input
@@ -1774,11 +1786,11 @@ function CollezioneContent() {
                         concentrazione: e.target.value,
                       })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Archivio
                   </label>
                   <select
@@ -1786,7 +1798,7 @@ function CollezioneContent() {
                     onChange={(e) =>
                       setSelectedProfumo({ ...selectedProfumo, stato: e.target.value })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   >
                     <option value="collezione">Collezione Privata</option>
                     <option value="radar">Radar - Testing</option>
@@ -1795,7 +1807,7 @@ function CollezioneContent() {
               </div>
 
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                   URL Immagine Flacone
                 </label>
                 <input
@@ -1808,13 +1820,13 @@ function CollezioneContent() {
                     })
                   }
                   placeholder="https://..."
-                  className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white font-mono focus:border-[#FF2A95] transition-all"
+                  className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white font-mono focus:border-[#C5A059] transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Note di Testa
                   </label>
                   <input
@@ -1826,11 +1838,11 @@ function CollezioneContent() {
                         note_testa: e.target.value,
                       })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Note di Cuore
                   </label>
                   <input
@@ -1842,11 +1854,11 @@ function CollezioneContent() {
                         note_cuore: e.target.value,
                       })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                     Note di Fondo
                   </label>
                   <input
@@ -1858,18 +1870,18 @@ function CollezioneContent() {
                         note_fondo: e.target.value,
                       })
                     }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                   />
                 </div>
               </div>
 
               <div className="p-4 rounded-xl bg-[#08080A]/90 border border-white/5 space-y-3">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#FF70B8]">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-[#F7E7CE]">
                   Test Olfattivo
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-mono text-[10px] text-[#FF4DA6] mb-1">
+                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
                       Su Mouche
                     </label>
                     <textarea
@@ -1881,11 +1893,11 @@ function CollezioneContent() {
                           note_mouche: e.target.value,
                         })
                       }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white focus:border-[#FF2A95] transition-all"
+                      className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white focus:border-[#C5A059] transition-all"
                     />
                   </div>
                   <div>
-                    <label className="block font-mono text-[10px] text-[#FF4DA6] mb-1">
+                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
                       Su Pelle
                     </label>
                     <textarea
@@ -1897,7 +1909,7 @@ function CollezioneContent() {
                           note_pelle: e.target.value,
                         })
                       }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white focus:border-[#FF2A95] transition-all"
+                      className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white focus:border-[#C5A059] transition-all"
                     />
                   </div>
                 </div>
@@ -1915,7 +1927,7 @@ function CollezioneContent() {
                     <div key={key}>
                       <div className="flex justify-between text-xs font-mono mb-1.5">
                         <span className="text-zinc-300">{label}</span>
-                        <span className="text-[#FF70B8] font-semibold">{val}/10</span>
+                        <span className="text-[#F7E7CE] font-semibold">{val}/10</span>
                       </div>
                       <div className="grid grid-cols-10 gap-1">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) => (
@@ -1931,8 +1943,8 @@ function CollezioneContent() {
                             className={`h-2.5 rounded-sm transition-all ${
                               step <= val
                                 ? step >= 8
-                                  ? 'bg-[#1FE866] shadow-[0_0_8px_rgba(31,232,102,0.3)]'
-                                  : 'bg-[#FF2A95]'
+                                  ? 'bg-[#F7E7CE] shadow-[0_0_8px_rgba(247,231,206,0.3)]'
+                                  : 'bg-[#C5A059]'
                                 : 'bg-zinc-800 hover:bg-zinc-700'
                             }`}
                           />
@@ -1957,14 +1969,14 @@ function CollezioneContent() {
                   <button
                     type="button"
                     onClick={() => setSelectedProfumo(null)}
-                    className="px-4 py-2 rounded-xl bg-white/5 text-[#FF70B8] text-xs font-mono uppercase hover:bg-white/10 transition"
+                    className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase hover:bg-white/10 transition"
                   >
                     Annulla
                   </button>
                   <button
                     type="submit"
                     disabled={savingDetail}
-                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold uppercase shadow-champagne-glow hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
                     {savingDetail ? 'Salvataggio...' : 'Salva Modifiche'}
                   </button>
@@ -1978,10 +1990,10 @@ function CollezioneContent() {
       {/* MODALE INDOSSO */}
       {wearProfumo && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-white/15 space-y-4 animate-scale-up">
+          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#C5A059]/30 space-y-4 animate-scale-up">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#FF4DA6]">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
                   Indosso
                 </p>
                 <h3 className="font-serif text-2xl text-white mt-0.5">
@@ -1998,7 +2010,7 @@ function CollezioneContent() {
 
             <form onSubmit={handleRecordWear} className="space-y-4">
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1.5">
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1.5">
                   Momento
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -2009,7 +2021,7 @@ function CollezioneContent() {
                       onClick={() => setMomentoGiornata(m)}
                       className={`py-2 rounded-xl font-mono text-xs border transition-all ${
                         momentoGiornata === m
-                          ? 'bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-semibold border-transparent'
+                          ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold border-transparent'
                           : 'bg-[#08080A] text-zinc-400 border-white/10'
                       }`}
                     >
@@ -2020,13 +2032,13 @@ function CollezioneContent() {
               </div>
 
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                   Contesto
                 </label>
                 <select
                   value={contestoOutfit}
                   onChange={(e) => setContestoOutfit(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#FF2A95] transition-all"
+                  className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
                 >
                   <option value="Ufficio">Ufficio</option>
                   <option value="Aperitivo">Aperitivo</option>
@@ -2037,14 +2049,14 @@ function CollezioneContent() {
               </div>
 
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#FF4DA6] mb-1">
+                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
                   Note
                 </label>
                 <textarea
                   rows={2}
                   value={noteGiorno}
                   onChange={(e) => setNoteGiorno(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-white/10 p-2.5 text-xs text-white focus:border-[#FF2A95] transition-all"
+                  className="w-full rounded-xl bg-[#08080A] border border-white/10 p-2.5 text-xs text-white focus:border-[#C5A059] transition-all"
                 />
               </div>
 
@@ -2052,14 +2064,14 @@ function CollezioneContent() {
                 <button
                   type="button"
                   onClick={() => setWearProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-[#FF70B8] text-xs font-mono"
+                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
                 >
                   Annulla
                 </button>
                 <button
                   type="submit"
                   disabled={savingWear}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#FF2A95] via-[#7B2CBF] to-[#1FE866] text-white font-mono text-xs font-semibold"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold"
                 >
                   {savingWear ? '...' : 'Conferma'}
                 </button>
@@ -2104,7 +2116,7 @@ export default function CollezionePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-[#FF70B8] font-mono text-xs animate-pulse">
+        <div className="min-h-screen flex items-center justify-center text-[#C5A059] font-mono text-xs animate-pulse">
           Caricamento...
         </div>
       }
