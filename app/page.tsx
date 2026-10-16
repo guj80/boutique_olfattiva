@@ -10,7 +10,6 @@ import {
   RefreshCw,
   FlaskConical,
   BookOpen,
-  ShieldCheck,
 } from 'lucide-react';
 import {
   supabase,
@@ -20,6 +19,24 @@ import {
   isRadarProfumo,
   getUnifiedNotes,
 } from '@/lib/supabase';
+
+const METEO = [
+  'Soleggiato e Caldo',
+  'Temperato Primaverile',
+  'Fresco Autunnale',
+  'Piovoso e Umido',
+  'Freddo Invernale',
+];
+const CONTESTI = ['Ufficio', 'Aperitivo', 'Cena', 'Serata', 'Evento'];
+const PROFILI = [
+  'Legnoso / Ambrato / Deciso',
+  'Agrumato / Fresco / Pulito',
+  'Speziato / Boozy / Caldo',
+  'Gourmand / Ricco',
+  'Marino / Aromatizzato',
+  'Cuoiato / Incensato / Fumoso',
+];
+const MOMENTI = ['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const;
 
 function PerfumeBottleIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
@@ -62,7 +79,7 @@ function SmartBottleImage({
 
   if (!cleanSrc || stage === 'failed') {
     return (
-      <div className="flex items-center justify-center text-zinc-600">
+      <div className="bottle-ph">
         <FlaskConical className={`${iconSize} stroke-[1.2]`} />
       </div>
     );
@@ -89,6 +106,36 @@ function SmartBottleImage({
   );
 }
 
+type Opt = string | { value: string; label: string };
+
+function Field({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Opt[];
+}) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <select className="field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const { value: v, label: l } = typeof o === 'string' ? { value: o, label: o } : o;
+          return (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
+}
+
 export default function BoutiqueHomePage() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [ultimoIndosso, setUltimoIndosso] = useState<Indosso | null>(null);
@@ -106,7 +153,8 @@ export default function BoutiqueHomePage() {
   } | null>(null);
 
   const [selectedQuickProfumoId, setSelectedQuickProfumoId] = useState('');
-  const [quickMomento, setQuickMomento] = useState<'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte'>('Mattina');
+  const [selectedDecantId, setSelectedDecantId] = useState('');
+  const [quickMomento, setQuickMomento] = useState<(typeof MOMENTI)[number]>('Mattina');
   const [quickContesto, setQuickContesto] = useState('Ufficio');
   const [savingQuickWear, setSavingQuickWear] = useState(false);
 
@@ -127,6 +175,9 @@ export default function BoutiqueHomePage() {
 
       const firstCol = allProfumi.find(isCollezioneProfumo);
       if (firstCol) setSelectedQuickProfumoId(firstCol.id);
+
+      const firstDecant = allProfumi.find(isRadarProfumo);
+      if (firstDecant) setSelectedDecantId(firstDecant.id);
 
       const { data: indossiData } = await supabase
         .from('indossi')
@@ -200,269 +251,114 @@ export default function BoutiqueHomePage() {
     }
   }
 
+  const last = ultimoIndosso?.profumi || null;
+  const toggle = (p: 'ai' | 'collezione' | 'decant') =>
+    setActivePanel(activePanel === p ? 'none' : p);
+
   return (
-    <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-6xl mx-auto w-full">
-      {/* HERO HEADER MONUMENTALE CON LOGO CENTRALE E RIFLESSI VERDI/FLOU */}
-      <header className="relative rounded-3xl boutique-glass border border-[#C5A059]/30 p-6 sm:p-8 overflow-hidden animate-fade-in shadow-[0_0_50px_rgba(20,50,30,0.25)]">
-        <div
-          className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full opacity-30 blur-3xl"
-          style={{
-            background: 'radial-gradient(circle, #22543d 0%, #C5A059 40%, transparent 75%)',
-          }}
-        />
-        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 text-center sm:text-left">
-            <div className="relative group shrink-0">
-              <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-[#22543d]/60 via-[#C5A059]/40 to-[#22543d]/60 opacity-80 blur-lg group-hover:opacity-100 transition duration-500" />
-              <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#0B0A09] border-2 border-[#C5A059]/70 shadow-[0_0_30px_rgba(197,160,89,0.3)] p-1.5 flex items-center justify-center overflow-hidden">
-                <img
-                  src="/logo.jpg"
-                  alt="Boutique Olfattiva Crest"
-                  className="w-full h-full object-contain rounded-xl group-hover:scale-105 transition duration-500"
+    <div className="shelf">
+      <main className="relative z-10 mx-auto w-full max-w-5xl px-4 sm:px-8 py-8">
+        <header className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="tile tile--ink w-20 h-20 sm:w-24 sm:h-24 shrink-0">
+              <img
+                src="/logo.jpg"
+                alt="Boutique Olfattiva"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <h1 className="serif on-field text-4xl sm:text-6xl leading-[0.95]">
+              Boutique
+              <br />
+              Olfattiva
+            </h1>
+          </div>
+          <Link href="/diario" className="btn btn--butter shrink-0" aria-label="Diario indossi">
+            <BookOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Diario indossi</span>
+          </Link>
+        </header>
+
+        {/* Hero: l'ultimo profumo indossato */}
+        <section className="card mt-8 p-5 sm:p-7">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="tile w-28 h-28 sm:w-36 sm:h-36 shrink-0">
+              {last ? (
+                <SmartBottleImage
+                  src={last.url_foto_vetrina || last.immagine_url}
+                  alt={last.nome}
+                  iconSize="w-10 h-10"
+                  className="w-full h-full object-contain p-2"
                 />
-              </div>
-            </div>
-
-            <div>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#C5A059]/15 border border-[#C5A059]/35 mb-2.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#C5A059]" />
-                <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#F7E7CE]">
-                  Atelier &amp; Neural Archive
-                </span>
-              </div>
-              <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white">
-                BOUTIQUE OLFATTIVA
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Link
-              href="/diario"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/35 text-[#F7E7CE] hover:border-[#F7E7CE] font-mono text-xs uppercase tracking-wider transition-all hover:scale-[1.02]"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-[#C5A059]" />
-              <span>Diario Indossi</span>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* SEZIONE CENTRALE: ACCESSI RAPIDI COLLEZIONE, SCANNER, RADAR */}
-      <section className="mt-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link
-            href="/collezione"
-            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group hover:scale-[1.015] transition-all duration-300 animate-fade-in border border-[#C5A059]/20"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                  01 / PRIVATE VAULT
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/25 font-mono text-[11px] text-[#F7E7CE]">
-                  {loading ? '...' : `${collezione.length} FLACONI`}
-                </span>
-              </div>
-              <PerfumeBottleIcon className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
-            </div>
-
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
-              Collezione Privata
-            </h3>
-
-            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
-              <span>APRI COLLEZIONE</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </Link>
-
-          <Link
-            href="/scanner"
-            className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col justify-between group hover:scale-[1.015] transition-all duration-300 animate-fade-in border border-[#C5A059]/20"
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                02 / ZERO-CLICK NEURAL ENGINE
-              </span>
-              <ScanLine className="w-5 h-5 text-[#F7E7CE] group-hover:scale-105 transition" />
-            </div>
-            <h3 className="font-serif text-2xl sm:text-3xl text-white mt-3">
-              IA Scanner e Estrattore
-            </h3>
-            <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-[#F7E7CE]">
-              <span>AVVIA ACQUISIZIONE</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </Link>
-        </div>
-
-        <Link
-          href="/collezione?vista=radar"
-          className="boutique-glass boutique-glass-hover rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[#C5A059]/40 block hover:scale-[1.01] transition-all duration-300 animate-fade-in"
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-[#C5A059]" />
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#C5A059]">
-                03 / LABORATORIO DI VALUTAZIONE
-              </span>
-            </div>
-            <h3 className="font-serif text-2xl text-white mt-2">
-              RADAR - TESTING
-            </h3>
-          </div>
-
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#C5A059]/15 border border-[#F7E7CE]/25 font-mono text-xs uppercase tracking-wider text-[#F7E7CE] self-start sm:self-center">
-            <span>{loading ? '...' : radar.length} IN OSSERVAZIONE</span>
-            <ChevronRight className="w-4 h-4" />
-          </div>
-        </Link>
-      </section>
-
-      {/* INDOSSO DEL GIORNO — POSIZIONATO IN FONDO COME CONSOLE */}
-      <section className="mt-6 animate-fade-in">
-        <div className="boutique-glass rounded-2xl p-5 sm:p-6 border border-[#F7E7CE]/20">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {ultimoIndosso?.profumi && (
-                <div className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#C5A059]/30 overflow-hidden flex items-center justify-center shrink-0">
-                  <SmartBottleImage
-                    src={
-                      ultimoIndosso.profumi.url_foto_vetrina ||
-                      ultimoIndosso.profumi.immagine_url
-                    }
-                    alt={ultimoIndosso.profumi.nome}
-                    className="w-full h-full object-contain p-1.5"
-                  />
-                </div>
+              ) : (
+                <PerfumeBottleIcon className="w-12 h-12 opacity-40" />
               )}
-              <div>
-                <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#C5A059] block">
-                  Scent of the Day
-                </span>
-                {ultimoIndosso && ultimoIndosso.profumi ? (
-                  <div className="mt-1 flex flex-wrap items-baseline gap-2">
-                    <h2 className="font-serif text-xl sm:text-2xl text-white">
-                      {ultimoIndosso.profumi.nome}
-                    </h2>
-                    <span className="text-sm text-[#C5A059] font-mono">
-                      — {ultimoIndosso.profumi.brand}
-                    </span>
-                    <span className="text-xs text-zinc-400 font-mono">
-                      ({ultimoIndosso.momento_giornata || 'Oggi'}
-                      {ultimoIndosso.contesto_outfit
-                        ? ` • ${ultimoIndosso.contesto_outfit}`
-                        : ''}
-                      )
-                    </span>
-                  </div>
-                ) : (
-                  <h2 className="font-serif text-xl sm:text-2xl text-white mt-0.5">
-                    Selezione del Giorno
-                  </h2>
-                )}
-              </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setActivePanel(activePanel === 'ai' ? 'none' : 'ai')}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs hover:scale-[1.02] active:scale-[0.98] transition-all ${
-                  activePanel === 'ai'
-                    ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold shadow-sm'
-                    : 'bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/35 hover:bg-[#C5A059]/25'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Chiedi all&apos;IA</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setActivePanel(activePanel === 'collezione' ? 'none' : 'collezione')
-                }
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs hover:scale-[1.02] active:scale-[0.98] transition-all ${
-                  activePanel === 'collezione'
-                    ? 'bg-[#F7E7CE] text-[#08080A] font-bold'
-                    : 'bg-[#08080A] text-zinc-300 border border-[#F7E7CE]/20 hover:text-white'
-                }`}
-              >
-                <PerfumeBottleIcon className="w-3.5 h-3.5 text-[#C5A059]" />
-                <span>Scegli da Collezione</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActivePanel(activePanel === 'decant' ? 'none' : 'decant')}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-mono text-xs hover:scale-[1.02] active:scale-[0.98] transition-all ${
-                  activePanel === 'decant'
-                    ? 'bg-[#F7E7CE] text-[#08080A] font-bold'
-                    : 'bg-[#08080A] text-zinc-300 border border-[#F7E7CE]/20 hover:text-white'
-                }`}
-              >
-                <Compass className="w-3.5 h-3.5 text-[#C5A059]" />
-                <span>In Prova / Decant</span>
-              </button>
+            <div className="min-w-0 flex-1">
+              {last ? (
+                <>
+                  <p className="text-sm font-semibold muted">L&apos;ultimo indosso</p>
+                  <h2 className="serif text-3xl sm:text-5xl leading-tight">{last.nome}</h2>
+                  <p className="mt-1 text-base">
+                    {last.brand}
+                    <span className="muted">
+                      , {(ultimoIndosso?.momento_giornata || 'oggi').toLowerCase()}
+                      {ultimoIndosso?.contesto_outfit
+                        ? `, ${ultimoIndosso.contesto_outfit.toLowerCase()}`
+                        : ''}
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <h2 className="serif text-3xl sm:text-5xl leading-tight">
+                  Cosa indossi oggi?
+                </h2>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggle('ai')}
+                  className={`btn ${activePanel === 'ai' ? 'btn--ink' : 'btn--butter'}`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Chiedi all&apos;IA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggle('collezione')}
+                  className={`btn ${activePanel === 'collezione' ? 'btn--ink' : ''}`}
+                >
+                  <PerfumeBottleIcon className="w-4 h-4" />
+                  Scegli dalla collezione
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggle('decant')}
+                  className={`btn ${activePanel === 'decant' ? 'btn--ink' : ''}`}
+                >
+                  <Compass className="w-4 h-4" />
+                  In prova / Decant
+                </button>
+              </div>
             </div>
           </div>
 
           {activePanel === 'ai' && (
-            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 space-y-4 animate-slide-up">
+            <div className="panel space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1">
-                    Clima / Stagione
-                  </label>
-                  <select
-                    value={meteo}
-                    onChange={(e) => setMeteo(e.target.value)}
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  >
-                    <option value="Soleggiato e Caldo">Soleggiato e Caldo</option>
-                    <option value="Temperato Primaverile">Temperato Primaverile</option>
-                    <option value="Fresco Autunnale">Fresco Autunnale</option>
-                    <option value="Piovoso e Umido">Piovoso e Umido</option>
-                    <option value="Freddo Invernale">Freddo Invernale</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1">
-                    Contesto
-                  </label>
-                  <select
-                    value={occasione}
-                    onChange={(e) => setOccasione(e.target.value)}
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  >
-                    <option value="Ufficio">Ufficio</option>
-                    <option value="Aperitivo">Aperitivo</option>
-                    <option value="Cena">Cena</option>
-                    <option value="Serata">Serata</option>
-                    <option value="Evento">Evento</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1">
-                    Profilo Olfattivo
-                  </label>
-                  <select
-                    value={umore}
-                    onChange={(e) => setUmore(e.target.value)}
-                    className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                  >
-                    <option value="Legnoso / Ambrato / Deciso">Legnoso / Ambrato / Deciso</option>
-                    <option value="Agrumato / Fresco / Pulito">Agrumato / Fresco / Pulito</option>
-                    <option value="Speziato / Boozy / Caldo">Speziato / Boozy / Caldo</option>
-                    <option value="Gourmand / Ricco">Gourmand / Ricco</option>
-                    <option value="Marino / Aromatizzato">Marino / Aromatizzato</option>
-                    <option value="Cuoiato / Incensato / Fumoso">Cuoiato / Incensato / Fumoso</option>
-                  </select>
-                </div>
+                <Field label="Clima / stagione" value={meteo} onChange={setMeteo} options={METEO} />
+                <Field
+                  label="Contesto"
+                  value={occasione}
+                  onChange={setOccasione}
+                  options={CONTESTI}
+                />
+                <Field
+                  label="Profilo olfattivo"
+                  value={umore}
+                  onChange={setUmore}
+                  options={PROFILI}
+                />
               </div>
 
               <div className="flex justify-end">
@@ -470,51 +366,46 @@ export default function BoutiqueHomePage() {
                   type="button"
                   onClick={askQuickAiEngine}
                   disabled={advisorLoading || collezione.length === 0}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase tracking-wider hover:scale-[1.02] transition-all disabled:opacity-50"
+                  className="btn btn--ink"
                 >
                   {advisorLoading ? (
                     <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Elaborazione...</span>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Sto pensando...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Chiedi all&apos;IA</span>
+                      <Sparkles className="w-4 h-4" />
+                      Consigliami tre profumi
                     </>
                   )}
                 </button>
               </div>
 
               {advisorResult && (
-                <div className="p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/40 space-y-3 animate-fade-in">
-                  <p className="text-xs text-[#F7E7CE] leading-relaxed">
-                    {advisorResult.advice}
-                  </p>
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed">{advisorResult.advice}</p>
                   {advisorResult.recommended.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {advisorResult.recommended.map((p) => (
                         <div
                           key={p.id}
-                          className="p-3 rounded-xl boutique-glass flex flex-col justify-between gap-2"
+                          className="card flex flex-col justify-between gap-3 p-3"
+                          style={{ boxShadow: '3px 3px 0 var(--ink)' }}
                         >
-                          <div className="flex items-start gap-2.5">
-                            <div className="w-10 h-10 rounded-lg bg-[#08080A] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                          <div className="flex items-start gap-3">
+                            <div className="tile w-12 h-12 shrink-0">
                               <SmartBottleImage
                                 src={p.url_foto_vetrina || p.immagine_url}
                                 alt={p.nome}
                                 iconSize="w-4 h-4"
-                                className="w-full h-full object-contain p-0.5"
+                                className="w-full h-full object-contain p-1"
                               />
                             </div>
                             <div className="min-w-0">
-                              <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059] truncate">
-                                {p.brand}
-                              </p>
-                              <p className="font-serif text-base text-white font-medium truncate">
-                                {p.nome}
-                              </p>
-                              <p className="text-[11px] text-zinc-400 line-clamp-1 mt-0.5">
+                              <p className="text-xs font-semibold muted truncate">{p.brand}</p>
+                              <p className="serif text-lg truncate">{p.nome}</p>
+                              <p className="text-xs muted line-clamp-1">
                                 {getUnifiedNotes(p) || p.famiglia_olfattiva}
                               </p>
                             </div>
@@ -522,9 +413,10 @@ export default function BoutiqueHomePage() {
                           <button
                             type="button"
                             onClick={() => handleQuickWearSave(p.id)}
-                            className="w-full py-1.5 rounded-lg bg-[#C5A059]/20 hover:bg-[#C5A059]/35 text-[#F7E7CE] font-mono text-[10px] uppercase tracking-wider transition"
+                            disabled={savingQuickWear}
+                            className="btn btn--butter justify-center"
                           >
-                            Seleziona per Oggi
+                            Indosso questo oggi
                           </button>
                         </div>
                       ))}
@@ -536,104 +428,132 @@ export default function BoutiqueHomePage() {
           )}
 
           {activePanel === 'collezione' && (
-            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end animate-slide-up">
+            <div className="panel grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
               <div className="sm:col-span-2">
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Flacone dalla Collezione ({collezione.length})
-                </label>
-                <select
+                <Field
+                  label={`Flacone dalla collezione (${collezione.length})`}
                   value={selectedQuickProfumoId}
-                  onChange={(e) => setSelectedQuickProfumoId(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                >
-                  {collezione.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.brand} - {p.nome}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedQuickProfumoId}
+                  options={collezione.map((p) => ({
+                    value: p.id,
+                    label: `${p.brand} - ${p.nome}`,
+                  }))}
+                />
               </div>
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Momento
-                </label>
-                <select
-                  value={quickMomento}
-                  onChange={(e) => setQuickMomento(e.target.value as any)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                >
-                  <option value="Mattina">Mattina</option>
-                  <option value="Pomeriggio">Pomeriggio</option>
-                  <option value="Sera">Sera</option>
-                  <option value="Notte">Notte</option>
-                </select>
-              </div>
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Contesto
-                </label>
-                <select
-                  value={quickContesto}
-                  onChange={(e) => setQuickContesto(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                >
-                  <option value="Ufficio">Ufficio</option>
-                  <option value="Aperitivo">Aperitivo</option>
-                  <option value="Cena">Cena</option>
-                  <option value="Serata">Serata</option>
-                  <option value="Evento">Evento</option>
-                </select>
-              </div>
+              <Field
+                label="Momento"
+                value={quickMomento}
+                onChange={(v) => setQuickMomento(v as (typeof MOMENTI)[number])}
+                options={[...MOMENTI]}
+              />
+              <Field
+                label="Contesto"
+                value={quickContesto}
+                onChange={setQuickContesto}
+                options={CONTESTI}
+              />
               <button
                 type="button"
                 onClick={() => handleQuickWearSave(selectedQuickProfumoId)}
                 disabled={savingQuickWear || !selectedQuickProfumoId}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold transition"
+                className="btn btn--ink justify-center"
               >
-                {savingQuickWear ? 'Salvataggio...' : 'Conferma Indosso'}
+                {savingQuickWear ? 'Salvo...' : 'Conferma indosso'}
               </button>
             </div>
           )}
 
           {activePanel === 'decant' && (
-            <div className="mt-5 pt-5 border-t border-[#F7E7CE]/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-slide-up">
+            <div className="panel">
               {radar.length > 0 ? (
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                   <div className="sm:col-span-2">
-                    <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                      Decant / Campioncini in Test ({radar.length})
-                    </label>
-                    <select
-                      onChange={(e) => setSelectedQuickProfumoId(e.target.value)}
-                      defaultValue={radar[0]?.id}
-                      className="w-full rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-3 py-2 text-xs text-white"
-                    >
-                      {radar.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.brand} - {p.nome}
-                        </option>
-                      ))}
-                    </select>
+                    <Field
+                      label={`Decant e campioncini in test (${radar.length})`}
+                      value={selectedDecantId || radar[0]?.id || ''}
+                      onChange={setSelectedDecantId}
+                      options={radar.map((p) => ({
+                        value: p.id,
+                        label: `${p.brand} - ${p.nome}`,
+                      }))}
+                    />
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      handleQuickWearSave(selectedQuickProfumoId || radar[0]?.id)
-                    }
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold"
+                    onClick={() => handleQuickWearSave(selectedDecantId || radar[0]?.id)}
+                    disabled={savingQuickWear}
+                    className="btn btn--ink justify-center"
                   >
-                    Indossa Decant Oggi
+                    Indosso il decant oggi
                   </button>
                 </div>
               ) : (
-                <p className="text-xs text-zinc-400">
-                  Nessun campioncino o profumo attualmente nel Radar Testing.
-                </p>
+                <p className="text-sm muted">Nessun campioncino nel Radar al momento.</p>
               )}
             </div>
           )}
-        </div>
-      </section>
-    </main>
+        </section>
+
+        {/* Accessi rapidi */}
+        <section className="mt-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+            <Link
+              href="/collezione"
+              className="card card--butter md:col-span-3 p-6 flex flex-col justify-between min-h-[11rem]"
+            >
+              <PerfumeBottleIcon className="w-7 h-7" />
+              <div className="mt-6 flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="serif text-3xl sm:text-4xl">La collezione</h3>
+                  <span className="chip mt-2">{loading ? '...' : collezione.length} flaconi</span>
+                </div>
+                <span className="go">
+                  <ChevronRight className="w-5 h-5" />
+                </span>
+              </div>
+            </Link>
+
+            <Link
+              href="/scanner"
+              className="card md:col-span-2 p-6 flex flex-col justify-between min-h-[11rem]"
+            >
+              <ScanLine className="w-7 h-7" />
+              <div className="mt-6 flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="serif text-2xl">Identifica un flacone</h3>
+                  <p className="mt-1 text-sm muted">
+                    Foto o testo: l&apos;IA cerca e verifica le informazioni.
+                  </p>
+                </div>
+                <span className="go shrink-0">
+                  <ChevronRight className="w-5 h-5" />
+                </span>
+              </div>
+            </Link>
+          </div>
+
+          <Link
+            href="/collezione?vista=radar"
+            className="card card--rose p-5 flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4">
+              <Compass className="w-6 h-6 shrink-0" />
+              <div>
+                <h3 className="serif text-2xl">Radar</h3>
+                <p className="text-sm">Il laboratorio dove valuti prima di comprare.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="chip hidden sm:inline-block">
+                {loading ? '...' : radar.length} in osservazione
+              </span>
+              <span className="go">
+                <ChevronRight className="w-5 h-5" />
+              </span>
+            </div>
+          </Link>
+        </section>
+      </main>
+    </div>
   );
 }
