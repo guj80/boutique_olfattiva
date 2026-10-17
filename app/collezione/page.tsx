@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Trash2, UserCheck } from 'lucide-react';
+import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Trash2, UserCheck, Calendar, Sparkles } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
@@ -96,7 +96,6 @@ export default function CollezionePage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
-      {/* HEADER E SELETTORE DELLE DUE VISTE */}
       <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
         <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
           <Link
@@ -141,7 +140,6 @@ export default function CollezionePage() {
         </div>
       </header>
 
-      {/* BARRA DI RICERCA E FILTRI */}
       <section className="mt-6 flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]" />
@@ -171,7 +169,6 @@ export default function CollezionePage() {
         </button>
       </section>
 
-      {/* CASSETTO FILTRI A SCOMPARSA */}
       {filterDrawerOpen && (
         <section className="mt-3 rounded-[24px] border border-[#D8B995]/30 bg-[#1E1428] p-5 space-y-4 shadow-xl">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -221,7 +218,7 @@ export default function CollezionePage() {
         </section>
       )}
 
-      {/* GRIGLIA FLACONI ESPANSI */}
+      {/* GRIGLIA FLACONI */}
       <section className="mt-8">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
@@ -272,7 +269,7 @@ export default function CollezionePage() {
         )}
       </section>
 
-      {/* SCHEDA DETTAGLIO MODALE */}
+      {/* SCHEDA DETTAGLIO ARRICCHITA */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16">
@@ -296,13 +293,21 @@ export default function CollezionePage() {
               <h2 className="font-serif text-3xl text-[#F6EFE4] mt-1">{selectedProfumo.nome}</h2>
               <p className="text-xs text-[#B8A9C9] mt-1">{selectedProfumo.concentrazione || 'Eau de Parfum'} • {selectedProfumo.famiglia_olfattiva}</p>
 
-              {/* Naso Profumiere */}
-              {(selectedProfumo as any).naso_profumiere && (
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#D8B995]">
-                  <UserCheck className="h-3.5 w-3.5" />
-                  <span>Naso: {(selectedProfumo as any).naso_profumiere}</span>
-                </div>
-              )}
+              {/* Dettagli Collezionista: Naso e Anno di Lancio */}
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                {(selectedProfumo as any).naso_profumiere && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#D8B995]">
+                    <UserCheck className="h-3.5 w-3.5" />
+                    <span>Naso: {(selectedProfumo as any).naso_profumiere}</span>
+                  </div>
+                )}
+                {(selectedProfumo as any).anno_lancio && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#B8A9C9]">
+                    <Calendar className="h-3.5 w-3.5 text-[#D8B995]" />
+                    <span>Anno: {(selectedProfumo as any).anno_lancio}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {selectedProfumo.descrizione_ai && (
