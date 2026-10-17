@@ -12,10 +12,10 @@ interface BottlePedestalProps {
 
 export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '' }: BottlePedestalProps) {
   const sizeClasses = {
-    sm: 'h-14 w-14 rounded-[16px]',
-    md: 'h-24 w-24 rounded-[22px]',
-    lg: 'h-40 w-32 rounded-[28px]',
-    xl: 'h-64 w-52 rounded-[36px]',
+    sm: 'h-16 w-16 rounded-[16px]',
+    md: 'h-28 w-24 rounded-[22px]',
+    lg: 'h-52 w-full rounded-[26px]',
+    xl: 'h-72 w-60 rounded-[32px]',
   }[size];
 
   const iconSizes = {
@@ -27,22 +27,18 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden border border-[#D8B995]/30 bg-gradient-to-b from-[#1E1428] via-[#140D1C] to-[#0A060F] shadow-[inset_0_4px_20px_rgba(0,0,0,0.8)] ${sizeClasses} ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden border border-[#D8B995]/25 bg-gradient-to-b from-[#1E1428] via-[#150E1F] to-[#0D0814] shadow-[inset_0_2px_16px_rgba(0,0,0,0.5)] ${sizeClasses} ${className}`}
     >
-      {/* Alone luminoso di profondità */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.12)_0%,transparent_75%)] pointer-events-none" />
+      {/* Alone luminoso di sottofondo che esalta la bottiglia */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.1)_0%,transparent_70%)] pointer-events-none" />
 
       {src ? (
         <div className="relative z-10 h-full w-full p-3 flex items-center justify-center">
-          {/* Maschera radiale morbida per fondere sfondi bianchi o colorati nel podio scuro */}
+          {/* Immagine espansa, grande, senza maschere restrittive */}
           <img
             src={src}
             alt={alt}
-            className="max-h-full max-w-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.7)] transition-transform duration-500 hover:scale-105"
-            style={{
-              maskImage: 'radial-gradient(circle at center, black 60%, transparent 100%)',
-              WebkitMaskImage: 'radial-gradient(circle at center, black 60%, transparent 100%)',
-            }}
+            className="max-h-full max-w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.7)] transition-transform duration-500 hover:scale-105"
           />
         </div>
       ) : (
@@ -67,10 +63,6 @@ export function SmartBottleImage({ src, alt = 'Profumo', className = '', iconSiz
           src={src}
           alt={alt}
           className="h-full w-full object-contain drop-shadow-md"
-          style={{
-            maskImage: 'radial-gradient(circle at center, black 70%, transparent 100%)',
-            WebkitMaskImage: 'radial-gradient(circle at center, black 70%, transparent 100%)',
-          }}
         />
       ) : (
         <FlaskConical className={`${iconSize} text-[#D8B995]/60`} />
