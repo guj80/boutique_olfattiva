@@ -8,9 +8,10 @@ interface BottlePedestalProps {
   alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  showSigil?: boolean; // Mostra il sigillo del logo solo nella collezione
 }
 
-export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '' }: BottlePedestalProps) {
+export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '', showSigil = false }: BottlePedestalProps) {
   const sizeClasses = {
     sm: 'h-16 w-16',
     md: 'h-28 w-24',
@@ -26,15 +27,12 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
   }[size];
 
   return (
-    <div
-      className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses} ${className}`}
-    >
+    <div className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses} ${className}`}>
       {/* Alone cromatico reattivo di sottofondo */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.18)_0%,transparent_75%)] pointer-events-none" />
 
       {src ? (
         <div className="relative z-10 h-full w-full p-2 flex items-center justify-center">
-          {/* Immagine con proporzioni native preservate al 100%, senza forzature */}
           <img
             src={src}
             alt={alt}
@@ -43,6 +41,13 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
         </div>
       ) : (
         <FlaskConical className={`${iconSizes} text-[#D8B995]/60 transition-transform duration-500 hover:scale-110`} />
+      )}
+
+      {/* Sigillo / Filigrana del Logo (Solo nella Collezione) */}
+      {showSigil && (
+        <div className="absolute bottom-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-[#140D1C]/95 border border-[#D8B995]/40 shadow-md">
+          <span className="font-mono text-[9px] font-bold text-[#D8B995]">L</span>
+        </div>
       )}
     </div>
   );
@@ -59,11 +64,7 @@ export function SmartBottleImage({ src, alt = 'Profumo', className = '', iconSiz
   return (
     <div className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#140D1C]/90 p-1.5 border border-white/10 ${className}`}>
       {src ? (
-        <img
-          src={src}
-          alt={alt}
-          className="h-full w-full object-contain drop-shadow-md"
-        />
+        <img src={src} alt={alt} className="h-full w-full object-contain drop-shadow-md" />
       ) : (
         <FlaskConical className={`${iconSize} text-[#D8B995]/60`} />
       )}
