@@ -101,9 +101,7 @@ function shiftHexHue(hex: string, degreeDelta: number): string {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
-  let r1 = 0,
-    g1 = 0,
-    b1 = 0;
+  let r1 = 0, g1 = 0, b1 = 0;
 
   if (h < 60) [r1, g1, b1] = [c, x, 0];
   else if (h < 120) [r1, g1, b1] = [x, c, 0];
@@ -113,9 +111,7 @@ function shiftHexHue(hex: string, degreeDelta: number): string {
   else [r1, g1, b1] = [c, 0, x];
 
   const toHex = (n: number) =>
-    Math.round((n + m) * 255)
-      .toString(16)
-      .padStart(2, '0');
+    Math.round((n + m) * 255).toString(16).padStart(2, '0');
 
   return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`;
 }
