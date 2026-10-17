@@ -15,25 +15,53 @@ const PURE_FAMILIES = [
   'Verde', 'Speziata', 'Legnosa', 'Ambrata', 'Gourmand', 'Cuoiata', 'Muschiata'
 ];
 
-// Funzione di pulizia automatica in background per normalizzare eventuali note in inglese
-function sanitizeNote(text?: string | null): string {
+// Dizionario tecnico di alta profumeria per normalizzare le note senza traduzioni amatoriali
+function formatPerfumeNote(text?: string | null): string {
   if (!text) return 'Non specificate';
-  let clean = text
-    .replace(/Bergamot/gi, 'Bergamotto')
-    .replace(/Lemon/gi, 'Limone')
-    .replace(/Mandarin/gi, 'Mandarino')
-    .replace(/Orange/gi, 'Arancia')
-    .replace(/Rose/gi, 'Rosa')
-    .replace(/Jasmine/gi, 'Gelsomino')
-    .replace(/Vanilla/gi, 'Vaniglia')
-    .replace(/Sandalwood/gi, 'Sandalo')
-    .replace(/Cedar/gi, 'Cedro')
-    .replace(/Musk/gi, 'Muschio')
-    .replace(/Amber/gi, 'Ambra')
-    .replace(/Patchouli/gi, 'Patchouli')
-    .replace(/Leather/gi, 'Cuoio')
-    .replace(/Pepper/gi, 'Pepe');
-  return clean;
+  
+  const translations: Record<string, string> = {
+    'bergamot': 'Bergamotto',
+    'lemon': 'Limone',
+    'mandarin': 'Mandarino',
+    'orange': 'Arancia',
+    'grapefruit': 'Pompelmo',
+    'neroli': 'Neroli',
+    'petitgrain': 'Petitgrain',
+    'rose': 'Rosa',
+    'jasmine': 'Gelsomino',
+    'white musk': 'Muschio Bianco',
+    'musk': 'Muschio',
+    'vanilla': 'Vaniglia',
+    'sandalwood': 'Sandalo',
+    'cedar': 'Cedro',
+    'amber': 'Ambra',
+    'ambergris': 'Ambra Grigia',
+    'patchouli': 'Patchouli',
+    'vetiver': 'Vetiver',
+    'leather': 'Cuoio',
+    'oud': 'Oud (Legno di Agar)',
+    'incense': 'Incenso',
+    'pepper': 'Pepe',
+    'pink pepper': 'Pepe Rosa',
+    'cardamom': 'Cardamomo',
+    'cinnamon': 'Cannella',
+    'iris': 'Iris',
+    'lavender': 'Lavanda',
+    'geranium': 'Geranio',
+    'tobacco': 'Tabacco',
+    'coffee': 'Caffè',
+    'cacao': 'Cacao',
+    'tonka bean': 'Fava Tonka'
+  };
+
+  let formatted = text.toLowerCase();
+  for (const [en, it] of Object.entries(translations)) {
+    const regex = new RegExp(`\\b${en}\\b`, 'gi');
+    formatted = formatted.replace(regex, it);
+  }
+
+  // Rende la prima lettera maiuscola per pulizia estetica
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
 export default function CollezionePage() {
@@ -190,6 +218,7 @@ export default function CollezionePage() {
         </div>
       </header>
 
+      {/* BARRA DI RICERCA E FILTRI */}
       <section className="mt-6 flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]" />
@@ -268,7 +297,7 @@ export default function CollezionePage() {
         </section>
       )}
 
-      {/* GRIGLIA FLACONI */}
+      {/* GRIGLIA FLACONI CON IL SIGILLO DEL LOGO SOLO NELLA COLLEZIONE */}
       <section className="mt-8">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
@@ -287,6 +316,7 @@ export default function CollezionePage() {
             {filteredProfumi.map((p) => {
               const aura = resolveAura(p.famiglia_olfattiva, p.nome);
               const imgUrl = p.url_foto_vetrina || p.immagine_url;
+              const isCollezione = activeTab === 'collezione';
 
               return (
                 <div
@@ -305,7 +335,8 @@ export default function CollezionePage() {
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-40 transition-opacity group-hover:opacity-80"
                         style={{ backgroundColor: aura.primary }}
                       />
-                      <BottlePedestal src={imgUrl} alt={p.nome} size="lg" className="relative z-10 !h-52 w-full" />
+                      {/* Mostra il sigillo del logo solo se siamo nella vista Collezione */}
+                      <BottlePedestal src={imgUrl} alt={p.nome} size="lg" className="relative z-10 !h-52 w-full" showSigil={isCollezione} />
                     </div>
                   </div>
 
@@ -323,7 +354,7 @@ export default function CollezionePage() {
         )}
       </section>
 
-      {/* SCHEDA DETTAGLIO MODALE (CON PULSANTE DI MODIFICA RAPIDA E PULIZIA NOTE) */}
+      {/* SCHEDA DETTAGLIO MODALE */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16">
@@ -344,7 +375,6 @@ export default function CollezionePage() {
             </div>
 
             {isEditing ? (
-              /* MODALITÀ MODIFICA RAPIDA IMMAGINE E DATI */
               <div className="space-y-4 pt-2">
                 <h3 className="font-serif text-xl text-[#D8B995]">Modifica Flacone</h3>
                 
@@ -368,13 +398,12 @@ export default function CollezionePage() {
                     />
                   </div>
                   <div>
-                    <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">URL Foto Vetrina (Immagine)</label>
+                    <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">URL Foto Vetrina</label>
                     <input
                       type="text"
                       value={editForm.url_foto_vetrina || editForm.immagine_url || ''}
                       onChange={(e) => setEditForm({ ...editForm, url_foto_vetrina: e.target.value })}
                       className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
-                      placeholder="https://..."
                     />
                   </div>
                   <div>
@@ -407,23 +436,16 @@ export default function CollezionePage() {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
-                  >
+                  <button onClick={() => setIsEditing(false)} className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]">
                     Annulla
                   </button>
-                  <button
-                    onClick={handleSaveEdit}
-                    className="flex items-center gap-1.5 rounded-full bg-[#D8B995] px-5 py-2 text-xs font-bold text-[#140D1C]"
-                  >
+                  <button onClick={handleSaveEdit} className="flex items-center gap-1.5 rounded-full bg-[#D8B995] px-5 py-2 text-xs font-bold text-[#140D1C]">
                     <Check className="h-3.5 w-3.5" />
                     <span>Salva modifiche</span>
                   </button>
                 </div>
               </div>
             ) : (
-              /* MODALITÀ VISUALIZZAZIONE NORMALE */
               <>
                 <div className="flex flex-col items-center text-center pt-2">
                   <div className="relative mb-4">
@@ -469,24 +491,24 @@ export default function CollezionePage() {
                     {selectedProfumo.note_testa && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
                         <span className="font-mono text-[11px] text-[#D8B995] uppercase tracking-wider font-bold">Note di Testa</span>
-                        <span className="text-left sm:text-right text-[#F6EFE4]">{sanitizeNote(selectedProfumo.note_testa)}</span>
+                        <span className="text-left sm:text-right text-[#F6EFE4]">{formatPerfumeNote(selectedProfumo.note_testa)}</span>
                       </div>
                     )}
                     {selectedProfumo.note_cuore && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
                         <span className="font-mono text-[11px] text-[#D8B995] uppercase tracking-wider font-bold">Note di Cuore</span>
-                        <span className="text-left sm:text-right text-[#F6EFE4]">{sanitizeNote(selectedProfumo.note_cuore)}</span>
+                        <span className="text-left sm:text-right text-[#F6EFE4]">{formatPerfumeNote(selectedProfumo.note_cuore)}</span>
                       </div>
                     )}
                     {selectedProfumo.note_fondo && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
                         <span className="font-mono text-[11px] text-[#D8B995] uppercase tracking-wider font-bold">Note di Fondo</span>
-                        <span className="text-left sm:text-right text-[#F6EFE4]">{sanitizeNote(selectedProfumo.note_fondo)}</span>
+                        <span className="text-left sm:text-right text-[#F6EFE4]">{formatPerfumeNote(selectedProfumo.note_fondo)}</span>
                       </div>
                     )}
                     {!selectedProfumo.note_testa && !selectedProfumo.note_cuore && !selectedProfumo.note_fondo && selectedProfumo.note_olfattive && (
                       <div className="rounded-[16px] bg-[#140D1C] p-4 border border-white/10 text-center text-[#F6EFE4]">
-                        {sanitizeNote(selectedProfumo.note_olfattive)}
+                        {formatPerfumeNote(selectedProfumo.note_olfattive)}
                       </div>
                     )}
                   </div>
@@ -520,16 +542,10 @@ export default function CollezionePage() {
             <h3 className="font-serif text-xl text-[#F6EFE4]">Eliminare questo flacone?</h3>
             <p className="text-xs text-[#B8A9C9]">Il profumo verrà rimosso definitivamente dalla tua collezione.</p>
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
-              >
+              <button onClick={() => setDeleteConfirmId(null)} className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]">
                 Annulla
               </button>
-              <button
-                onClick={() => handleDelete(deleteConfirmId)}
-                className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-red-500"
-              >
+              <button onClick={() => handleDelete(deleteConfirmId)} className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-red-500">
                 Conferma Eliminazione
               </button>
             </div>
