@@ -272,7 +272,7 @@ export default function CollezionePage() {
         )}
       </section>
 
-      {/* SCHEDA DETTAGLIO MODALE (CON NASI PROFUMIERI, ETICHETTE E SAFE-AREA CONTRO IL MENU IN BASSO) */}
+      {/* SCHEDA DETTAGLIO MODALE */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16">
@@ -297,10 +297,10 @@ export default function CollezionePage() {
               <p className="text-xs text-[#B8A9C9] mt-1">{selectedProfumo.concentrazione || 'Eau de Parfum'} • {selectedProfumo.famiglia_olfattiva}</p>
 
               {/* Naso Profumiere */}
-              {selectedProfumo.naso_profumiere && (
+              {(selectedProfumo as any).naso_profumiere && (
                 <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#D8B995]">
                   <UserCheck className="h-3.5 w-3.5" />
-                  <span>Naso: {selectedProfumo.naso_profumiere}</span>
+                  <span>Naso: {(selectedProfumo as any).naso_profumiere}</span>
                 </div>
               )}
             </div>
