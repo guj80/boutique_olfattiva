@@ -12,10 +12,10 @@ interface BottlePedestalProps {
 
 export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '' }: BottlePedestalProps) {
   const sizeClasses = {
-    sm: 'h-16 w-16 rounded-[16px]',
-    md: 'h-28 w-24 rounded-[22px]',
-    lg: 'h-52 w-full rounded-[26px]',
-    xl: 'h-72 w-60 rounded-[32px]',
+    sm: 'h-16 w-16',
+    md: 'h-28 w-24',
+    lg: 'h-52 w-full',
+    xl: 'h-72 w-60',
   }[size];
 
   const iconSizes = {
@@ -27,18 +27,17 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden border border-[#D8B995]/25 bg-gradient-to-b from-[#1E1428] via-[#150E1F] to-[#0D0814] shadow-[inset_0_2px_16px_rgba(0,0,0,0.5)] ${sizeClasses} ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses} ${className}`}
     >
-      {/* Alone luminoso di sottofondo che esalta la bottiglia */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.1)_0%,transparent_70%)] pointer-events-none" />
+      {/* Alone luminoso di sottofondo che esalta la bottiglia senza box rigidi */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.18)_0%,transparent_75%)] pointer-events-none" />
 
       {src ? (
-        <div className="relative z-10 h-full w-full p-3 flex items-center justify-center">
-          {/* Immagine espansa, grande, senza maschere restrittive */}
+        <div className="relative z-10 h-full w-full p-2 flex items-center justify-center">
           <img
             src={src}
             alt={alt}
-            className="max-h-full max-w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.7)] transition-transform duration-500 hover:scale-105"
+            className="max-h-full max-w-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.8)] transition-transform duration-500 hover:scale-105"
           />
         </div>
       ) : (
