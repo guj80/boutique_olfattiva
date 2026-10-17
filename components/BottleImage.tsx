@@ -29,11 +29,12 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
     <div
       className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses} ${className}`}
     >
-      {/* Alone luminoso di sottofondo che esalta la bottiglia senza box rigidi */}
+      {/* Alone cromatico reattivo di sottofondo */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.18)_0%,transparent_75%)] pointer-events-none" />
 
       {src ? (
         <div className="relative z-10 h-full w-full p-2 flex items-center justify-center">
+          {/* Immagine con proporzioni native preservate al 100%, senza forzature */}
           <img
             src={src}
             alt={alt}
