@@ -1,27 +1,57 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { Bricolage_Grotesque, Instrument_Serif } from 'next/font/google';
+import { AuraProvider } from '@/components/AuraProvider';
+import { Aura } from '@/components/Aura';
+import { BottomDock } from '@/components/BottomDock';
+import { ToastProvider } from '@/components/Toast';
+import { SpruzzoProvider } from '@/components/Spruzzo';
+
+const bricolage = Bricolage_Grotesque({
+  subsets: ['latin'],
+  axes: ['opsz', 'wdth'],
+  variable: '--font-bricolage',
+  display: 'swap',
+});
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
+  variable: '--font-instrument',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'Boutique Olfattiva — Private Olfactory Archive',
-  description: 'Private Olfactory Vault & Neural Fragrance Engine.',
-  icons: {
-    icon: '/logo.jpg',
-    apple: '/logo.jpg',
+  title: 'Boutique Olfattiva',
+  description: 'La tua collezione di profumi, viva.',
+  themeColor: '#140D1C',
+  viewport: { width: 'device-width', initialScale: 1, viewportFit: 'cover' },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Boutique Olfattiva',
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="it" className="dark">
-      <body className="min-h-screen bg-[#08080A] text-white antialiased selection:bg-[#C5A059]/30 selection:text-[#F7E7CE]">
-        <div className="fixed inset-0 bg-obsidian-radial pointer-events-none z-0" />
-        <div className="relative z-10 min-h-screen flex flex-col">
-          {children}
-        </div>
+    <html lang="it" className={`dark ${bricolage.variable} ${instrumentSerif.variable}`}>
+      <body className="antialiased selection:bg-[#D8B995] selection:text-[#140D1C]">
+        <AuraProvider>
+          <ToastProvider>
+            <SpruzzoProvider>
+              <Aura />
+              <div
+                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+                className="relative z-10 flex min-h-[100dvh] w-full flex-col pb-28"
+              >
+                {children}
+              </div>
+              <BottomDock />
+            </SpruzzoProvider>
+          </ToastProvider>
+        </AuraProvider>
       </body>
     </html>
   );
