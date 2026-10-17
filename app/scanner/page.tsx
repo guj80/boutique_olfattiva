@@ -17,7 +17,9 @@ import {
   Search,
   FlaskConical,
 } from 'lucide-react';
-import { supabase, Profumo, getUnifiedNotes } from '@/lib/supabase';
+import { supabase, Profumo } from '@/lib/supabase';
+import { Logo } from '@/components/Logo';
+import { useToast } from '@/components/Toast';
 
 const PURE_FAMILIES = [
   'Agrumata',
@@ -38,11 +40,9 @@ export default function ScannerPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'name' | 'photo' | 'url'>('name');
 
-  // Riferimenti separati per Fotocamera e Galleria
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Input per le 3 modalità
   const [inputUrl, setInputUrl] = useState('');
   const [inputName, setInputName] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -51,12 +51,12 @@ export default function ScannerPage() {
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Scheda di Anteprima Editabile (Review Card)
   const [draft, setDraft] = useState<Partial<Profumo> | null>(null);
   const [modelSource, setModelSource] = useState<string>('');
   const [targetStato, setTargetStato] = useState<'collezione' | 'radar'>('collezione');
 
-  // Compressione immagine lato client per evitare errori 413 Payload Too Large su Vercel
+  const { showToast } = useToast();
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -100,15 +100,15 @@ export default function ScannerPage() {
     if (e) e.preventDefault();
 
     if (mode === 'url' && !inputUrl.trim()) {
-      alert('Inserisci un link valido.');
+      showToast('Inserisci un link valido.', 'error');
       return;
     }
     if (mode === 'name' && !inputName.trim()) {
-      alert('Inserisci Marchio e Nome del profumo.');
+      showToast('Inserisci Marchio e Nome del profumo.', 'error');
       return;
     }
     if (mode === 'photo' && !imagePreview) {
-      alert('Scatta una foto o seleziona un\'immagine dalla Galleria.');
+      showToast('Scatta una foto o seleziona un\'immagine.', 'error');
       return;
     }
 
@@ -134,7 +134,7 @@ export default function ScannerPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Errore durante l\'estrazione dei dati.');
+        throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
       setModelSource(data._modelUsed || 'neural-engine');
@@ -160,8 +160,9 @@ export default function ScannerPage() {
         note_mouche: '',
         note_pelle: '',
       });
+      showToast('Scheda estratta con successo.');
     } catch (err: any) {
-      alert(err?.message || 'Impossibile completare l\'estrazione.');
+      showToast(err?.message || "Impossibile completare l'estrazione.", 'error');
     } finally {
       setExtracting(false);
     }
@@ -170,7 +171,7 @@ export default function ScannerPage() {
   async function handleSaveToSupabase(e: React.FormEvent) {
     e.preventDefault();
     if (!draft || !draft.nome || !draft.brand) {
-      alert('Assicurati che Marchio e Nome siano compilati.');
+      showToast('Assicurati che Marchio e Nome siano compilati.', 'error');
       return;
     }
 
@@ -209,7 +210,6 @@ export default function ScannerPage() {
       const { error } = await supabase.from('profumi').insert([fullPayload]);
 
       if (error) {
-        // Fallback compatibilità colonne base se necessario
         const { error: fallbackErr } = await supabase.from('profumi').insert([
           {
             nome: fullPayload.nome,
@@ -222,540 +222,256 @@ export default function ScannerPage() {
         if (fallbackErr) throw fallbackErr;
       }
 
+      showToast('Profumo salvato correttamente.');
       router.push(
         targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione'
       );
     } catch (err: any) {
-      alert(`Errore nel salvataggio: ${err?.message}`);
+      showToast(`Errore nel salvataggio: ${err?.message}`, 'error');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-5xl mx-auto w-full">
-      {/* HEADER COORDINATO CON MEDAGLIONE LOGO */}
-      <header className="flex items-center justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15 animate-fade-in">
+    <main className="mx-auto w-full max-w-3xl px-4 sm:px-8 py-8 pb-28">
+      {/* HEADER */}
+      <header className="flex items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
         <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] border border-[#C5A059]/30 hover:border-[#F7E7CE] hover:scale-105 transition-all"
-            title="Torna alla Home"
+            aria-label="Torna alla home"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D8B995]/30 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-[#D8B995]"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5 text-[#D8B995]" />
           </Link>
-
-          <div className="w-12 h-12 rounded-xl bg-[#0B0A09] border border-[#C5A059]/60 p-1 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(197,160,89,0.2)]">
-            <img
-              src="/logo.jpg"
-              alt="Boutique Olfattiva"
-              className="w-full h-full object-contain rounded-lg"
-            />
-          </div>
-
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#C5A059]">
-              Zero-Hallucination Neural Engine
-            </p>
-            <h1 className="font-serif text-2xl sm:text-3xl text-white font-semibold">
-              IA Scanner &amp; Catalogatore
-            </h1>
-          </div>
+          <Logo className="h-7" />
         </div>
-
         <Link
           href="/collezione"
-          className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#08080A] border border-[#C5A059]/30 text-[#F7E7CE] font-mono text-xs uppercase tracking-wider hover:border-[#F7E7CE] transition"
+          className="rounded-full border border-[#D8B995]/30 bg-[#1E1428] px-4 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:border-[#D8B995]"
         >
-          <span>Vai a Collezione</span>
+          Vai a Collezione
         </Link>
       </header>
 
-      {/* SELETTORE 3 MODALITÀ DI ACQUISIZIONE */}
-      <section className="mt-6 boutique-glass rounded-2xl p-5 sm:p-6 border border-[#C5A059]/25 space-y-5 animate-fade-in">
-        <div className="grid grid-cols-3 gap-2.5 p-1.5 rounded-2xl bg-[#08080A] border border-white/10">
+      {/* MODALITÀ DI ACQUISIZIONE */}
+      <section className="mt-6 rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-5 sm:p-6 aura-shadow space-y-5">
+        <div className="grid grid-cols-3 gap-2 rounded-full bg-[#140D1C] p-1.5 border border-white/10">
           <button
             type="button"
             onClick={() => setMode('name')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-mono text-xs uppercase tracking-wider transition-all ${
-              mode === 'name'
-                ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+            className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
+              mode === 'name' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
           >
-            <Search className="w-3.5 h-3.5" />
-            <span>Nome &amp; Brand</span>
+            <Search className="h-3.5 w-3.5" />
+            <span>Nome</span>
           </button>
-
           <button
             type="button"
             onClick={() => setMode('photo')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-mono text-xs uppercase tracking-wider transition-all ${
-              mode === 'photo'
-                ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+            className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
+              mode === 'photo' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
           >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Foto / Galleria</span>
+            <Camera className="h-3.5 w-3.5" />
+            <span>Foto</span>
           </button>
-
           <button
             type="button"
             onClick={() => setMode('url')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-mono text-xs uppercase tracking-wider transition-all ${
-              mode === 'url'
-                ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+            className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
+              mode === 'url' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
           >
-            <Link2 className="w-3.5 h-3.5" />
-            <span>Da Link Web</span>
+            <Link2 className="h-3.5 w-3.5" />
+            <span>Link</span>
           </button>
         </div>
 
-        {/* MODALITÀ 1: RICERCA PER NOME E BRAND (59.325 DB + NICCHIA LIVE) */}
         {mode === 'name' && (
-          <form onSubmit={handleExtract} className="space-y-3 animate-fade-in">
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-[#C5A059]">
-              Marchio e Nome del Profumo (Catalogo 59.325 + Nicchia Live)
+          <form onSubmit={handleExtract} className="space-y-3">
+            <label className="block text-xs font-medium text-[#B8A9C9]">
+              Marchio e Nome del Profumo
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
                 value={inputName}
                 onChange={(e) => setInputName(e.target.value)}
-                placeholder="Es. Orto Parisi Megamare, Ex Nihilo Blue Talisman, Amouage..."
-                className="flex-1 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C5A059]"
+                placeholder="Es. Orto Parisi Megamare, Byredo Gypsy Water..."
+                className="flex-1 rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-[#D8B995] focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={extracting || !inputName.trim()}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 shrink-0"
+                className="flex items-center justify-center gap-2 rounded-[16px] bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e] disabled:opacity-40"
               >
-                {extracting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Estrazione...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>Estrai Scheda</span>
-                  </>
-                )}
+                {extracting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                <span>Estrai</span>
               </button>
             </div>
           </form>
         )}
 
-        {/* MODALITÀ 2: FOTO FOTOCAMERA OPPURE GALLERIA TELEFONO */}
         {mode === 'photo' && (
-          <div className="space-y-4 animate-fade-in">
-            {/* Input nascosto 1: Fotocamera diretta */}
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-
-            {/* Input nascosto 2: Galleria / Libreria Foto (SENZA capture) */}
-            <input
-              ref={galleryInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
+          <div className="space-y-4">
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
+            <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
             {!imagePreview ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
-                  className="p-6 rounded-2xl bg-[#08080A] border border-[#C5A059]/35 hover:border-[#F7E7CE] flex flex-col items-center justify-center gap-3 group transition-all hover:scale-[1.01]"
+                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-[#D8B995]/50"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#C5A059]/15 border border-[#C5A059]/40 flex items-center justify-center text-[#F7E7CE] group-hover:scale-110 transition">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-serif text-lg text-white font-medium">
-                      Scatta Foto
-                    </p>
-                    <p className="font-mono text-[11px] text-zinc-400 mt-0.5">
-                      Usa la fotocamera per inquadrare flacone o campioncino
-                    </p>
-                  </div>
+                  <Camera className="h-6 w-6 text-[#D8B995]" />
+                  <span className="text-sm font-semibold text-[#F6EFE4]">Scatta Foto</span>
                 </button>
-
                 <button
                   type="button"
                   onClick={() => galleryInputRef.current?.click()}
-                  className="p-6 rounded-2xl bg-[#08080A] border border-[#C5A059]/35 hover:border-[#F7E7CE] flex flex-col items-center justify-center gap-3 group transition-all hover:scale-[1.01]"
+                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-[#D8B995]/50"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#C5A059]/15 border border-[#C5A059]/40 flex items-center justify-center text-[#F7E7CE] group-hover:scale-110 transition">
-                    <ImageIcon className="w-6 h-6" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-serif text-lg text-white font-medium">
-                      Carica da Galleria
-                    </p>
-                    <p className="font-mono text-[11px] text-zinc-400 mt-0.5">
-                      Scegli una foto o uno screenshot salvato sul telefono
-                    </p>
-                  </div>
+                  <ImageIcon className="h-6 w-6 text-[#D8B995]" />
+                  <span className="text-sm font-semibold text-[#F6EFE4]">Carica da Galleria</span>
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[#08080A] border border-[#C5A059]/40">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[20px] bg-[#140D1C] p-4 border border-white/10">
                 <div className="flex items-center gap-4">
-                  <img
-                    src={imagePreview}
-                    alt="Anteprima Flacone"
-                    className="w-20 h-20 rounded-xl object-contain bg-black border border-white/10 p-1"
-                  />
+                  <img src={imagePreview} alt="Anteprima" className="h-16 w-16 rounded-xl object-contain bg-black p-1" />
                   <div>
-                    <p className="font-serif text-lg text-white">
-                      Immagine pronta per l&apos;analisi
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => galleryInputRef.current?.click()}
-                        className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono text-[#F7E7CE]"
-                      >
-                        Cambia da Galleria
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setImagePreview(null)}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-mono"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Rimuovi</span>
-                      </button>
-                    </div>
+                    <p className="text-sm font-semibold text-[#F6EFE4]">Immagine pronta</p>
+                    <button type="button" onClick={() => setImagePreview(null)} className="text-xs text-red-400 mt-1">Rimuovi</button>
                   </div>
                 </div>
-
                 <button
                   type="button"
                   onClick={() => handleExtract()}
                   disabled={extracting}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase tracking-wider hover:scale-[1.02] transition-all disabled:opacity-50"
+                  className="rounded-full bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C]"
                 >
-                  {extracting ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Analisi Visiva...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      <span>Avvia Riconoscimento</span>
-                    </>
-                  )}
+                  {extracting ? 'Analisi...' : 'Avvia Riconoscimento'}
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* MODALITÀ 3: ESTRAZIONE DA URL / LINK PRODOTTO */}
         {mode === 'url' && (
-          <form onSubmit={handleExtract} className="space-y-3 animate-fade-in">
-            <label className="block font-mono text-[11px] uppercase tracking-wider text-[#C5A059]">
-              Incolla Link Ufficiale del Brand, Fragrantica o Parfumo
-            </label>
+          <form onSubmit={handleExtract} className="space-y-3">
+            <label className="block text-xs font-medium text-[#B8A9C9]">Incolla Link Ufficiale</label>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="url"
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
                 placeholder="https://..."
-                className="flex-1 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C5A059]"
+                className="flex-1 rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4]"
               />
               <button
                 type="submit"
                 disabled={extracting || !inputUrl.trim()}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 shrink-0"
+                className="rounded-[16px] bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C]"
               >
-                {extracting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Lettura Pagina...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>Estrai da Link</span>
-                  </>
-                )}
+                {extracting ? 'Lettura...' : 'Estrai'}
               </button>
             </div>
           </form>
         )}
       </section>
 
-      {/* SCHEDA DI REVISIONE E SALVATAGGIO */}
+      {/* SCHEDA DI REVISIONE */}
       {draft && (
-        <section className="mt-6 boutique-glass rounded-2xl p-6 sm:p-7 border border-[#C5A059]/40 animate-slide-up">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-[#F7E7CE]/15">
-            <div className="flex items-center gap-3.5">
-              <div className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#C5A059]/30 flex items-center justify-center overflow-hidden shrink-0">
+        <section className="mt-6 rounded-[28px] border border-[#D8B995]/40 bg-[#1E1428]/95 p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#140D1C] border border-white/10">
                 {draft.url_foto_vetrina ? (
-                  <img
-                    src={draft.url_foto_vetrina}
-                    alt={draft.nome || 'Flacone'}
-                    className="w-full h-full object-contain p-1"
-                  />
+                  <img src={draft.url_foto_vetrina} alt="" className="h-full w-full object-contain p-1" />
                 ) : (
-                  <FlaskConical className="w-6 h-6 text-[#C5A059]" />
+                  <FlaskConical className="h-5 w-5 text-[#D8B995]" />
                 )}
               </div>
               <div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#C5A059]/15 border border-[#C5A059]/40 text-[10px] font-mono text-[#F7E7CE]">
-                  <CheckCircle2 className="w-3 h-3 text-[#C5A059]" />
-                  <span>Fonte: {modelSource}</span>
-                </div>
-                <h2 className="font-serif text-2xl text-white mt-1">
-                  {draft.brand} — {draft.nome}
-                </h2>
+                <span className="font-mono text-[10px] text-[#D8B995]">Fonte: {modelSource}</span>
+                <h2 className="font-serif text-2xl text-[#F6EFE4]">{draft.brand} — {draft.nome}</h2>
               </div>
             </div>
 
-            {/* DESTINAZIONE: COLLEZIONE O RADAR TESTING */}
-            <div className="inline-flex p-1 rounded-xl bg-[#08080A] border border-[#F7E7CE]/20 self-start sm:self-center">
+            <div className="flex rounded-full bg-[#140D1C] p-1 border border-white/10">
               <button
                 type="button"
                 onClick={() => setTargetStato('collezione')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
-                  targetStato === 'collezione'
-                    ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold'
-                    : 'text-zinc-400 hover:text-white'
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  targetStato === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'
                 }`}
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>In Collezione</span>
+                Collezione
               </button>
               <button
                 type="button"
                 onClick={() => setTargetStato('radar')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs transition-all ${
-                  targetStato === 'radar'
-                    ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold'
-                    : 'text-zinc-400 hover:text-white'
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  targetStato === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'
                 }`}
               >
-                <Compass className="w-3.5 h-3.5" />
-                <span>In Testing / Radar</span>
+                Radar
               </button>
             </div>
           </div>
 
-          <form onSubmit={handleSaveToSupabase} className="space-y-4 mt-5">
+          <form onSubmit={handleSaveToSupabase} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Marchio Ufficiale
-                </label>
+                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Marchio</label>
                 <input
                   type="text"
                   value={draft.brand || ''}
                   onChange={(e) => setDraft({ ...draft, brand: e.target.value })}
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 px-3 py-2 text-xs text-white focus:border-[#C5A059]"
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
-
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Nome Fragranza
-                </label>
+                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Nome</label>
                 <input
                   type="text"
                   value={draft.nome || ''}
                   onChange={(e) => setDraft({ ...draft, nome: e.target.value })}
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 px-3 py-2 text-xs text-white focus:border-[#C5A059]"
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
-
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Famiglia Olfattiva Pura
-                </label>
+                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Famiglia</label>
                 <select
                   value={draft.famiglia_olfattiva || 'Legnosa'}
-                  onChange={(e) =>
-                    setDraft({ ...draft, famiglia_olfattiva: e.target.value })
-                  }
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 px-3 py-2 text-xs text-white focus:border-[#C5A059]"
+                  onChange={(e) => setDraft({ ...draft, famiglia_olfattiva: e.target.value })}
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 >
                   {PURE_FAMILIES.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
+                    <option key={f} value={f} className="bg-[#140D1C]">{f}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Concentrazione
-                </label>
-                <input
-                  type="text"
-                  value={draft.concentrazione || ''}
-                  onChange={(e) =>
-                    setDraft({ ...draft, concentrazione: e.target.value })
-                  }
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 px-3 py-2 text-xs text-white focus:border-[#C5A059]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Prezzo Stimato (€)
-                </label>
-                <input
-                  type="text"
-                  value={draft.prezzo_stimato_euro || ''}
-                  onChange={(e) =>
-                    setDraft({ ...draft, prezzo_stimato_euro: e.target.value })
-                  }
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 px-3 py-2 text-xs font-mono text-white focus:border-[#C5A059]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  URL Foto Flacone
-                </label>
-                <input
-                  type="text"
-                  value={draft.url_foto_vetrina || ''}
-                  onChange={(e) =>
-                    setDraft({ ...draft, url_foto_vetrina: e.target.value })
-                  }
-                  placeholder="https://..."
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 px-3 py-2 text-xs font-mono text-white focus:border-[#C5A059]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Note di Testa Ufficiali
-                </label>
-                <textarea
-                  rows={2}
-                  value={draft.note_testa || ''}
-                  onChange={(e) =>
-                    setDraft({ ...draft, note_testa: e.target.value })
-                  }
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 p-2.5 text-xs text-white focus:border-[#C5A059]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Note di Cuore Ufficiali
-                </label>
-                <textarea
-                  rows={2}
-                  value={draft.note_cuore || ''}
-                  onChange={(e) =>
-                    setDraft({ ...draft, note_cuore: e.target.value })
-                  }
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 p-2.5 text-xs text-white focus:border-[#C5A059]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Note di Fondo Ufficiali
-                </label>
-                <textarea
-                  rows={2}
-                  value={draft.note_fondo || ''}
-                  onChange={(e) =>
-                    setDraft({ ...draft, note_fondo: e.target.value })
-                  }
-                  className="w-full rounded-xl bg-[#08080A] border border-white/15 p-2.5 text-xs text-white focus:border-[#C5A059]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                Sintesi Tecnica del Profilo Olfattivo
-              </label>
-              <textarea
-                rows={2}
-                value={draft.descrizione_ai || ''}
-                onChange={(e) =>
-                  setDraft({ ...draft, descrizione_ai: e.target.value })
-                }
-                className="w-full rounded-xl bg-[#08080A] border border-white/15 p-2.5 text-xs text-white focus:border-[#C5A059]"
-              />
-            </div>
-
-            {targetStato === 'radar' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-[#08080A]/90 border border-[#C5A059]/30">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Impressioni su Mouche
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={draft.note_mouche || ''}
-                    onChange={(e) =>
-                      setDraft({ ...draft, note_mouche: e.target.value })
-                    }
-                    placeholder="Appunti olfattivi su mouche..."
-                    className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Impressioni su Pelle
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={draft.note_pelle || ''}
-                    onChange={(e) =>
-                      setDraft({ ...draft, note_pelle: e.target.value })
-                    }
-                    placeholder="Evoluzione sulla pelle..."
-                    className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#F7E7CE]/15">
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 font-mono text-xs uppercase"
+                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
               >
                 Annulla
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all"
+                className="rounded-full bg-[#D8B995] px-6 py-2 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e] disabled:opacity-50"
               >
-                {saving
-                  ? 'Salvataggio...'
-                  : targetStato === 'radar'
-                  ? 'Salva nel Radar Testing'
-                  : 'Salva in Collezione Privata'}
+                {saving ? 'Salvataggio...' : 'Conferma e Salva'}
               </button>
             </div>
           </form>
