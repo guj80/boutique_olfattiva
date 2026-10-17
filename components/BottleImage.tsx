@@ -8,7 +8,7 @@ interface BottlePedestalProps {
   alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  showSigil?: boolean; // Mostra il sigillo del logo solo nella collezione
+  showSigil?: boolean;
 }
 
 export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '', showSigil = false }: BottlePedestalProps) {
@@ -43,10 +43,11 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
         <FlaskConical className={`${iconSizes} text-[#D8B995]/60 transition-transform duration-500 hover:scale-110`} />
       )}
 
-      {/* Sigillo / Filigrana del Logo (Solo nella Collezione) */}
+      {/* Filigrana del Logo integrata nell'angolo in basso a destra (Solo nella Collezione) */}
       {showSigil && (
-        <div className="absolute bottom-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-[#140D1C]/95 border border-[#D8B995]/40 shadow-md">
-          <span className="font-mono text-[9px] font-bold text-[#D8B995]">L</span>
+        <div className="absolute bottom-2 right-2 z-20 flex h-7 w-7 items-center justify-center overflow-hidden rounded-md border border-[#D8B995]/30 bg-[#140D1C]/80 shadow-lg backdrop-blur-sm opacity-80 transition-opacity hover:opacity-100">
+          {/* Sostituisci '/logo.jpg' con il percorso del tuo logo caricato nella cartella public di Next.js */}
+          <img src="/logo.jpg" alt="Logo L'Aura" className="h-full w-full object-cover" />
         </div>
       )}
     </div>
