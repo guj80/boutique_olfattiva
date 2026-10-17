@@ -29,12 +29,10 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
     <div
       className={`relative flex items-center justify-center overflow-hidden border border-[#D8B995]/20 bg-gradient-to-b from-[#1E1428] to-[#120A1A] shadow-[inset_0_2px_12px_rgba(0,0,0,0.6)] ${sizeClasses} ${className}`}
     >
-      {/* Alone luminoso di profondità */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.08)_0%,transparent_70%)] pointer-events-none" />
 
       {src ? (
         <div className="relative z-10 h-full w-full p-2 flex items-center justify-center">
-          {/* Immagine originale preservata al 100% nella compressione, con vignettatura morbida per azzerare lo stacco dello sfondo */}
           <img
             src={src}
             alt={alt}
@@ -52,7 +50,15 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
   );
 }
 
-export function SmartBottleImage({ src, alt = 'Profumo', className = '' }: { src?: string | null; alt?: string; className?: string }) {
+interface SmartBottleImageProps {
+  src?: string | null;
+  alt?: string;
+  className?: string;
+  iconSize?: string;
+  blend?: boolean;
+}
+
+export function SmartBottleImage({ src, alt = 'Profumo', className = '', iconSize = 'h-5 w-5' }: SmartBottleImageProps) {
   return (
     <div className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#140D1C]/80 p-1 border border-white/10 ${className}`}>
       {src ? (
@@ -66,7 +72,7 @@ export function SmartBottleImage({ src, alt = 'Profumo', className = '' }: { src
           }}
         />
       ) : (
-        <FlaskConical className="h-5 w-5 text-[#D8B995]/60" />
+        <FlaskConical className={`${iconSize} text-[#D8B995]/60`} />
       )}
     </div>
   );
