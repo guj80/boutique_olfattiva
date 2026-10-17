@@ -1,445 +1,668 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
-  ArrowLeft,
-  Link2,
-  Camera,
   Sparkles,
-  RefreshCw,
-  CheckCircle2,
-  ShieldCheck,
   Compass,
-  Image as ImageIcon,
-  Trash2,
-  Search,
-  FlaskConical,
+  ScanLine,
+  RefreshCw,
+  Library,
+  CalendarHeart,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import {
+  supabase,
+  isCollezioneProfumo,
+  isRadarProfumo,
+  getUnifiedNotes,
+} from '@/lib/supabase';
+import { useAura, resolveAura } from '@/components/AuraProvider';
+import { BottlePedestal, SmartBottleImage } from '@/components/BottleImage';
 import { Logo } from '@/components/Logo';
+import { Sheet } from '@/components/Sheet';
+import { useSpruzzo } from '@/components/Spruzzo';
 import { useToast } from '@/components/Toast';
+import { springSnappy, springSoft } from '@/lib/motion';
 
-const PURE_FAMILIES = [
-  'Agrumata',
-  'Aromatica',
-  'Marina',
-  'Floreale',
-  'Fruttata',
-  'Verde',
-  'Speziata',
-  'Legnosa',
-  'Ambrata',
-  'Gourmand',
-  'Cuoiata',
-  'Muschiata',
+const METEO = [
+  'Soleggiato e Caldo',
+  'Temperato Primaverile',
+  'Fresco Autunnale',
+  'Piovoso e Umido',
+  'Freddo Invernale',
 ];
+const CONTESTI = ['Ufficio', 'Aperitivo', 'Cena', 'Serata', 'Evento'];
+const PROFILI = [
+  'Legnoso / Ambrato / Deciso',
+  'Agrumato / Fresco / Pulito',
+  'Speziato / Boozy / Caldo',
+  'Gourmand / Ricco',
+  'Marino / Aromatizzato',
+  'Cuoiato / Incensato / Fumoso',
+];
+const MOMENTI = ['Mattina', 'Pomeriggio', 'Sera', 'Notte'];
 
-export default function ScannerPage() {
-  const router = useRouter();
-  const [mode, setMode] = useState('name');
+const CONTESTO_FRASE = {
+  Ufficio: 'in ufficio',
+  Aperitivo: "all'aperitivo",
+  Cena: 'a cena',
+  Serata: 'in serata',
+  Evento: 'a un evento',
+};
 
-  const cameraInputRef = useRef(null);
-  const galleryInputRef = useRef(null);
+function formatWearLine(indosso) {
+  if (!indosso) return '';
+  const mom = (indosso.momento_giornata || 'Oggi').toLowerCase();
+  const ctxRaw = indosso.contesto_outfit || '';
+  const ctx = CONTESTO_FRASE[ctxRaw] || (ctxRaw ? `per ${ctxRaw.toLowerCase()}` : '');
+  const text = ctx ? `${mom}, ${ctx}` : mom;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
-  const [inputUrl, setInputUrl] = useState('');
-  const [inputName, setInputName] = useState('');
-  const [imagePreview, setImagePreview] = useState(null);
+function getNotesPreview(p) {
+  const parts = [p.note_testa, p.note_cuore, p.note_fondo]
+    .filter(Boolean)
+    .join(', ')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length > 0) return parts.slice(0, 4).join(', ');
+  return getUnifiedNotes(p) || p.famiglia_olfattiva || '';
+}
 
-  const [extracting, setExtracting] = useState(false);
-  const [saving, setSaving] = useState(false);
+function ChipRow({ label, options, value, onChange, bleed = '-mx-5 px-5' }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[13px] font-medium text-[#B8A9C9]">{label}</p>
+      <div className={`no-scrollbar flex gap-2 overflow-x-auto pb-1 ${bleed}`}>
+        {options.map((opt) => {
+          const active = value === opt;
+          const btnClass = active
+            ? 'font-semibold shadow-sm'
+            : 'border-white/10 bg-[#281B35]/70 text-[#F6EFE4] hover:border-[#D8B995]/40';
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(opt)}
+              style={
+                active
+                  ? {
+                      backgroundColor: 'var(--aura-1)',
+                      color: '#140D1C',
+                      borderColor: 'var(--aura-1)',
+                    }
+                  : undefined
+              }
+              className={`shrink-0 rounded-[14px] border px-3.5 py-2 text-[13px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D8B995] ${btnClass}`}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-  const [draft, setDraft] = useState(null);
-  const [modelSource, setModelSource] = useState('');
-  const [targetStato, setTargetStato] = useState('collezione');
+export default function BoutiqueHomePage() {
+  const [profumi, setProfumi] = useState([]);
+  const [ultimoIndosso, setUltimoIndosso] = useState(null);
+  const [ultimiSette, setUltimiSette] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState('collezione');
+
+  const [meteo, setMeteo] = useState('Fresco Autunnale');
+  const [occasione, setOccasione] = useState('Ufficio');
+  const [umore, setUmore] = useState('Legnoso / Ambrato / Deciso');
+  const [advisorLoading, setAdvisorLoading] = useState(false);
+  const [advisorResult, setAdvisorResult] = useState(null);
+
+  const [selectedQuickProfumoId, setSelectedQuickProfumoId] = useState('');
+  const [selectedDecantId, setSelectedDecantId] = useState('');
+  const [quickMomento, setQuickMomento] = useState('Mattina');
+  const [quickContesto, setQuickContesto] = useState('Ufficio');
+  const [savingQuickWear, setSavingQuickWear] = useState(false);
+
+  const heroBottleRef = useRef(null);
+  const { setAuraFromProfumo } = useAura();
+  const { triggerSpruzzo } = useSpruzzo();
   const { showToast } = useToast();
 
-  function handleFileChange(e: any) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    const h = new Date().getHours();
+    const initialMomento =
+      h >= 5 && h < 12
+        ? 'Mattina'
+        : h >= 12 && h < 18
+        ? 'Pomeriggio'
+        : h >= 18 && h < 23
+        ? 'Sera'
+        : 'Notte';
+    setQuickMomento(initialMomento);
+    fetchVaultData(false);
+  }, []);
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 1200;
-        let w = img.width;
-        let h = img.height;
+  async function fetchVaultData(silent = false) {
+    if (!silent) setLoading(true);
+    try {
+      const { data: profumiData } = await supabase
+        .from('profumi')
+        .select('*')
+        .order('nome', { ascending: true });
 
-        if (w > h && w > maxDim) {
-          h = Math.round((h * maxDim) / w);
-          w = maxDim;
-        } else if (h >= w && h > maxDim) {
-          w = Math.round((w * maxDim) / h);
-          h = maxDim;
-        }
+      const allProfumi = profumiData || [];
+      setProfumi(allProfumi);
 
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, w, h);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.84);
-          setImagePreview(compressedDataUrl);
-        }
-      };
-      if (typeof ev.target?.result === 'string') {
-        img.src = ev.target.result;
+      const firstCol = allProfumi.find(isCollezioneProfumo);
+      if (firstCol) {
+        setSelectedQuickProfumoId((prev) => prev || firstCol.id);
       }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+
+      const firstDecant = allProfumi.find(isRadarProfumo);
+      if (firstDecant) {
+        setSelectedDecantId((prev) => prev || firstDecant.id);
+      }
+
+      const { data: indossiData } = await supabase
+        .from('indossi')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(7);
+
+      if (indossiData && indossiData.length > 0) {
+        const enriched = indossiData.map((item) => ({
+          ...item,
+          profumi: allProfumi.find((p) => p.id === item.profumo_id) || null,
+        }));
+        setUltimoIndosso(enriched[0]);
+        setUltimiSette(enriched);
+        setAuraFromProfumo(enriched[0].profumi || firstCol || null);
+      } else {
+        setUltimoIndosso(null);
+        setUltimiSette([]);
+        setAuraFromProfumo(firstCol || null);
+      }
+    } catch (e) {
+      console.error('Errore caricamento collezione:', e);
+      showToast('Non riesco a caricare i flaconi. Riprova tra poco.', 'error');
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }
 
-  async function handleExtract(e: any) {
-    if (e) e.preventDefault();
+  const collezione = useMemo(() => profumi.filter(isCollezioneProfumo), [profumi]);
+  const radar = useMemo(() => profumi.filter(isRadarProfumo), [profumi]);
 
-    if (mode === 'url' && !inputUrl.trim()) {
-      showToast('Inserisci un link valido.', 'error');
+  async function askQuickAiEngine() {
+    if (collezione.length === 0) {
+      showToast('Aggiungi almeno un flacone in collezione per chiedere consiglio.', 'error');
       return;
     }
-    if (mode === 'name' && !inputName.trim()) {
-      showToast('Inserisci Marchio e Nome del profumo.', 'error');
-      return;
-    }
-    if (mode === 'photo' && !imagePreview) {
-      showToast("Scatta una foto o seleziona un'immagine.", 'error');
-      return;
-    }
-
-    setExtracting(true);
-    setDraft(null);
-
+    setAdvisorLoading(true);
+    setAdvisorResult(null);
     try {
-      const payload: any = {};
-      if (mode === 'url') {
-        payload.url = inputUrl.trim();
-      } else if (mode === 'name') {
-        payload.queryName = inputName.trim();
-      } else if (mode === 'photo' && imagePreview) {
-        payload.imageBase64 = imagePreview;
-        payload.mimeType = 'image/jpeg';
-      }
-
-      const res = await fetch('/api/extract', {
+      const query = `Clima: "${meteo}". Contesto: "${occasione}". Stile ricercato: "${umore}". Seleziona in modo tecnico e oggettivo 3 profumi della mia collezione adatti a oggi basandoti solo sulle loro note reali.`;
+      const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ query, profumi: collezione }),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Errore durante l'estrazione dei dati.");
-      }
+      if (!res.ok) throw new Error(data.error || 'Errore IA');
 
-      setModelSource(data._modelUsed || 'neural-engine');
-      setDraft({
-        nome: data.nome || '',
-        brand: data.brand || '',
-        concentrazione: data.concentrazione || 'Eau de Parfum',
-        famiglia_olfattiva: data.famiglia_olfattiva || 'Legnosa',
-        note_testa: data.note_testa || '',
-        note_cuore: data.note_cuore || '',
-        note_fondo: data.note_fondo || '',
-        note_olfattive: data.note_olfattive || '',
-        descrizione_ai: data.descrizione_ai || '',
-        prezzo_stimato_euro: data.prezzo_stimato_euro || '€150',
-        url_foto_vetrina: data.url_foto_vetrina || (mode === 'photo' ? imagePreview : null),
+      const recIds = data.recommendedIds || [];
+      const recProfumi = recIds
+        .map((id) => collezione.find((p) => p.id === id))
+        .filter(Boolean);
+
+      setAdvisorResult({
+        advice: data.sommelierAdvice,
+        recommended: recProfumi.slice(0, 3),
       });
-      showToast('Scheda estratta con successo.');
-    } catch (err: any) {
-      showToast(err?.message || "Impossibile completare l'estrazione.", 'error');
+    } catch (err) {
+      showToast(err?.message || 'Non riesco a consultare il sommelier in questo momento.', 'error');
     } finally {
-      setExtracting(false);
+      setAdvisorLoading(false);
     }
   }
 
-  async function handleSaveToSupabase(e: any) {
-    e.preventDefault();
-    if (!draft || !draft.nome || !draft.brand) {
-      showToast('Assicurati che Marchio e Nome siano compilati.', 'error');
-      return;
-    }
-
-    setSaving(true);
+  async function handleQuickWearSave(profumoIdToWear, anchorEl) {
+    if (!profumoIdToWear) return;
+    setSavingQuickWear(true);
     try {
-      const unifiedNotes =
-        draft.note_olfattive ||
-        [draft.note_testa, draft.note_cuore, draft.note_fondo]
-          .filter(Boolean)
-          .join(', ');
-
-      const fullPayload = {
-        nome: draft.nome.trim(),
-        brand: draft.brand.trim(),
-        concentrazione: draft.concentrazione || 'Eau de Parfum',
-        famiglia_olfattiva: draft.famiglia_olfattiva || 'Legnosa',
-        note_testa: draft.note_testa || '',
-        note_cuore: draft.note_cuore || '',
-        note_fondo: draft.note_fondo || '',
-        note_olfattive: unifiedNotes,
-        descrizione_ai: draft.descrizione_ai || '',
-        prezzo_stimato_euro: draft.prezzo_stimato_euro || '€150',
-        url_foto_vetrina: draft.url_foto_vetrina || null,
-        stato: targetStato,
-      };
-
-      const { error } = await supabase.from('profumi').insert([fullPayload]);
+      const { error } = await supabase.from('indossi').insert([
+        {
+          profumo_id: profumoIdToWear,
+          momento_giornata: quickMomento,
+          contesto_outfit: quickContesto,
+        },
+      ]);
       if (error) throw error;
 
-      showToast('Profumo salvato correttamente.');
-      router.push(targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione');
-    } catch (err: any) {
-      showToast(`Errore nel salvataggio: ${err?.message}`, 'error');
+      const worn = profumi.find((p) => p.id === profumoIdToWear) || null;
+      if (worn) setAuraFromProfumo(worn);
+
+      setSheetOpen(false);
+      triggerSpruzzo(anchorEl || heroBottleRef);
+      showToast(worn ? `Oggi indossi ${worn.nome}.` : 'Indosso registrato.');
+      await fetchVaultData(true);
+    } catch (err) {
+      showToast(err?.message || "Non sono riuscito a salvare l'indosso.", 'error');
     } finally {
-      setSaving(false);
+      setSavingQuickWear(false);
     }
   }
 
+  const last = ultimoIndosso?.profumi || null;
+  const lastImg = last ? last.url_foto_vetrina || last.immagine_url : null;
+  const wearLine = formatWearLine(ultimoIndosso);
+
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 sm:px-8 py-8 pb-28">
-      <header className="flex items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D8B995]/30 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-[#D8B995]"
-          >
-            <ArrowLeft className="h-5 w-5 text-[#D8B995]" />
-          </Link>
+    <main className="mx-auto w-full max-w-[460px] px-5 pt-4 pb-12">
+      <section className="flex min-h-[calc(100dvh-7.5rem)] flex-col justify-between py-2">
+        <header className="flex items-center justify-between">
           <Logo className="h-7" />
-        </div>
-        <Link
-          href="/collezione"
-          className="rounded-full border border-[#D8B995]/30 bg-[#1E1428] px-4 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:border-[#D8B995]"
-        >
-          Vai a Collezione
-        </Link>
-      </header>
+          <Link
+            href="/scanner"
+            aria-label="Apri scanner"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D8B995]/25 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-[#D8B995]"
+          >
+            <ScanLine className="h-5 w-5 text-[#D8B995]" />
+          </Link>
+        </header>
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-5 sm:p-6 aura-shadow space-y-5">
-        <div className="grid grid-cols-3 gap-2 rounded-full bg-[#140D1C] p-1.5 border border-white/10">
-          <button
-            type="button"
-            onClick={() => setMode('name')}
-            className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
-              mode === 'name' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
-            }`}
-          >
-            <Search className="h-3.5 w-3.5" />
-            <span>Nome</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('photo')}
-            className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
-              mode === 'photo' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
-            }`}
-          >
-            <Camera className="h-3.5 w-3.5" />
-            <span>Foto</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('url')}
-            className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
-              mode === 'url' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
-            }`}
-          >
-            <Link2 className="h-3.5 w-3.5" />
-            <span>Link</span>
-          </button>
-        </div>
-
-        {mode === 'name' && (
-          <form onSubmit={handleExtract} className="space-y-3">
-            <label className="block text-xs font-medium text-[#B8A9C9]">
-              Marchio e Nome del Profumo
-            </label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="text"
-                value={inputName}
-                onChange={(e) => setInputName(e.target.value)}
-                placeholder="Es. Orto Parisi Megamare, Byredo Gypsy Water..."
-                className="flex-1 rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-[#D8B995] focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={extracting || !inputName.trim()}
-                className="flex items-center justify-center gap-2 rounded-[16px] bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e] disabled:opacity-40"
-              >
-                {extracting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                <span>Estrai</span>
-              </button>
+        <div className="my-auto flex flex-col items-center text-center py-6">
+          {loading ? (
+            <div className="flex flex-col items-center gap-5 w-full">
+              <div className="h-72 w-60 rounded-[44px] aura-skeleton" />
+              <div className="h-10 w-56 rounded-2xl aura-skeleton" />
+              <div className="h-5 w-36 rounded-xl aura-skeleton" />
             </div>
-          </form>
-        )}
+          ) : last ? (
+            <>
+              <motion.div
+                ref={heroBottleRef}
+                key={last.id}
+                initial={{ opacity: 0, scale: 0.94, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={springSoft}
+              >
+                <BottlePedestal src={lastImg} alt={last.nome} size="xl" />
+              </motion.div>
 
-        {mode === 'photo' && (
-          <div className="space-y-4">
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
-            <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-
-            {!imagePreview ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-[#D8B995]/50"
-                >
-                  <Camera className="h-6 w-6 text-[#D8B995]" />
-                  <span className="text-sm font-semibold text-[#F6EFE4]">Scatta Foto</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-[#D8B995]/50"
-                >
-                  <ImageIcon className="h-6 w-6 text-[#D8B995]" />
-                  <span className="text-sm font-semibold text-[#F6EFE4]">Carica da Galleria</span>
-                </button>
+              <div className="mt-6 max-w-[36ch] space-y-1.5">
+                <p className="text-[15px] font-medium text-[#D8B995]">{last.brand}</p>
+                <h1 className="font-serif text-[clamp(2.4rem,8vw,3.5rem)] leading-[1.04] text-[#F6EFE4]">
+                  {last.nome}
+                </h1>
+                {wearLine && (
+                  <p className="text-[14px] text-[#B8A9C9] pt-1">{wearLine}</p>
+                )}
               </div>
-            ) : (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[20px] bg-[#140D1C] p-4 border border-white/10">
-                <div className="flex items-center gap-4">
-                  <img src={imagePreview} alt="Anteprima" className="h-16 w-16 rounded-xl object-contain bg-black p-1" />
-                  <div>
-                    <p className="text-sm font-semibold text-[#F6EFE4]">Immagine pronta</p>
-                    <button type="button" onClick={() => setImagePreview(null)} className="text-xs text-red-400 mt-1">Rimuovi</button>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleExtract(null)}
-                  disabled={extracting}
-                  className="rounded-full bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C]"
-                >
-                  {extracting ? 'Analisi...' : 'Avvia Riconoscimento'}
-                </button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-5 py-6">
+              <div ref={heroBottleRef}>
+                <BottlePedestal src={null} alt="Nessun profumo indossato" size="lg" />
+              </div>
+              <div className="space-y-2 max-w-[30ch]">
+                <h1 className="font-serif text-[clamp(2.5rem,8vw,3.5rem)] leading-[1.05] text-[#F6EFE4]">
+                  Oggi chi sei?
+                </h1>
+                <p className="text-[15px] text-[#B8A9C9]">
+                  {collezione.length === 0
+                    ? 'Lo scaffale è vuoto: aggiungi il primo flacone.'
+                    : 'Scegli cosa indossare o lascia fare al sommelier.'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSheetMode('collezione');
+              setSheetOpen(true);
+            }}
+            style={{
+              backgroundColor: 'var(--aura-1)',
+              color: '#140D1C',
+              boxShadow: '0 14px 34px -8px color-mix(in srgb, var(--aura-1) 50%, transparent)',
+            }}
+            className="min-h-[52px] w-full rounded-[20px] px-6 py-3.5 text-[16px] font-bold tracking-[-0.02em] transition-transform active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F6EFE4]"
+          >
+            {last ? 'Cambia profumo' : 'Scegli il profumo di oggi'}
+          </button>
+        </div>
+      </section>
+
+      <section className="mt-8 rounded-[28px] border border-[#D8B995]/20 bg-[#1E1428]/90 p-5 aura-shadow space-y-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[21px] font-bold tracking-[-0.03em] text-[#F6EFE4]">
+              Ispirazione del giorno
+            </h2>
+            <p className="text-[14px] text-[#B8A9C9]">
+              Tocca clima, contesto e carattere per tre proposte su misura.
+            </p>
+          </div>
+          <Sparkles className="h-5 w-5 shrink-0 mt-1" style={{ color: 'var(--aura-1)' }} />
+        </div>
+
+        <div className="space-y-4">
+          <ChipRow label="Clima" options={METEO} value={meteo} onChange={setMeteo} />
+          <ChipRow
+            label="Contesto"
+            options={CONTESTI}
+            value={occasione}
+            onChange={(v) => {
+              setOccasione(v);
+              setQuickContesto(v);
+            }}
+          />
+          <ChipRow label="Carattere olfattivo" options={PROFILI} value={umore} onChange={setUmore} />
+        </div>
+
+        <button
+          type="button"
+          onClick={askQuickAiEngine}
+          disabled={advisorLoading || collezione.length === 0}
+          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#D8B995]/40 bg-[#281B35] px-5 py-3 text-[15px] font-semibold text-[#F6EFE4] transition hover:border-[#D8B995] disabled:opacity-50"
+        >
+          {advisorLoading ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin text-[#D8B995]" />
+              <span>Cerco tra i tuoi flaconi...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 text-[#D8B995]" />
+              <span>Consigliami tre profumi</span>
+            </>
+          )}
+        </button>
+
+        {advisorResult && (
+          <div className="space-y-4 pt-2 border-t border-white/10">
+            <p className="font-serif text-[17px] leading-[1.45] text-[#F6EFE4]">
+              {advisorResult.advice}
+            </p>
+
+            {advisorResult.recommended.length > 0 && (
+              <div className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-5 pb-2">
+                {advisorResult.recommended.map((p) => {
+                  const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+                  const pImg = p.url_foto_vetrina || p.immagine_url;
+                  return (
+                    <div
+                      key={p.id}
+                      style={{ borderColor: `${pAura.primary}44` }}
+                      className="flex w-[250px] shrink-0 snap-center flex-col justify-between rounded-[22px] border bg-[#281B35]/90 p-4 gap-4"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <BottlePedestal src={pImg} alt={p.nome} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-medium text-[#D8B995]">{p.brand}</p>
+                          <p className="truncate font-serif text-[20px] leading-tight text-[#F6EFE4]">{p.nome}</p>
+                          <p className="line-clamp-1 text-[12px] text-[#B8A9C9] mt-0.5">{getNotesPreview(p)}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={savingQuickWear}
+                        onClick={(e) => handleQuickWearSave(p.id, e.currentTarget)}
+                        style={{ backgroundColor: pAura.primary, color: '#140D1C' }}
+                        className="min-h-[44px] w-full rounded-[14px] py-2.5 text-[14px] font-bold transition active:scale-[0.98] disabled:opacity-50"
+                      >
+                        Indosso oggi
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
-
-        {mode === 'url' && (
-          <form onSubmit={handleExtract} className="space-y-3">
-            <label className="block text-xs font-medium text-[#B8A9C9]">Incolla Link Ufficiale</label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="url"
-                value={inputUrl}
-                onChange={(e) => setInputUrl(e.target.value)}
-                placeholder="https://..."
-                className="flex-1 rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4]"
-              />
-              <button
-                type="submit"
-                disabled={extracting || !inputUrl.trim()}
-                className="rounded-[16px] bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C]"
-              >
-                {extracting ? 'Lettura...' : 'Estrai'}
-              </button>
-            </div>
-          </form>
-        )}
       </section>
 
-      {draft && (
-        <section className="mt-6 rounded-[28px] border border-[#D8B995]/40 bg-[#1E1428]/95 p-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#140D1C] border border-white/10">
-                {draft.url_foto_vetrina ? (
-                  <img src={draft.url_foto_vetrina} alt="" className="h-full w-full object-contain p-1" />
-                ) : (
-                  <FlaskConical className="h-5 w-5 text-[#D8B995]" />
-                )}
-              </div>
-              <div>
-                <span className="font-mono text-[10px] text-[#D8B995]">Fonte: {modelSource}</span>
-                <h2 className="font-serif text-2xl text-[#F6EFE4]">{draft.brand} — {draft.nome}</h2>
-              </div>
+      <section className="mt-6 space-y-3.5">
+        <div className="grid grid-cols-5 gap-3.5">
+          <Link
+            href="/collezione"
+            className="col-span-3 flex flex-col justify-between rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-5 transition hover:border-[#D8B995]/50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-semibold text-[#F6EFE4]">Collezione</span>
+              <Library className="h-4 w-4 text-[#D8B995]" />
             </div>
+            <div className="mt-5">
+              <span className="font-serif text-[44px] leading-none text-[#F6EFE4]">
+                {loading ? '—' : collezione.length}
+              </span>
+              <p className="text-[13px] text-[#B8A9C9] mt-1">Flaconi sullo scaffale</p>
+            </div>
+          </Link>
 
-            <div className="flex rounded-full bg-[#140D1C] p-1 border border-white/10">
-              <button
-                type="button"
-                onClick={() => setTargetStato('collezione')}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  targetStato === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'
-                }`}
-              >
-                Collezione
-              </button>
-              <button
-                type="button"
-                onClick={() => setTargetStato('radar')}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  targetStato === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'
-                }`}
-              >
-                Radar
-              </button>
+          <Link
+            href="/collezione?vista=radar"
+            className="col-span-2 flex flex-col justify-between rounded-[24px] border border-white/10 bg-[#281B35]/80 p-5 transition hover:border-[#D8B995]/50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-semibold text-[#F6EFE4]">Radar</span>
+              <Compass className="h-4 w-4 text-[#D8B995]" />
             </div>
+            <div className="mt-5">
+              <span className="font-serif text-[38px] leading-none text-[#F6EFE4]">
+                {loading ? '—' : radar.length}
+              </span>
+              <p className="text-[13px] text-[#B8A9C9] mt-1">Decant in prova</p>
+            </div>
+          </Link>
+        </div>
+
+        <Link
+          href="/diario"
+          className="flex items-center justify-between gap-4 rounded-[22px] border border-white/10 bg-[#1E1428]/90 px-5 py-4 transition hover:border-[#D8B995]/50"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <CalendarHeart className="h-4 w-4 text-[#D8B995]" />
+              <span className="text-[15px] font-semibold text-[#F6EFE4]">Diario olfattivo</span>
+            </div>
+            <p className="text-[13px] text-[#B8A9C9]">
+              {ultimiSette.length > 0 ? `Gli ultimi ${ultimiSette.length} indossi registrati` : 'Nessun indosso registrato'}
+            </p>
           </div>
 
-          <form onSubmit={handleSaveToSupabase} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Marchio</label>
-                <input
-                  type="text"
-                  value={draft.brand || ''}
-                  onChange={(e) => setDraft({ ...draft, brand: e.target.value })}
-                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: 7 }).map((_, idx) => {
+              const item = ultimiSette[idx];
+              const dotAura = item?.profumi ? resolveAura(item.profumi.famiglia_olfattiva, item.profumi.nome) : null;
+              return (
+                <span
+                  key={idx}
+                  title={item?.profumi?.nome || 'Vuoto'}
+                  style={dotAura ? { backgroundColor: dotAura.primary, boxShadow: `0 0 10px ${dotAura.primary}88` } : undefined}
+                  className={dotAura ? 'h-3.5 w-3.5 rounded-full' : 'h-3.5 w-3.5 rounded-full border border-white/15 bg-[#281B35]'}
                 />
-              </div>
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Nome</label>
-                <input
-                  type="text"
-                  value={draft.nome || ''}
-                  onChange={(e) => setDraft({ ...draft, nome: e.target.value })}
-                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Famiglia</label>
-                <select
-                  value={draft.famiglia_olfattiva || 'Legnosa'}
-                  onChange={(e) => setDraft({ ...draft, famiglia_olfattiva: e.target.value })}
-                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
-                >
-                  {PURE_FAMILIES.map((f) => (
-                    <option key={f} value={f} className="bg-[#140D1C]">{f}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+              );
+            })}
+          </div>
+        </Link>
+      </section>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="Cosa indossi oggi?"
+        subtitle="Scegli il momento, il contesto e il profumo."
+        initialSnap="full"
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-3 gap-1.5 rounded-[16px] bg-[#140D1C] p-1.5">
+            {[
+              { id: 'collezione', label: 'Collezione' },
+              { id: 'decant', label: 'Decant' },
+              { id: 'ai', label: 'Consiglio IA' },
+            ].map((tab) => {
+              const active = sheetMode === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSheetMode(tab.id)}
+                  className={`relative min-h-[40px] rounded-[12px] text-[13px] font-semibold transition-colors ${
+                    active ? 'text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="sheet-mode-pill"
+                      transition={springSnappy}
+                      style={{ backgroundColor: 'var(--aura-1)' }}
+                      className="absolute inset-0 rounded-[12px]"
+                    />
+                  )}
+                  <span className="relative z-10">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="space-y-4 rounded-[20px] bg-[#281B35]/60 p-4">
+            <ChipRow
+              label="Momento della giornata"
+              options={MOMENTI}
+              value={quickMomento}
+              onChange={setQuickMomento}
+              bleed="-mx-4 px-4"
+            />
+            <ChipRow
+              label="Contesto"
+              options={CONTESTI}
+              value={quickContesto}
+              onChange={setQuickContesto}
+              bleed="-mx-4 px-4"
+            />
+          </div>
+
+          {sheetMode === 'collezione' && (
+            <div className="space-y-4">
+              {collezione.length > 0 ? (
+                <>
+                  <div className="max-h-[34dvh] space-y-2 overflow-y-auto pr-1">
+                    {collezione.map((p) => {
+                      const selected = selectedQuickProfumoId === p.id;
+                      const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+                      const pImg = p.url_foto_vetrina || p.immagine_url;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedQuickProfumoId(p.id)}
+                          style={selected ? { borderColor: pAura.primary, backgroundColor: '#281B35' } : undefined}
+                          className="flex w-full items-center gap-3.5 rounded-[18px] border border-white/10 bg-[#140D1C]/60 p-3 text-left transition hover:border-white/25"
+                        >
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[12px] bg-[#F6EFE4] p-1.5 flex items-center justify-center">
+                            <SmartBottleImage src={pImg} alt={p.nome} blend={true} iconSize="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] text-[#D8B995]">{p.brand}</p>
+                            <p className="truncate font-serif text-[19px] leading-tight text-[#F6EFE4]">{p.nome}</p>
+                          </div>
+                          <span
+                            style={selected ? { backgroundColor: pAura.primary } : undefined}
+                            className={`h-4 w-4 shrink-0 rounded-full border ${selected ? 'border-transparent' : 'border-white/30'}`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={savingQuickWear || !selectedQuickProfumoId}
+                    onClick={() => handleQuickWearSave(selectedQuickProfumoId)}
+                    style={{ backgroundColor: 'var(--aura-1)', color: '#140D1C' }}
+                    className="min-h-[50px] w-full rounded-[18px] py-3 text-[15px] font-bold transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {savingQuickWear ? 'Registro...' : 'Indosso oggi'}
+                  </button>
+                </>
+              ) : (
+                <p className="text-center text-[14px] text-[#B8A9C9] py-6">Lo scaffale è vuoto.</p>
+              )}
+            </div>
+          )}
+
+          {sheetMode === 'decant' && (
+            <div className="space-y-4">
+              {radar.length > 0 ? (
+                <>
+                  <div className="max-h-[34dvh] space-y-2 overflow-y-auto pr-1">
+                    {radar.map((p) => {
+                      const selected = selectedDecantId === p.id;
+                      const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+                      const pImg = p.url_foto_vetrina || p.immagine_url;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedDecantId(p.id)}
+                          style={selected ? { borderColor: pAura.primary, backgroundColor: '#281B35' } : undefined}
+                          className="flex w-full items-center gap-3.5 rounded-[18px] border border-white/10 bg-[#140D1C]/60 p-3 text-left transition hover:border-white/25"
+                        >
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[12px] bg-[#F6EFE4] p-1.5 flex items-center justify-center">
+                            <SmartBottleImage src={pImg} alt={p.nome} blend={true} iconSize="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] text-[#D8B995]">{p.brand}</p>
+                            <p className="truncate font-serif text-[19px] leading-tight text-[#F6EFE4]">{p.nome}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingQuickWear}
+                    onClick={() => handleQuickWearSave(selectedDecantId || radar[0]?.id)}
+                    style={{ backgroundColor: 'var(--aura-1)', color: '#140D1C' }}
+                    className="min-h-[50px] w-full rounded-[18px] py-3 text-[15px] font-bold"
+                  >
+                    Indosso questo decant
+                  </button>
+                </>
+              ) : (
+                <p className="text-center text-[14px] text-[#B8A9C9] py-6">Nessun decant nel Radar.</p>
+              )}
+            </div>
+          )}
+
+          {sheetMode === 'ai' && (
+            <div className="space-y-4">
+              <ChipRow label="Clima" options={METEO} value={meteo} onChange={setMeteo} bleed="-mx-6 px-6" />
+              <ChipRow label="Carattere" options={PROFILI} value={umore} onChange={setUmore} bleed="-mx-6 px-6" />
               <button
                 type="button"
-                onClick={() => setDraft(null)}
-                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
+                onClick={askQuickAiEngine}
+                disabled={advisorLoading || collezione.length === 0}
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#D8B995]/40 bg-[#281B35] px-5 py-3 text-[15px] font-semibold text-[#F6EFE4]"
               >
-                Annulla
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-full bg-[#D8B995] px-6 py-2 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e] disabled:opacity-50"
-              >
-                {saving ? 'Salvataggio...' : 'Conferma e Salva'}
+                {advisorLoading ? <RefreshCw className="h-4 w-4 animate-spin text-[#D8B995]" /> : <Sparkles className="h-4 w-4 text-[#D8B995]" />}
+                <span>Consigliami tre profumi</span>
               </button>
             </div>
-          </form>
-        </section>
-      )}
+          )}
+        </div>
+      </Sheet>
     </main>
   );
 }
