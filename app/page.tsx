@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   Sparkles,
   Compass,
   ScanLine,
-  ChevronRight,
   RefreshCw,
-  FlaskConical,
-  BookOpen,
+  Library,
+  CalendarHeart,
 } from 'lucide-react';
 import {
   supabase,
@@ -19,6 +19,13 @@ import {
   isRadarProfumo,
   getUnifiedNotes,
 } from '@/lib/supabase';
+import { useAura, resolveAura } from '@/components/AuraProvider';
+import { BottlePedestal, SmartBottleImage } from '@/components/BottleImage';
+import { Logo } from '@/components/Logo';
+import { Sheet } from '@/components/Sheet';
+import { useSpruzzo } from '@/components/Spruzzo';
+import { useToast } from '@/components/Toast';
+import { springSnappy, springSoft } from '@/lib/motion';
 
 const METEO = [
   'Soleggiato e Caldo',
@@ -38,104 +45,77 @@ const PROFILI = [
 ];
 const MOMENTI = ['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const;
 
-function PerfumeBottleIcon({ className = 'w-5 h-5' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <rect x="9" y="2" width="6" height="3" rx="1" />
-      <path d="M10 5v2h4V5" />
-      <rect x="5" y="7" width="14" height="15" rx="3" />
-      <rect x="8.5" y="11" width="7" height="6" rx="1" />
-    </svg>
-  );
+const CONTESTO_FRASE: Record<string, string> = {
+  Ufficio: 'in ufficio',
+  Aperitivo: "all'aperitivo",
+  Cena: 'a cena',
+  Serata: 'in serata',
+  Evento: 'a un evento',
+};
+
+function formatWearLine(indosso: Indosso | null): string {
+  if (!indosso) return '';
+  const mom = (indosso.momento_giornata || 'Oggi').toLowerCase();
+  const ctxRaw = indosso.contesto_outfit || '';
+  const ctx = CONTESTO_FRASE[ctxRaw] || (ctxRaw ? `per ${ctxRaw.toLowerCase()}` : '');
+  const text = ctx ? `${mom}, ${ctx}` : mom;
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function SmartBottleImage({
-  src,
-  alt,
-  className,
-  iconSize = 'w-5 h-5',
-}: {
-  src?: string | null;
-  alt: string;
-  className?: string;
-  iconSize?: string;
-}) {
-  const cleanSrc = (src || '').trim();
-  const [stage, setStage] = useState<'direct' | 'proxy' | 'failed'>('direct');
-
-  useEffect(() => {
-    setStage('direct');
-  }, [cleanSrc]);
-
-  if (!cleanSrc || stage === 'failed') {
-    return (
-      <div className="flex items-center justify-center text-zinc-600">
-        <FlaskConical className={`${iconSize} stroke-[1.2]`} />
-      </div>
-    );
-  }
-
-  const finalSrc =
-    stage === 'direct'
-      ? cleanSrc
-      : `https://wsrv.nl/?url=${encodeURIComponent(cleanSrc)}&output=webp`;
-
-  return (
-    <img
-      src={finalSrc}
-      alt={alt}
-      referrerPolicy="no-referrer"
-      loading="lazy"
-      decoding="async"
-      className={className}
-      onError={() => {
-        if (stage === 'direct') setStage('proxy');
-        else setStage('failed');
-      }}
-    />
-  );
+function getNotesPreview(p: Profumo): string {
+  const parts = [p.note_testa, p.note_cuore, p.note_fondo]
+    .filter(Boolean)
+    .join(', ')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length > 0) return parts.slice(0, 4).join(', ');
+  return getUnifiedNotes(p) || p.famiglia_olfattiva || '';
 }
 
-type Opt = string | { value: string; label: string };
-
-function Field({
+function ChipRow({
   label,
+  options,
   value,
   onChange,
-  options,
+  bleed = '-mx-5 px-5',
 }: {
   label: string;
+  options: readonly string[];
   value: string;
   onChange: (v: string) => void;
-  options: Opt[];
+  bleed?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="block font-mono text-[10px] uppercase tracking-widest text-[#8C867B]">
-        {label}
-      </label>
-      <select
-        className="w-full rounded-xl bg-[#070708] border border-white/[0.1] px-3 py-2.5 text-xs text-[#F5F2EB] focus:outline-none focus:border-[#22543d]"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((o) => {
-          const { value: v, label: l } = typeof o === 'string' ? { value: o, label: o } : o;
+    <div className="space-y-2">
+      <p className="text-[13px] font-medium text-[#B8A9C9]">{label}</p>
+      <div className={`no-scrollbar flex gap-2 overflow-x-auto pb-1 ${bleed}`}>
+        {options.map((opt) => {
+          const active = value === opt;
+          const btnClass = active
+            ? 'font-semibold shadow-sm'
+            : 'border-white/10 bg-[#281B35]/70 text-[#F6EFE4] hover:border-[#D8B995]/40';
           return (
-            <option key={v} value={v} className="bg-[#09090B] text-white">
-              {l}
-            </option>
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(opt)}
+              style={
+                active
+                  ? {
+                      backgroundColor: 'var(--aura-1)',
+                      color: '#140D1C',
+                      borderColor: 'var(--aura-1)',
+                    }
+                  : undefined
+              }
+              className={`shrink-0 rounded-[14px] border px-3.5 py-2 text-[13px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#D8B995] ${btnClass}`}
+            >
+              {opt}
+            </button>
           );
         })}
-      </select>
+      </div>
     </div>
   );
 }
@@ -143,9 +123,11 @@ function Field({
 export default function BoutiqueHomePage() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [ultimoIndosso, setUltimoIndosso] = useState<Indosso | null>(null);
+  const [ultimiSette, setUltimiSette] = useState<Indosso[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [activePanel, setActivePanel] = useState<'none' | 'ai' | 'collezione' | 'decant'>('none');
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<'collezione' | 'decant' | 'ai'>('collezione');
 
   const [meteo, setMeteo] = useState('Fresco Autunnale');
   const [occasione, setOccasione] = useState('Ufficio');
@@ -162,12 +144,27 @@ export default function BoutiqueHomePage() {
   const [quickContesto, setQuickContesto] = useState('Ufficio');
   const [savingQuickWear, setSavingQuickWear] = useState(false);
 
+  const heroBottleRef = useRef<HTMLDivElement | null>(null);
+  const { setAuraFromProfumo } = useAura();
+  const { triggerSpruzzo } = useSpruzzo();
+  const { showToast } = useToast();
+
   useEffect(() => {
-    fetchVaultData();
+    const h = new Date().getHours();
+    const initialMomento =
+      h >= 5 && h < 12
+        ? 'Mattina'
+        : h >= 12 && h < 18
+        ? 'Pomeriggio'
+        : h >= 18 && h < 23
+        ? 'Sera'
+        : 'Notte';
+    setQuickMomento(initialMomento);
+    fetchVaultData(false);
   }, []);
 
-  async function fetchVaultData() {
-    setLoading(true);
+  async function fetchVaultData(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const { data: profumiData } = await supabase
         .from('profumi')
@@ -178,26 +175,39 @@ export default function BoutiqueHomePage() {
       setProfumi(allProfumi);
 
       const firstCol = allProfumi.find(isCollezioneProfumo);
-      if (firstCol) setSelectedQuickProfumoId(firstCol.id);
+      if (firstCol) {
+        setSelectedQuickProfumoId((prev) => prev || firstCol.id);
+      }
 
       const firstDecant = allProfumi.find(isRadarProfumo);
-      if (firstDecant) setSelectedDecantId(firstDecant.id);
+      if (firstDecant) {
+        setSelectedDecantId((prev) => prev || firstDecant.id);
+      }
 
       const { data: indossiData } = await supabase
         .from('indossi')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(7);
 
       if (indossiData && indossiData.length > 0) {
-        const last = indossiData[0] as Indosso;
-        const matchedProfumo = allProfumi.find((p) => p.id === last.profumo_id) || null;
-        setUltimoIndosso({ ...last, profumi: matchedProfumo });
+        const enriched = (indossiData as Indosso[]).map((item) => ({
+          ...item,
+          profumi: allProfumi.find((p) => p.id === item.profumo_id) || null,
+        }));
+        setUltimoIndosso(enriched[0]);
+        setUltimiSette(enriched);
+        setAuraFromProfumo(enriched[0].profumi || firstCol || null);
+      } else {
+        setUltimoIndosso(null);
+        setUltimiSette([]);
+        setAuraFromProfumo(firstCol || null);
       }
     } catch (e) {
-      console.error('Errore caricamento Vault:', e);
+      console.error('Errore caricamento collezione:', e);
+      showToast('Non riesco a caricare i flaconi. Riprova tra poco.', 'error');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -205,7 +215,10 @@ export default function BoutiqueHomePage() {
   const radar = useMemo(() => profumi.filter(isRadarProfumo), [profumi]);
 
   async function askQuickAiEngine() {
-    if (collezione.length === 0) return;
+    if (collezione.length === 0) {
+      showToast('Aggiungi almeno un flacone in collezione per chiedere consiglio.', 'error');
+      return;
+    }
     setAdvisorLoading(true);
     setAdvisorResult(null);
     try {
@@ -228,13 +241,16 @@ export default function BoutiqueHomePage() {
         recommended: recProfumi.slice(0, 3),
       });
     } catch (err: any) {
-      alert(err?.message || "Impossibile consultare l'IA in questo momento.");
+      showToast(err?.message || 'Non riesco a consultare il sommelier in questo momento.', 'error');
     } finally {
       setAdvisorLoading(false);
     }
   }
 
-  async function handleQuickWearSave(profumoIdToWear: string) {
+  async function handleQuickWearSave(
+    profumoIdToWear: string,
+    anchorEl?: HTMLElement | null
+  ) {
     if (!profumoIdToWear) return;
     setSavingQuickWear(true);
     try {
@@ -246,381 +262,585 @@ export default function BoutiqueHomePage() {
         },
       ]);
       if (error) throw error;
-      await fetchVaultData();
-      setActivePanel('none');
+
+      const worn = profumi.find((p) => p.id === profumoIdToWear) || null;
+      if (worn) setAuraFromProfumo(worn);
+
+      setSheetOpen(false);
+      triggerSpruzzo(anchorEl || heroBottleRef);
+      showToast(worn ? `Oggi indossi ${worn.nome}.` : 'Indosso registrato.');
+      await fetchVaultData(true);
     } catch (err: any) {
-      alert(err?.message || 'Errore registrazione indosso.');
+      showToast(err?.message || "Non sono riuscito a salvare l'indosso.", 'error');
     } finally {
       setSavingQuickWear(false);
     }
   }
 
   const last = ultimoIndosso?.profumi || null;
-  const toggle = (p: 'ai' | 'collezione' | 'decant') =>
-    setActivePanel(activePanel === p ? 'none' : p);
+  const lastImg = last ? last.url_foto_vetrina || last.immagine_url : null;
+  const wearLine = formatWearLine(ultimoIndosso);
 
   return (
-    <main className="min-h-screen bg-[#060607] text-[#EDE9E0] px-4 sm:px-8 lg:px-12 py-8 max-w-5xl mx-auto w-full selection:bg-[#22543d] selection:text-white">
-      
-      {/* 1. HERO HEADER MONUMENTALE CON LOGO CENTRALE E RIFLESSI VERDI/FLOU */}
-      <header className="relative rounded-[24px] bg-gradient-to-b from-[#111115] via-[#0A0A0C] to-[#070708] border border-[#22543d]/40 p-6 sm:p-8 overflow-hidden shadow-[0_0_40px_rgba(34,84,61,0.2)]">
-        <div
-          className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full opacity-25 blur-3xl"
-          style={{
-            background: 'radial-gradient(circle, #22543d 0%, #10b981 30%, transparent 70%)',
-          }}
-        />
+    <main className="mx-auto w-full max-w-[460px] px-5 pt-4 pb-12">
+      {/* 1. PRIMO SCHERMO: AURA E PROFUMO DEL GIORNO */}
+      <section className="flex min-h-[calc(100dvh-7.5rem)] flex-col justify-between py-2">
+        <header className="flex items-center justify-between">
+          <Logo className="h-7" />
+          <Link
+            href="/scanner"
+            aria-label="Apri scanner"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D8B995]/25 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-[#D8B995]"
+          >
+            <ScanLine className="h-5 w-5 text-[#D8B995]" />
+          </Link>
+        </header>
 
-        <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-            <div className="relative group shrink-0">
-              <div className="absolute -inset-2 rounded-2xl bg-gradient-to-tr from-[#22543d]/60 via-[#10b981]/30 to-transparent opacity-75 blur-md group-hover:opacity-100 transition duration-500" />
-              <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#09090B] border border-[#22543d]/80 shadow-2xl p-1.5 flex items-center justify-center overflow-hidden">
-                <img
-                  src="/logo.jpg"
-                  alt="Boutique Olfattiva"
-                  className="w-full h-full object-cover rounded-xl group-hover:scale-105 transition duration-500"
-                />
+        <div className="my-auto flex flex-col items-center text-center py-6">
+          {loading ? (
+            <div className="flex flex-col items-center gap-5 w-full">
+              <div className="h-72 w-60 rounded-[44px] aura-skeleton" />
+              <div className="h-10 w-56 rounded-2xl aura-skeleton" />
+              <div className="h-5 w-36 rounded-xl aura-skeleton" />
+            </div>
+          ) : last ? (
+            <>
+              <motion.div
+                ref={heroBottleRef}
+                key={last.id}
+                initial={{ opacity: 0, scale: 0.94, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={springSoft}
+              >
+                <BottlePedestal src={lastImg} alt={last.nome} size="xl" />
+              </motion.div>
+
+              <div className="mt-6 max-w-[36ch] space-y-1.5">
+                <p className="text-[15px] font-medium text-[#D8B995]">{last.brand}</p>
+                <h1 className="font-serif text-[clamp(2.4rem,8vw,3.5rem)] leading-[1.04] text-[#F6EFE4]">
+                  {last.nome}
+                </h1>
+                {wearLine && (
+                  <p className="text-[14px] text-[#B8A9C9] pt-1">{wearLine}</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-5 py-6">
+              <div ref={heroBottleRef}>
+                <BottlePedestal src={null} alt="Nessun profumo indossato" size="lg" />
+              </div>
+              <div className="space-y-2 max-w-[30ch]">
+                <h1 className="font-serif text-[clamp(2.5rem,8vw,3.5rem)] leading-[1.05] text-[#F6EFE4]">
+                  Oggi chi sei?
+                </h1>
+                <p className="text-[15px] text-[#B8A9C9]">
+                  {collezione.length === 0
+                    ? 'Lo scaffale è vuoto: aggiungi il primo flacone.'
+                    : 'Scegli cosa indossare o lascia fare al sommelier.'}
+                </p>
               </div>
             </div>
+          )}
+        </div>
 
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#8C867B]">
-                Private Olfactory Vault &amp; Atelier
-              </p>
-              <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal tracking-wide text-[#F5F2EB] mt-1">
-                BOUTIQUE OLFATTIVA
-              </h1>
+        <div className="flex flex-col gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSheetMode('collezione');
+              setSheetOpen(true);
+            }}
+            style={{
+              backgroundColor: 'var(--aura-1)',
+              color: '#140D1C',
+              boxShadow: '0 14px 34px -8px color-mix(in srgb, var(--aura-1) 50%, transparent)',
+            }}
+            className="min-h-[52px] w-full rounded-[20px] px-6 py-3.5 text-[16px] font-bold tracking-[-0.02em] transition-transform active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F6EFE4]"
+          >
+            {last ? 'Cambia profumo' : 'Scegli il profumo di oggi'}
+          </button>
+        </div>
+      </section>
+
+      {/* 2. SCHEDA CONSIGLIO IA */}
+      <section className="mt-8 rounded-[28px] border border-[#D8B995]/20 bg-[#1E1428]/90 p-5 aura-shadow space-y-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[21px] font-bold tracking-[-0.03em] text-[#F6EFE4]">
+              Ispirazione del giorno
+            </h2>
+            <p className="text-[14px] text-[#B8A9C9]">
+              Tocca clima, contesto e carattere per tre proposte su misura.
+            </p>
+          </div>
+          <Sparkles
+            className="h-5 w-5 shrink-0 mt-1"
+            style={{ color: 'var(--aura-1)' }}
+          />
+        </div>
+
+        <div className="space-y-4">
+          <ChipRow label="Clima" options={METEO} value={meteo} onChange={setMeteo} />
+          <ChipRow
+            label="Contesto"
+            options={CONTESTI}
+            value={occasione}
+            onChange={(v) => {
+              setOccasione(v);
+              setQuickContesto(v);
+            }}
+          />
+          <ChipRow
+            label="Carattere olfattivo"
+            options={PROFILI}
+            value={umore}
+            onChange={setUmore}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={askQuickAiEngine}
+          disabled={advisorLoading || collezione.length === 0}
+          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#D8B995]/40 bg-[#281B35] px-5 py-3 text-[15px] font-semibold text-[#F6EFE4] transition hover:border-[#D8B995] disabled:opacity-50"
+        >
+          {advisorLoading ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin text-[#D8B995]" />
+              <span>Cerco tra i tuoi flaconi...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 text-[#D8B995]" />
+              <span>Consigliami tre profumi</span>
+            </>
+          )}
+        </button>
+
+        {advisorLoading && (
+          <div className="space-y-3 pt-2">
+            <div className="h-16 w-full rounded-[18px] aura-skeleton" />
+            <div className="flex gap-3 overflow-hidden">
+              <div className="h-44 w-64 shrink-0 rounded-[22px] aura-skeleton" />
+              <div className="h-44 w-64 shrink-0 rounded-[22px] aura-skeleton" />
             </div>
           </div>
+        )}
+
+        {advisorResult && (
+          <div className="space-y-4 pt-2 border-t border-white/10">
+            <p className="font-serif text-[17px] leading-[1.45] text-[#F6EFE4]">
+              {advisorResult.advice}
+            </p>
+
+            {advisorResult.recommended.length > 0 && (
+              <div className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-5 pb-2">
+                {advisorResult.recommended.map((p) => {
+                  const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+                  const pImg = p.url_foto_vetrina || p.immagine_url;
+                  return (
+                    <div
+                      key={p.id}
+                      style={{ borderColor: `${pAura.primary}44` }}
+                      className="flex w-[250px] shrink-0 snap-center flex-col justify-between rounded-[22px] border bg-[#281B35]/90 p-4 gap-4"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <BottlePedestal src={pImg} alt={p.nome} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-medium text-[#D8B995]">
+                            {p.brand}
+                          </p>
+                          <p className="truncate font-serif text-[20px] leading-tight text-[#F6EFE4]">
+                            {p.nome}
+                          </p>
+                          <p className="line-clamp-1 text-[12px] text-[#B8A9C9] mt-0.5">
+                            {getNotesPreview(p)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={savingQuickWear}
+                        onClick={(e) => handleQuickWearSave(p.id, e.currentTarget)}
+                        style={{
+                          backgroundColor: pAura.primary,
+                          color: '#140D1C',
+                        }}
+                        className="min-h-[44px] w-full rounded-[14px] py-2.5 text-[14px] font-bold transition active:scale-[0.98] disabled:opacity-50"
+                      >
+                        Indosso oggi
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* 3. ACCESSI RAPIDI */}
+      <section className="mt-6 space-y-3.5">
+        <div className="grid grid-cols-5 gap-3.5">
+          <Link
+            href="/collezione"
+            className="col-span-3 flex flex-col justify-between rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-5 transition hover:border-[#D8B995]/50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-semibold text-[#F6EFE4]">Collezione</span>
+              <Library className="h-4 w-4 text-[#D8B995]" />
+            </div>
+            <div className="mt-5">
+              <span className="font-serif text-[44px] leading-none text-[#F6EFE4]">
+                {loading ? '—' : collezione.length}
+              </span>
+              <p className="text-[13px] text-[#B8A9C9] mt-1">Flaconi sullo scaffale</p>
+            </div>
+          </Link>
 
           <Link
-            href="/diario"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.1] text-[#EDE9E0] hover:border-[#22543d] hover:bg-white/[0.08] font-mono text-xs uppercase tracking-wider transition-all"
+            href="/collezione?vista=radar"
+            className="col-span-2 flex flex-col justify-between rounded-[24px] border border-white/10 bg-[#281B35]/80 p-5 transition hover:border-[#D8B995]/50"
           >
-            <BookOpen className="w-3.5 h-3.5 text-[#10b981]" />
-            <span>Diario Indossi</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-semibold text-[#F6EFE4]">Radar</span>
+              <Compass className="h-4 w-4 text-[#D8B995]" />
+            </div>
+            <div className="mt-5">
+              <span className="font-serif text-[38px] leading-none text-[#F6EFE4]">
+                {loading ? '—' : radar.length}
+              </span>
+              <p className="text-[13px] text-[#B8A9C9] mt-1">Decant in prova</p>
+            </div>
           </Link>
         </div>
-      </header>
 
-      {/* 2. SFERA CENTRALE: INDOSSO DEL GIORNO (SCENT OF THE DAY) */}
-      <section className="mt-8 relative rounded-[24px] bg-gradient-to-b from-[#121215] to-[#0A0A0C] border border-white/[0.09] p-6 sm:p-8 shadow-xl">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[#070708] border border-white/[0.12] overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
-              {last ? (
-                <SmartBottleImage
-                  src={last.url_foto_vetrina || last.immagine_url}
-                  alt={last.nome}
-                  iconSize="w-8 h-8"
-                  className="w-full h-full object-contain p-2"
+        <Link
+          href="/diario"
+          className="flex items-center justify-between gap-4 rounded-[22px] border border-white/10 bg-[#1E1428]/90 px-5 py-4 transition hover:border-[#D8B995]/50"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <CalendarHeart className="h-4 w-4 text-[#D8B995]" />
+              <span className="text-[15px] font-semibold text-[#F6EFE4]">Diario olfattivo</span>
+            </div>
+            <p className="text-[13px] text-[#B8A9C9]">
+              {ultimiSette.length > 0
+                ? `Gli ultimi ${ultimiSette.length} indossi registrati`
+                : 'Nessun indosso ancora registrato'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5" aria-label="Ultimi sette indossi">
+            {Array.from({ length: 7 }).map((_, idx) => {
+              const item = ultimiSette[idx];
+              const dotAura = item?.profumi
+                ? resolveAura(item.profumi.famiglia_olfattiva, item.profumi.nome)
+                : null;
+              const dotClass = dotAura
+                ? 'h-3.5 w-3.5 rounded-full'
+                : 'h-3.5 w-3.5 rounded-full border border-white/15 bg-[#281B35]';
+              return (
+                <span
+                  key={idx}
+                  title={item?.profumi?.nome || 'Vuoto'}
+                  style={
+                    dotAura
+                      ? {
+                          backgroundColor: dotAura.primary,
+                          boxShadow: `0 0 10px ${dotAura.primary}88`,
+                        }
+                      : undefined
+                  }
+                  className={dotClass}
                 />
-              ) : (
-                <PerfumeBottleIcon className="w-8 h-8 text-[#5A5751] stroke-[1.2]" />
-              )}
-            </div>
+              );
+            })}
+          </div>
+        </Link>
+      </section>
 
-            <div className="min-w-0">
-              <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#10b981]">
-                SCENT OF THE DAY • ULTIMO INDOSSO
-              </span>
-              {last ? (
-                <div className="mt-1">
-                  <h2 className="font-serif text-2xl sm:text-3xl text-[#F5F2EB] tracking-wide truncate">
-                    {last.nome}
-                  </h2>
-                  <p className="font-mono text-xs text-[#8C867B] mt-0.5">
-                    {last.brand}
-                    <span className="text-zinc-400">
-                      {' '}
-                      • {(ultimoIndosso?.momento_giornata || 'oggi').toLowerCase()}
-                      {ultimoIndosso?.contesto_outfit
-                        ? ` (${ultimoIndosso.contesto_outfit})`
-                        : ''}
-                    </span>
-                  </p>
-                </div>
-              ) : (
-                <h2 className="font-serif text-2xl sm:text-3xl text-[#F5F2EB] tracking-wide mt-1">
-                  Cosa indossi oggi?
-                </h2>
-              )}
-            </div>
+      {/* 4. SHEET CAMBIA PROFUMO */}
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="Cosa indossi oggi?"
+        subtitle="Scegli il momento, il contesto e il profumo."
+        initialSnap="full"
+      >
+        <div className="space-y-6">
+          <div
+            role="tablist"
+            aria-label="Modalità di scelta"
+            className="grid grid-cols-3 gap-1.5 rounded-[16px] bg-[#140D1C] p-1.5"
+          >
+            {[
+              { id: 'collezione', label: 'Collezione' },
+              { id: 'decant', label: 'Decant' },
+              { id: 'ai', label: 'Consiglio IA' },
+            ].map((tab) => {
+              const active = sheetMode === tab.id;
+              const tabColor = active
+                ? 'text-[#140D1C]'
+                : 'text-[#B8A9C9] hover:text-[#F6EFE4]';
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setSheetMode(tab.id as 'collezione' | 'decant' | 'ai')}
+                  className={`relative min-h-[40px] rounded-[12px] text-[13px] font-semibold transition-colors ${tabColor}`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="sheet-mode-pill"
+                      transition={springSnappy}
+                      style={{ backgroundColor: 'var(--aura-1)' }}
+                      className="absolute inset-0 rounded-[12px]"
+                    />
+                  )}
+                  <span className="relative z-10">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => toggle('ai')}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs uppercase tracking-wider transition-all ${
-                activePanel === 'ai'
-                  ? 'bg-[#10b981] text-[#060607] font-semibold'
-                  : 'bg-white/[0.04] text-[#EDE9E0] border border-white/[0.1] hover:border-[#10b981]'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Sommelier IA</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => toggle('collezione')}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs uppercase tracking-wider transition-all ${
-                activePanel === 'collezione'
-                  ? 'bg-[#10b981] text-[#060607] font-semibold'
-                  : 'bg-white/[0.04] text-[#EDE9E0] border border-white/[0.1] hover:border-[#10b981]'
-              }`}
-            >
-              <PerfumeBottleIcon className="w-3.5 h-3.5" />
-              <span>Scegli Flacone</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => toggle('decant')}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs uppercase tracking-wider transition-all ${
-                activePanel === 'decant'
-                  ? 'bg-[#10b981] text-[#060607] font-semibold'
-                  : 'bg-white/[0.04] text-[#EDE9E0] border border-white/[0.1] hover:border-[#10b981]'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Decant</span>
-            </button>
+          <div className="space-y-4 rounded-[20px] bg-[#281B35]/60 p-4">
+            <ChipRow
+              label="Momento della giornata"
+              options={MOMENTI}
+              value={quickMomento}
+              onChange={(v) => setQuickMomento(v as (typeof MOMENTI)[number])}
+              bleed="-mx-4 px-4"
+            />
+            <ChipRow
+              label="Contesto"
+              options={CONTESTI}
+              value={quickContesto}
+              onChange={setQuickContesto}
+              bleed="-mx-4 px-4"
+            />
           </div>
-        </div>
 
-        {/* PANNELLO 1: SOMMELIER IA */}
-        {activePanel === 'ai' && (
-          <div className="mt-6 pt-6 border-t border-white/[0.08] space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label="Clima / Stagione" value={meteo} onChange={setMeteo} options={METEO} />
-              <Field label="Contesto" value={occasione} onChange={setOccasione} options={CONTESTI} />
-              <Field label="Profilo Olfattivo" value={umore} onChange={setUmore} options={PROFILI} />
+          {sheetMode === 'collezione' && (
+            <div className="space-y-4">
+              {collezione.length > 0 ? (
+                <>
+                  <div className="max-h-[34dvh] space-y-2 overflow-y-auto pr-1">
+                    {collezione.map((p) => {
+                      const selected = selectedQuickProfumoId === p.id;
+                      const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+                      const pImg = p.url_foto_vetrina || p.immagine_url;
+                      const rowStyle = selected
+                        ? 'shadow-sm'
+                        : 'border-white/10 bg-[#140D1C]/60 hover:border-white/25';
+                      const dotBorder = selected ? 'border-transparent' : 'border-white/30';
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedQuickProfumoId(p.id)}
+                          style={
+                            selected
+                              ? {
+                                  borderColor: pAura.primary,
+                                  backgroundColor: '#281B35',
+                                }
+                              : undefined
+                          }
+                          className={`flex w-full items-center gap-3.5 rounded-[18px] border p-3 text-left transition ${rowStyle}`}
+                        >
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[12px] bg-[#F6EFE4] p-1.5 flex items-center justify-center">
+                            <SmartBottleImage
+                              src={pImg}
+                              alt={p.nome}
+                              blend={true}
+                              iconSize="w-5 h-5"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] text-[#D8B995]">{p.brand}</p>
+                            <p className="truncate font-serif text-[19px] leading-tight text-[#F6EFE4]">
+                              {p.nome}
+                            </p>
+                          </div>
+                          <span
+                            style={
+                              selected ? { backgroundColor: pAura.primary } : undefined
+                            }
+                            className={`h-4 w-4 shrink-0 rounded-full border ${dotBorder}`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={savingQuickWear || !selectedQuickProfumoId}
+                    onClick={() => handleQuickWearSave(selectedQuickProfumoId)}
+                    style={{ backgroundColor: 'var(--aura-1)', color: '#140D1C' }}
+                    className="min-h-[50px] w-full rounded-[18px] py-3 text-[15px] font-bold transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {savingQuickWear ? 'Registro...' : 'Indosso oggi'}
+                  </button>
+                </>
+              ) : (
+                <p className="text-center text-[14px] text-[#B8A9C9] py-6">
+                  Lo scaffale è vuoto: aggiungi il primo flacone dallo scanner.
+                </p>
+              )}
             </div>
+          )}
 
-            <div className="flex justify-end">
+          {sheetMode === 'decant' && (
+            <div className="space-y-4">
+              {radar.length > 0 ? (
+                <>
+                  <div className="max-h-[34dvh] space-y-2 overflow-y-auto pr-1">
+                    {radar.map((p) => {
+                      const currentDecantId = selectedDecantId || radar[0]?.id || '';
+                      const selected = currentDecantId === p.id;
+                      const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+                      const pImg = p.url_foto_vetrina || p.immagine_url;
+                      const rowStyle = selected
+                        ? 'shadow-sm'
+                        : 'border-white/10 bg-[#140D1C]/60 hover:border-white/25';
+                      const dotBorder = selected ? 'border-transparent' : 'border-white/30';
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedDecantId(p.id)}
+                          style={
+                            selected
+                              ? {
+                                  borderColor: pAura.primary,
+                                  backgroundColor: '#281B35',
+                                }
+                              : undefined
+                          }
+                          className={`flex w-full items-center gap-3.5 rounded-[18px] border p-3 text-left transition ${rowStyle}`}
+                        >
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[12px] bg-[#F6EFE4] p-1.5 flex items-center justify-center">
+                            <SmartBottleImage
+                              src={pImg}
+                              alt={p.nome}
+                              blend={true}
+                              iconSize="w-5 h-5"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] text-[#D8B995]">{p.brand}</p>
+                            <p className="truncate font-serif text-[19px] leading-tight text-[#F6EFE4]">
+                              {p.nome}
+                            </p>
+                          </div>
+                          <span
+                            style={
+                              selected ? { backgroundColor: pAura.primary } : undefined
+                            }
+                            className={`h-4 w-4 shrink-0 rounded-full border ${dotBorder}`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={savingQuickWear}
+                    onClick={() =>
+                      handleQuickWearSave(selectedDecantId || radar[0]?.id || '')
+                    }
+                    style={{ backgroundColor: 'var(--aura-1)', color: '#140D1C' }}
+                    className="min-h-[50px] w-full rounded-[18px] py-3 text-[15px] font-bold transition active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {savingQuickWear ? 'Registro...' : 'Indosso questo decant'}
+                  </button>
+                </>
+              ) : (
+                <p className="text-center text-[14px] text-[#B8A9C9] py-6">
+                  Nessun campioncino o decant attualmente in osservazione nel Radar.
+                </p>
+              )}
+            </div>
+          )}
+
+          {sheetMode === 'ai' && (
+            <div className="space-y-4">
+              <ChipRow
+                label="Clima"
+                options={METEO}
+                value={meteo}
+                onChange={setMeteo}
+                bleed="-mx-6 px-6"
+              />
+              <ChipRow
+                label="Carattere olfattivo"
+                options={PROFILI}
+                value={umore}
+                onChange={setUmore}
+                bleed="-mx-6 px-6"
+              />
+
               <button
                 type="button"
                 onClick={askQuickAiEngine}
                 disabled={advisorLoading || collezione.length === 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#10b981] text-[#060607] font-mono text-xs font-semibold uppercase tracking-wider hover:bg-[#34d399] transition disabled:opacity-50"
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#D8B995]/40 bg-[#281B35] px-5 py-3 text-[15px] font-semibold text-[#F6EFE4] disabled:opacity-50"
               >
                 {advisorLoading ? (
                   <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Analisi nel Caveau...</span>
+                    <RefreshCw className="h-4 w-4 animate-spin text-[#D8B995]" />
+                    <span>Cerco tra i tuoi flaconi...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Trova i 3 Ideali</span>
+                    <Sparkles className="h-4 w-4 text-[#D8B995]" />
+                    <span>Consigliami tre profumi</span>
                   </>
                 )}
               </button>
-            </div>
 
-            {advisorResult && (
-              <div className="p-4 rounded-xl bg-[#070708] border border-white/[0.1] space-y-3.5">
-                <p className="text-xs text-[#D6CFC2] leading-relaxed">
-                  {advisorResult.advice}
-                </p>
-                {advisorResult.recommended.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {advisorResult && (
+                <div className="space-y-3 pt-2">
+                  <p className="font-serif text-[16px] text-[#F6EFE4]">
+                    {advisorResult.advice}
+                  </p>
+                  <div className="space-y-2">
                     {advisorResult.recommended.map((p) => (
                       <div
                         key={p.id}
-                        className="p-3.5 rounded-xl bg-[#0E0E11] border border-white/[0.08] flex flex-col justify-between gap-3"
+                        className="flex items-center justify-between gap-3 rounded-[16px] border border-white/10 bg-[#140D1C]/70 p-3"
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="w-11 h-11 rounded-lg bg-[#070708] border border-white/[0.08] overflow-hidden flex items-center justify-center shrink-0">
-                            <SmartBottleImage
-                              src={p.url_foto_vetrina || p.immagine_url}
-                              alt={p.nome}
-                              iconSize="w-4 h-4"
-                              className="w-full h-full object-contain p-1"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-mono text-[9px] uppercase tracking-widest text-[#8C867B] truncate">
-                              {p.brand}
-                            </p>
-                            <p className="font-serif text-base text-[#F5F2EB] truncate">
-                              {p.nome}
-                            </p>
-                            <p className="text-[11px] text-[#7D786F] line-clamp-1 mt-0.5">
-                              {getUnifiedNotes(p) || p.famiglia_olfattiva}
-                            </p>
-                          </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] text-[#D8B995]">{p.brand}</p>
+                          <p className="truncate font-serif text-[18px] text-[#F6EFE4]">
+                            {p.nome}
+                          </p>
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleQuickWearSave(p.id)}
                           disabled={savingQuickWear}
-                          className="w-full py-2 rounded-lg bg-white/[0.06] hover:bg-[#10b981] hover:text-[#060607] text-[#EDE9E0] font-mono text-[10px] uppercase tracking-widest transition"
+                          onClick={() => handleQuickWearSave(p.id)}
+                          style={{ backgroundColor: 'var(--aura-1)', color: '#140D1C' }}
+                          className="shrink-0 rounded-[12px] px-3.5 py-2 text-[13px] font-bold"
                         >
-                          Indossa Oggi
+                          Indosso oggi
                         </button>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* PANNELLO 2: SCELTA DA COLLEZIONE */}
-        {activePanel === 'collezione' && (
-          <div className="mt-6 pt-6 border-t border-white/[0.08] grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-            <div className="sm:col-span-2">
-              <Field
-                label={`Flacone ({collezione.length})`}
-                value={selectedQuickProfumoId}
-                onChange={setSelectedQuickProfumoId}
-                options={collezione.map((p) => ({
-                  value: p.id,
-                  label: `${p.brand} — ${p.nome}`,
-                }))}
-              />
-            </div>
-            <Field
-              label="Momento"
-              value={quickMomento}
-              onChange={(v) => setQuickMomento(v as (typeof MOMENTI)[number])}
-              options={[...MOMENTI]}
-            />
-            <Field
-              label="Contesto"
-              value={quickContesto}
-              onChange={setQuickContesto}
-              options={CONTESTI}
-            />
-            <button
-              type="button"
-              onClick={() => handleQuickWearSave(selectedQuickProfumoId)}
-              disabled={savingQuickWear || !selectedQuickProfumoId}
-              className="px-4 py-2.5 rounded-xl bg-[#10b981] hover:bg-[#34d399] text-[#060607] font-mono text-xs font-semibold uppercase tracking-wider transition"
-            >
-              {savingQuickWear ? 'Salvataggio...' : 'Conferma'}
-            </button>
-          </div>
-        )}
-
-        {/* PANNELLO 3: DECANT IN PROVA */}
-        {activePanel === 'decant' && (
-          <div className="mt-6 pt-6 border-t border-white/[0.08]">
-            {radar.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                <div className="sm:col-span-2">
-                  <Field
-                    label={`Decant in Osservazione (${radar.length})`}
-                    value={selectedDecantId || radar[0]?.id || ''}
-                    onChange={setSelectedDecantId}
-                    options={radar.map((p) => ({
-                      value: p.id,
-                      label: `${p.brand} — ${p.nome}`,
-                    }))}
-                  />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleQuickWearSave(selectedDecantId || radar[0]?.id)}
-                  disabled={savingQuickWear}
-                  className="px-4 py-2.5 rounded-xl bg-[#10b981] hover:bg-[#34d399] text-[#060607] font-mono text-xs font-semibold uppercase tracking-wider transition"
-                >
-                  Indossa Decant
-                </button>
-              </div>
-            ) : (
-              <p className="text-xs text-[#8C867B] font-mono">
-                Nessun campioncino o profumo attualmente nel Radar Testing.
-              </p>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* 3. ACCESSI RAPIDI A GRIGLIA (COLLEZIONE, SCANNER, RADAR) */}
-      <section className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        
-        {/* COLLEZIONE PRIVATA */}
-        <Link
-          href="/collezione"
-          className="group rounded-[22px] bg-gradient-to-b from-[#131316] to-[#09090B] border border-white/[0.08] hover:border-[#10b981]/50 p-6 flex flex-col justify-between transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#8C867B]">
-              01 / VAULT
-            </span>
-            <PerfumeBottleIcon className="w-5 h-5 text-[#10b981]" />
-          </div>
-          <div className="my-6">
-            <span className="font-serif text-4xl text-[#F5F2EB] font-light">
-              {loading ? '—' : collezione.length}
-            </span>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-[#8C867B] mt-1">
-              Flaconi in archivio
-            </p>
-          </div>
-          <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-            <span className="font-serif text-base text-[#F5F2EB]">Collezione Privata</span>
-            <ChevronRight className="w-4 h-4 text-[#8C867B] group-hover:translate-x-1 transition" />
-          </div>
-        </Link>
-
-        {/* IA SCANNER & ESTRATTORE */}
-        <Link
-          href="/scanner"
-          className="group rounded-[22px] bg-gradient-to-b from-[#131316] to-[#09090B] border border-white/[0.08] hover:border-[#10b981]/50 p-6 flex flex-col justify-between transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#8C867B]">
-              02 / AI ENGINE
-            </span>
-            <ScanLine className="w-5 h-5 text-[#10b981]" />
-          </div>
-          <div className="my-6">
-            <div className="font-serif text-xl text-[#F5F2EB]">Acquisizione</div>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-[#8C867B] mt-1">
-              Foto • Link • 59K DB
-            </p>
-          </div>
-          <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-            <span className="font-serif text-base text-[#F5F2EB]">IA Scanner</span>
-            <ChevronRight className="w-4 h-4 text-[#8C867B] group-hover:translate-x-1 transition" />
-          </div>
-        </Link>
-
-        {/* RADAR TESTING */}
-        <Link
-          href="/collezione?vista=radar"
-          className="group rounded-[22px] bg-gradient-to-b from-[#131316] to-[#09090B] border border-white/[0.08] hover:border-[#10b981]/50 p-6 flex flex-col justify-between transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#8C867B]">
-              03 / LAB
-            </span>
-            <Compass className="w-5 h-5 text-[#10b981]" />
-          </div>
-          <div className="my-6">
-            <span className="font-serif text-4xl text-[#F5F2EB] font-light">
-              {loading ? '—' : radar.length}
-            </span>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-[#8C867B] mt-1">
-              Decant &amp; Mouche
-            </p>
-          </div>
-          <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-            <span className="font-serif text-base text-[#F5F2EB]">Radar Testing</span>
-            <ChevronRight className="w-4 h-4 text-[#8C867B] group-hover:translate-x-1 transition" />
-          </div>
-        </Link>
-
-      </section>
-
+              )}
+            </div>
+          )}
+        </div>
+      </Sheet>
     </main>
   );
 }
