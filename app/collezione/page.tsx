@@ -367,6 +367,7 @@ export default function CollezionePage() {
       {/* SCHEDA DETTAGLIO MODALE */}
       {selectedProfumo && (() => {
         const seasons = getSeasonsForFamily(selectedProfumo.famiglia_olfattiva);
+        const pAny = selectedProfumo as any;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
             <div className="relative w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16">
@@ -472,16 +473,16 @@ export default function CollezionePage() {
                     <p className="text-xs text-[#B8A9C9] mt-1">{selectedProfumo.concentrazione || 'Eau de Parfum'} • {selectedProfumo.famiglia_olfattiva}</p>
 
                     <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                      {selectedProfumo.naso && (
+                      {pAny.naso && (
                         <div className="inline-flex items-center gap-1.5 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#D8B995]">
                           <UserCheck className="h-3.5 w-3.5" />
-                          <span>Naso: {selectedProfumo.naso}</span>
+                          <span>Naso: {pAny.naso}</span>
                         </div>
                       )}
-                      {selectedProfumo.anno_lancio && (
+                      {pAny.anno_lancio && (
                         <div className="inline-flex items-center gap-1.5 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#B8A9C9]">
                           <Calendar className="h-3.5 w-3.5 text-[#D8B995]" />
-                          <span>Anno: {selectedProfumo.anno_lancio}</span>
+                          <span>Anno: {pAny.anno_lancio}</span>
                         </div>
                       )}
                     </div>
