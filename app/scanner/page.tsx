@@ -17,7 +17,7 @@ import {
   Search,
   FlaskConical,
 } from 'lucide-react';
-import { supabase, Profumo } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
 import { useToast } from '@/components/Toast';
 
@@ -34,30 +34,29 @@ const PURE_FAMILIES = [
   'Gourmand',
   'Cuoiata',
   'Muschiata',
-] as const;
+];
 
 export default function ScannerPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<'name' | 'photo' | 'url'>('name');
+  const [mode, setMode] = useState('name');
 
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   const [inputUrl, setInputUrl] = useState('');
   const [inputName, setInputName] = useState('');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageMime, setImageMime] = useState<string>('image/jpeg');
+  const [imagePreview, setImagePreview] = useState(null);
 
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [draft, setDraft] = useState<Partial<Profumo> | null>(null);
-  const [modelSource, setModelSource] = useState<string>('');
-  const [targetStato, setTargetStato] = useState<'collezione' | 'radar'>('collezione');
+  const [draft, setDraft] = useState(null);
+  const [modelSource, setModelSource] = useState('');
+  const [targetStato, setTargetStato] = useState('collezione');
 
   const { showToast } = useToast();
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -85,7 +84,6 @@ export default function ScannerPage() {
           ctx.drawImage(img, 0, 0, w, h);
           const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.84);
           setImagePreview(compressedDataUrl);
-          setImageMime('image/jpeg');
         }
       };
       if (typeof ev.target?.result === 'string') {
@@ -96,7 +94,7 @@ export default function ScannerPage() {
     e.target.value = '';
   }
 
-  async function handleExtract(e?: React.FormEvent) {
+  async function handleExtract(e) {
     if (e) e.preventDefault();
 
     if (mode === 'url' && !inputUrl.trim()) {
@@ -108,7 +106,7 @@ export default function ScannerPage() {
       return;
     }
     if (mode === 'photo' && !imagePreview) {
-      showToast('Scatta una foto o seleziona un\'immagine.', 'error');
+      showToast("Scatta una foto o seleziona un'immagine.", 'error');
       return;
     }
 
@@ -116,14 +114,14 @@ export default function ScannerPage() {
     setDraft(null);
 
     try {
-      const payload: Record<string, any> = {};
+      const payload = {};
       if (mode === 'url') {
         payload.url = inputUrl.trim();
       } else if (mode === 'name') {
         payload.queryName = inputName.trim();
       } else if (mode === 'photo' && imagePreview) {
         payload.imageBase64 = imagePreview;
-        payload.mimeType = imageMime;
+        payload.mimeType = 'image/jpeg';
       }
 
       const res = await fetch('/api/extract', {
@@ -149,26 +147,17 @@ export default function ScannerPage() {
         note_olfattive: data.note_olfattive || '',
         descrizione_ai: data.descrizione_ai || '',
         prezzo_stimato_euro: data.prezzo_stimato_euro || '€150',
-        formato_ml: Number(data.formato_ml) || 100,
-        stagione_ideale: data.stagione_ideale || 'Tutte le stagioni',
-        occasione_ideale: data.occasione_ideale || 'Serata',
-        voto_longevita: Number(data.voto_longevita) || 8,
-        voto_scia: Number(data.voto_scia) || 8,
-        voto_proiezione: Number(data.voto_proiezione) || 8,
-        voto_complessita: Number(data.voto_complessita) || 8,
         url_foto_vetrina: data.url_foto_vetrina || (mode === 'photo' ? imagePreview : null),
-        note_mouche: '',
-        note_pelle: '',
       });
       showToast('Scheda estratta con successo.');
-    } catch (err: any) {
+    } catch (err) {
       showToast(err?.message || "Impossibile completare l'estrazione.", 'error');
     } finally {
       setExtracting(false);
     }
   }
 
-  async function handleSaveToSupabase(e: React.FormEvent) {
+  async function handleSaveToSupabase(e) {
     e.preventDefault();
     if (!draft || !draft.nome || !draft.brand) {
       showToast('Assicurati che Marchio e Nome siano compilati.', 'error');
@@ -183,7 +172,7 @@ export default function ScannerPage() {
           .filter(Boolean)
           .join(', ');
 
-      const fullPayload: Record<string, any> = {
+      const fullPayload = {
         nome: draft.nome.trim(),
         brand: draft.brand.trim(),
         concentrazione: draft.concentrazione || 'Eau de Parfum',
@@ -194,39 +183,16 @@ export default function ScannerPage() {
         note_olfattive: unifiedNotes,
         descrizione_ai: draft.descrizione_ai || '',
         prezzo_stimato_euro: draft.prezzo_stimato_euro || '€150',
-        formato_ml: Number(draft.formato_ml) || 100,
-        stagione_ideale: draft.stagione_ideale || '',
-        occasione_ideale: draft.occasione_ideale || '',
-        voto_longevita: Number(draft.voto_longevita) || 8,
-        voto_scia: Number(draft.voto_scia) || 8,
-        voto_proiezione: Number(draft.voto_proiezione) || 8,
-        voto_complessita: Number(draft.voto_complessita) || 8,
         url_foto_vetrina: draft.url_foto_vetrina || null,
         stato: targetStato,
-        note_mouche: draft.note_mouche || null,
-        note_pelle: draft.note_pelle || null,
       };
 
       const { error } = await supabase.from('profumi').insert([fullPayload]);
-
-      if (error) {
-        const { error: fallbackErr } = await supabase.from('profumi').insert([
-          {
-            nome: fullPayload.nome,
-            brand: fullPayload.brand,
-            famiglia_olfattiva: fullPayload.famiglia_olfattiva,
-            note_olfattive: fullPayload.note_olfattive,
-            stato: targetStato,
-          },
-        ]);
-        if (fallbackErr) throw fallbackErr;
-      }
+      if (error) throw error;
 
       showToast('Profumo salvato correttamente.');
-      router.push(
-        targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione'
-      );
-    } catch (err: any) {
+      router.push(targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione');
+    } catch (err) {
       showToast(`Errore nel salvataggio: ${err?.message}`, 'error');
     } finally {
       setSaving(false);
@@ -235,7 +201,6 @@ export default function ScannerPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 sm:px-8 py-8 pb-28">
-      {/* HEADER */}
       <header className="flex items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
         <div className="flex items-center gap-4">
           <Link
@@ -255,7 +220,6 @@ export default function ScannerPage() {
         </Link>
       </header>
 
-      {/* MODALITÀ DI ACQUISIZIONE */}
       <section className="mt-6 rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-5 sm:p-6 aura-shadow space-y-5">
         <div className="grid grid-cols-3 gap-2 rounded-full bg-[#140D1C] p-1.5 border border-white/10">
           <button
@@ -384,7 +348,6 @@ export default function ScannerPage() {
         )}
       </section>
 
-      {/* SCHEDA DI REVISIONE */}
       {draft && (
         <section className="mt-6 rounded-[28px] border border-[#D8B995]/40 bg-[#1E1428]/95 p-6 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
