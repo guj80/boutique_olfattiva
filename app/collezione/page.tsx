@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Trash2, UserCheck } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
@@ -95,8 +95,8 @@ export default function CollezionePage() {
   const activeFiltersCount = (selectedFamily !== 'Tutte' ? 1 : 0) + (selectedBrand !== 'Tutti' ? 1 : 0);
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-28">
-      {/* HEADER E SELETTORE DELLE DUE VISTE (SCAFFALE / RADAR) */}
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
+      {/* HEADER E SELETTORE DELLE DUE VISTE */}
       <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
         <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
           <Link
@@ -109,7 +109,6 @@ export default function CollezionePage() {
           <Logo className="h-7" />
         </div>
 
-        {/* Selettore Vista in evidenza */}
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
           <div className="flex rounded-full bg-[#140D1C] p-1 border border-white/10">
             <button
@@ -174,7 +173,7 @@ export default function CollezionePage() {
 
       {/* CASSETTO FILTRI A SCOMPARSA */}
       {filterDrawerOpen && (
-        <section className="mt-3 rounded-[24px] border border-[#D8B995]/30 bg-[#1E1428] p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 shadow-xl">
+        <section className="mt-3 rounded-[24px] border border-[#D8B995]/30 bg-[#1E1428] p-5 space-y-4 shadow-xl">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <h3 className="text-xs font-semibold uppercase tracking-widest text-[#D8B995]">Filtri Avanzati</h3>
             <button onClick={() => { setSelectedFamily('Tutte'); setSelectedBrand('Tutti'); }} className="text-xs text-[#B8A9C9] hover:text-[#F6EFE4]">
@@ -222,7 +221,7 @@ export default function CollezionePage() {
         </section>
       )}
 
-      {/* GRIGLIA FLACONI ESPANSI CON NOMI A CAPO */}
+      {/* GRIGLIA FLACONI ESPANSI */}
       <section className="mt-8">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
@@ -255,7 +254,6 @@ export default function CollezionePage() {
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-40 transition-opacity group-hover:opacity-80"
                         style={{ backgroundColor: aura.primary }}
                       />
-                      {/* Podio ingrandito ed espanso */}
                       <BottlePedestal src={imgUrl} alt={p.nome} size="lg" className="relative z-10 !h-52 w-full" />
                     </div>
                   </div>
@@ -274,13 +272,13 @@ export default function CollezionePage() {
         )}
       </section>
 
-      {/* SCHEDA DETTAGLIO MODALE (CON ETICHETTE ORIGINALI: TESTA, CUORE, FONDO) */}
+      {/* SCHEDA DETTAGLIO MODALE (CON NASI PROFUMIERI, ETICHETTE E SAFE-AREA CONTRO IL MENU IN BASSO) */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar">
+          <div className="relative w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16">
             <button
               onClick={() => setSelectedProfumo(null)}
-              className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-[#140D1C] text-[#B8A9C9] hover:text-white border border-white/10 transition"
+              className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-[#140D1C] text-[#B8A9C9] hover:text-white border border-white/10 transition z-20"
             >
               <X className="h-4 w-4" />
             </button>
@@ -297,6 +295,14 @@ export default function CollezionePage() {
               <span className="font-mono text-xs text-[#D8B995] uppercase tracking-widest">{selectedProfumo.brand}</span>
               <h2 className="font-serif text-3xl text-[#F6EFE4] mt-1">{selectedProfumo.nome}</h2>
               <p className="text-xs text-[#B8A9C9] mt-1">{selectedProfumo.concentrazione || 'Eau de Parfum'} • {selectedProfumo.famiglia_olfattiva}</p>
+
+              {/* Naso Profumiere */}
+              {selectedProfumo.naso_profumiere && (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#D8B995]">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  <span>Naso: {selectedProfumo.naso_profumiere}</span>
+                </div>
+              )}
             </div>
 
             {selectedProfumo.descrizione_ai && (
@@ -337,7 +343,7 @@ export default function CollezionePage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-white/10">
+            <div className="flex items-center justify-between pt-4 pb-4 border-t border-white/10">
               <button
                 onClick={() => setDeleteConfirmId(selectedProfumo.id)}
                 className="flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-500/10 transition"
