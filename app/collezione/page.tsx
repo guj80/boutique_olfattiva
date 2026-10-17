@@ -1,290 +1,4 @@
-'use client';
-
-import React, { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Sparkles, Trash2 } from 'lucide-react';
-import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
-import { Logo } from '@/components/Logo';
-import { BottlePedestal, SmartBottleImage } from '@/components/BottleImage';
-import { resolveAura } from '@/components/AuraProvider';
-import { useToast } from '@/components/Toast';
-
-const PURE_FAMILIES = [
-  'Agrumata', 'Aromatica', 'Marina', 'Floreale', 'Fruttata',
-  'Verde', 'Speziata', 'Legnosa', 'Ambrata', 'Gourmand', 'Cuoiata', 'Muschiata'
-];
-
-export default function CollezionePage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const vistaParam = searchParams.get('vista');
-
-  const [activeTab, setActiveTab] = useState<'collezione' | 'radar'>(vistaParam === 'radar' ? 'radar' : 'collezione');
-  const [profumi, setProfumi] = useState<Profumo[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Stati di ricerca e filtro compatti nel cassetto a scomparsa
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFamily, setSelectedFamily] = useState<string>('Tutte');
-  const [selectedBrand, setSelectedBrand] = useState<string>('Tutti');
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-
-  // Dettaglio flacone selezionato
-  const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
-  const { showToast } = useToast();
-
-  useEffect(() => {
-    setActiveTab(vistaParam === 'radar' ? 'radar' : 'collezione');
-  }, [vistaParam]);
-
-  useEffect(() => {
-    fetchProfumi();
-  }, []);
-
-  async function fetchProfumi() {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('profumi').select('*').order('nome', { ascending: true });
-      if (error) throw error;
-      setProfumi(data || []);
-    } catch (err: any) {
-      showToast('Impossibile caricare i profumi.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const brands = useMemo(() => {
-    const set = new Set(profumi.map((p) => p.brand).filter(Boolean));
-    return ['Tutti', ...Array.from(set)];
-  }, [profumi]);
-
-  const filteredProfumi = useMemo(() => {
-    return profumi.filter((p) => {
-      const matchTab = activeTab === 'radar' ? isRadarProfumo(p) : isCollezioneProfumo(p);
-      if (!matchTab) return false;
-
-      const q = searchQuery.toLowerCase();
-      const matchSearch =
-        !q ||
-        p.nome.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        (p.note_olfattive && p.note_olfattive.toLowerCase().includes(q));
-
-      const matchFamily = selectedFamily === 'Tutte' || p.famiglia_olfattiva === selectedFamily;
-      const matchBrand = selectedBrand === 'Tutti' || p.brand === selectedBrand;
-
-      return matchSearch && matchFamily && matchBrand;
-    });
-  }, [profumi, activeTab, searchQuery, selectedFamily, selectedBrand]);
-
-  async function handleDelete(id: string) {
-    try {
-      const { error } = await supabase.from('profumi').delete().eq('id', id);
-      if (error) throw error;
-      setProfumi((prev) => prev.filter((p) => p.id !== id));
-      setSelectedProfumo(null);
-      setDeleteConfirmId(null);
-      showToast('Flacone rimosso dalla collezione.');
-    } catch (err: any) {
-      showToast(err?.message || "Errore durante l'eliminazione.", 'error');
-    }
-  }
-
-  const activeFiltersCount = (selectedFamily !== 'Tutte' ? 1 : 0) + (selectedBrand !== 'Tutti' ? 1 : 0);
-
-  return (
-    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-28">
-      {/* HEADER DI LUSSO */}
-      <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
-        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
-          <Link
-            href="/"
-            aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D8B995]/30 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-[#D8B995]"
-          >
-            <ArrowLeft className="h-5 w-5 text-[#D8B995]" />
-          </Link>
-          <Logo className="h-7" />
-          <div className="flex sm:hidden rounded-full bg-[#140D1C] p-1 border border-white/10">
-            <button
-              onClick={() => { setActiveTab('collezione'); router.push('/collezione'); }}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeTab === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
-            >
-              Scaffale
-            </button>
-            <button
-              onClick={() => { setActiveTab('radar'); router.push('/collezione?vista=radar'); }}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeTab === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
-            >
-              Radar
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Desktop & Azioni rapide */}
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-          <div className="hidden sm:flex rounded-full bg-[#140D1C] p-1 border border-white/10">
-            <button
-              onClick={() => { setActiveTab('collezione'); router.push('/collezione'); }}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${activeTab === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
-            >
-              Scaffale
-            </button>
-            <button
-              onClick={() => { setActiveTab('radar'); router.push('/collezione?vista=radar'); }}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${activeTab === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
-            >
-              Radar (Decant)
-            </button>
-          </div>
-
-          <Link
-            href="/scanner"
-            className="flex items-center gap-2 rounded-full bg-[#D8B995] px-5 py-2.5 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e]"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Aggiungi</span>
-          </Link>
-        </div>
-      </header>
-
-      {/* BARRA DI RICERCA E APERTURA FILTRI SALVASPAZIO */}
-      <section className="mt-6 flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca per nome, brand o note olfattive..."
-            className="w-full rounded-[18px] border border-white/10 bg-[#1E1428]/90 pl-11 pr-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-[#D8B995] focus:outline-none"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#B8A9C9] hover:text-white">
-              Cancella
-            </button>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setFilterDrawerOpen(!filterDrawerOpen)}
-          className={`flex items-center gap-2.5 rounded-[18px] border px-5 py-3 text-xs font-semibold transition ${
-            activeFiltersCount > 0 ? 'border-[#D8B995] bg-[#281B35] text-[#D8B995]' : 'border-white/10 bg-[#1E1428]/90 text-[#F6EFE4] hover:border-[#D8B995]/50'
-          }`}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          <span>Filtri {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}</span>
-        </button>
-      </section>
-
-      {/* CASSETTO FILTRI A SCOMPARSA (SALVASPAZIO) */}
-      {filterDrawerOpen && (
-        <section className="mt-3 rounded-[24px] border border-[#D8B995]/30 bg-[#1E1428] p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 shadow-xl">
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-[#D8B995]">Filtri Avanzati</h3>
-            <button onClick={() => { setSelectedFamily('Tutte'); setSelectedBrand('Tutti'); }} className="text-xs text-[#B8A9C9] hover:text-[#F6EFE4]">
-              Resetta filtri
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <p className="text-[11px] font-mono uppercase text-[#B8A9C9] mb-2">Marchio</p>
-              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto no-scrollbar">
-                {brands.map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => setSelectedBrand(b)}
-                    className={`rounded-full px-3 py-1 text-xs transition ${selectedBrand === b ? 'bg-[#D8B995] text-[#140D1C] font-bold' : 'bg-[#140D1C] text-[#B8A9C9] border border-white/10 hover:text-white'}`}
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[11px] font-mono uppercase text-[#B8A9C9] mb-2">Famiglia Olfattiva</p>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => setSelectedFamily('Tutte')}
-                  className={`rounded-full px-3 py-1 text-xs transition ${selectedFamily === 'Tutte' ? 'bg-[#D8B995] text-[#140D1C] font-bold' : 'bg-[#140D1C] text-[#B8A9C9] border border-white/10 hover:text-white'}`}
-                >
-                  Tutte
-                </button>
-                {PURE_FAMILIES.map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setSelectedFamily(f)}
-                    className={`rounded-full px-3 py-1 text-xs transition ${selectedFamily === f ? 'bg-[#D8B995] text-[#140D1C] font-bold' : 'bg-[#140D1C] text-[#B8A9C9] border border-white/10 hover:text-white'}`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* GRIGLIA FLACONI CON OBLÒ VETRINA */}
-      <section className="mt-8">
-        {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-64 rounded-[28px] aura-skeleton" />
-            ))}
-          </div>
-        ) : filteredProfumi.length === 0 ? (
-          <div className="rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-16 text-center space-y-3">
-            <Compass className="h-10 w-10 text-[#D8B995] mx-auto opacity-50" />
-            <h2 className="font-serif text-2xl text-[#F6EFE4]">Nessuna fragranza trovata</h2>
-            <p className="text-xs text-[#B8A9C9]">Prova a modificare i filtri o aggiungi un nuovo flacone.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {filteredProfumi.map((p) => {
-              const aura = resolveAura(p.famiglia_olfattiva, p.nome);
-              const imgUrl = p.url_foto_vetrina || p.immagine_url;
-
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedProfumo(p)}
-                  style={{ borderColor: `${aura.primary}33` }}
-                  className="group relative flex flex-col justify-between rounded-[28px] border bg-[#1E1428]/90 p-4 transition-all duration-300 hover:scale-[1.02] hover:border-[#D8B995] cursor-pointer shadow-lg"
-                >
-                  <div className="flex justify-center py-2">
-                    {/* Oblò Vetrina con vignettatura e alone cromatico */}
-                    <div className="relative">
-                      <div
-                        className="absolute inset-0 rounded-[24px] blur-xl opacity-40 transition-opacity group-hover:opacity-80"
-                        style={{ backgroundColor: aura.primary }}
-                      />
-                      <BottlePedestal src={imgUrl} alt={p.nome} size="md" className="relative z-10" />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-1 text-center">
-                    <p className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider truncate">{p.brand}</p>
-                    <h3 className="font-serif text-lg text-[#F6EFE4] truncate group-hover:text-[#D8B995] transition-colors">
-                      {p.nome}
-                    </h3>
-                    <p className="text-[11px] text-[#B8A9C9]">{p.famiglia_olfattiva}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* SCHEDA DETTAGLIO MODALE (EMOTIONAL & RIFINITA) */}
+{/* SCHEDA DETTAGLIO MODALE (EMOTIONAL & FLUIDA) */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar">
@@ -295,11 +9,11 @@ export default function CollezionePage() {
               <X className="h-4 w-4" />
             </button>
 
-            {/* Focus visivo sul flacone con piedistallo grande e alone */}
+            {/* Focus visivo sul flacone in vetrina */}
             <div className="flex flex-col items-center text-center pt-2">
               <div className="relative mb-4">
                 <div
-                  className="absolute inset-0 rounded-[36px] blur-2xl opacity-50"
+                  className="absolute inset-0 rounded-[36px] blur-2xl opacity-60"
                   style={{ backgroundColor: resolveAura(selectedProfumo.famiglia_olfattiva, selectedProfumo.nome).primary }}
                 />
                 <BottlePedestal src={selectedProfumo.url_foto_vetrina || selectedProfumo.immagine_url} alt={selectedProfumo.nome} size="xl" className="relative z-10" />
@@ -310,7 +24,7 @@ export default function CollezionePage() {
               <p className="text-xs text-[#B8A9C9] mt-1">{selectedProfumo.concentrazione || 'Eau de Parfum'} • {selectedProfumo.famiglia_olfattiva}</p>
             </div>
 
-            {/* Descrizione IA / Poetica */}
+            {/* Descrizione Poetica / IA */}
             {selectedProfumo.descrizione_ai && (
               <div className="rounded-[20px] bg-[#140D1C]/60 p-4 border border-white/10">
                 <p className="font-serif text-sm italic leading-relaxed text-[#F6EFE4]/90 text-center">
@@ -319,22 +33,34 @@ export default function CollezionePage() {
               </div>
             )}
 
-            {/* Piramide Olfattiva / Note */}
+            {/* Flusso Sensoriale a Micro-Badge (Senza etichette rigide o pesanti) */}
             <div className="space-y-3">
-              <h3 className="font-mono text-xs uppercase tracking-widest text-[#D8B995]">Piramide Olfattiva</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                <div className="rounded-[16px] bg-[#140D1C] p-3 border border-white/10">
-                  <span className="block font-mono text-[10px] text-[#D8B995] mb-1">TESTA</span>
-                  <p className="text-[#F6EFE4]">{selectedProfumo.note_testa || 'Non specificate'}</p>
-                </div>
-                <div className="rounded-[16px] bg-[#140D1C] p-3 border border-white/10">
-                  <span className="block font-mono text-[10px] text-[#D8B995] mb-1">CUORE</span>
-                  <p className="text-[#F6EFE4]">{selectedProfumo.note_cuore || 'Non specificate'}</p>
-                </div>
-                <div className="rounded-[16px] bg-[#140D1C] p-3 border border-white/10">
-                  <span className="block font-mono text-[10px] text-[#D8B995] mb-1">FONDO</span>
-                  <p className="text-[#F6EFE4]">{selectedProfumo.note_fondo || 'Non specificate'}</p>
-                </div>
+              <h3 className="font-mono text-[11px] uppercase tracking-widest text-[#D8B995]">Evoluzione Olfattiva</h3>
+              
+              <div className="space-y-2 text-xs">
+                {selectedProfumo.note_testa && (
+                  <div className="flex items-center justify-between rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
+                    <span className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider">✦ L&apos;Impatto</span>
+                    <span className="text-right text-[#F6EFE4] font-medium">{selectedProfumo.note_testa}</span>
+                  </div>
+                )}
+                {selectedProfumo.note_cuore && (
+                  <div className="flex items-center justify-between rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
+                    <span className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider">◆ L&apos;Anima</span>
+                    <span className="text-right text-[#F6EFE4] font-medium">{selectedProfumo.note_cuore}</span>
+                  </div>
+                )}
+                {selectedProfumo.note_fondo && (
+                  <div className="flex items-center justify-between rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
+                    <span className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider">● La Scia</span>
+                    <span className="text-right text-[#F6EFE4] font-medium">{selectedProfumo.note_fondo}</span>
+                  </div>
+                )}
+                {!selectedProfumo.note_testa && !selectedProfumo.note_cuore && !selectedProfumo.note_fondo && selectedProfumo.note_olfattive && (
+                  <div className="rounded-[16px] bg-[#140D1C] p-4 border border-white/10 text-center text-[#F6EFE4]">
+                    {selectedProfumo.note_olfattive}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -358,30 +84,3 @@ export default function CollezionePage() {
           </div>
         </div>
       )}
-
-      {/* MODALE CONFERMA ELIMINAZIONE */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/90 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#1E1428] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
-            <h3 className="font-serif text-xl text-[#F6EFE4]">Eliminare questo flacone?</h3>
-            <p className="text-xs text-[#B8A9C9]">Il profumo verrà rimosso definitivamente dalla tua collezione.</p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirmId)}
-                className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-red-500"
-              >
-                Conferma Eliminazione
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
