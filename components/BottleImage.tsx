@@ -1,95 +1,73 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { FlaskConical } from 'lucide-react';
 
-export function SmartBottleImage({
-  src,
-  alt,
-  className = 'w-full h-full object-contain',
-  iconSize = 'w-6 h-6',
-  blend = false,
-}: {
+interface BottlePedestalProps {
   src?: string | null;
-  alt: string;
-  className?: string;
-  iconSize?: string;
-  blend?: boolean;
-}) {
-  const cleanSrc = (src || '').trim();
-  const [stage, setStage] = useState<'direct' | 'proxy' | 'failed'>('direct');
-
-  useEffect(() => {
-    setStage('direct');
-  }, [cleanSrc]);
-
-  if (!cleanSrc || stage === 'failed') {
-    const placeholderColor = blend ? 'text-[#3A2A5E]' : 'text-[#D8B995]/75';
-    return (
-      <div className={`flex h-full w-full items-center justify-center ${placeholderColor}`}>
-        <FlaskConical className={`${iconSize} stroke-[1.4]`} />
-      </div>
-    );
-  }
-
-  const finalSrc =
-    stage === 'direct'
-      ? cleanSrc
-      : `https://wsrv.nl/?url=${encodeURIComponent(cleanSrc)}&output=webp`;
-
-  const imgClass = blend ? `${className} mix-blend-multiply` : className;
-
-  return (
-    <img
-      src={finalSrc}
-      alt={alt}
-      referrerPolicy="no-referrer"
-      loading="lazy"
-      decoding="async"
-      className={imgClass}
-      onError={() => {
-        if (stage === 'direct') setStage('proxy');
-        else setStage('failed');
-      }}
-    />
-  );
-}
-
-export function BottlePedestal({
-  src,
-  alt,
-  size = 'lg',
-  className = '',
-}: {
-  src?: string | null;
-  alt: string;
+  alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-}) {
+}
+
+export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '' }: BottlePedestalProps) {
   const sizeClasses = {
-    sm: 'w-14 h-14 rounded-[16px] p-2',
-    md: 'w-24 h-24 rounded-[22px] p-3',
-    lg: 'w-48 h-56 rounded-[36px] p-5',
-    xl: 'w-60 h-72 rounded-[44px] p-6',
+    sm: 'h-14 w-14 rounded-[16px]',
+    md: 'h-24 w-24 rounded-[22px]',
+    lg: 'h-40 w-32 rounded-[28px]',
+    xl: 'h-64 w-52 rounded-[36px]',
   }[size];
 
-  const iconDimension = size === 'sm' ? 'w-5 h-5' : 'w-10 h-10';
+  const iconSizes = {
+    sm: 'h-6 w-6',
+    md: 'h-8 w-8',
+    lg: 'h-12 w-12',
+    xl: 'h-16 w-16',
+  }[size];
 
   return (
     <div
-      className={`relative aspect-[5/6] flex items-center justify-center overflow-hidden select-none pedestal-surface ${sizeClasses} ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden border border-[#D8B995]/20 bg-gradient-to-b from-[#1E1428] to-[#120A1A] shadow-[inset_0_2px_12px_rgba(0,0,0,0.6)] ${sizeClasses} ${className}`}
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-4 bottom-2 h-4 rounded-full bg-black/15 blur-md"
-      />
-      <SmartBottleImage
-        src={src}
-        alt={alt}
-        blend={true}
-        iconSize={iconDimension}
-        className="relative z-10 h-full w-full object-contain transition-transform duration-500"
-      />
+      {/* Alone luminoso di profondità */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.08)_0%,transparent_70%)] pointer-events-none" />
+
+      {src ? (
+        <div className="relative z-10 h-full w-full p-2 flex items-center justify-center">
+          {/* Immagine originale preservata al 100% nella compressione, con vignettatura morbida per azzerare lo stacco dello sfondo */}
+          <img
+            src={src}
+            alt={alt}
+            className="max-h-full max-w-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)] transition-transform duration-500 hover:scale-105"
+            style={{
+              maskImage: 'radial-gradient(circle at center, black 65%, transparent 100%)',
+              WebkitMaskImage: 'radial-gradient(circle at center, black 65%, transparent 100%)',
+            }}
+          />
+        </div>
+      ) : (
+        <FlaskConical className={`${iconSizes} text-[#D8B995]/60 transition-transform duration-500 hover:scale-110`} />
+      )}
+    </div>
+  );
+}
+
+export function SmartBottleImage({ src, alt = 'Profumo', className = '' }: { src?: string | null; alt?: string; className?: string }) {
+  return (
+    <div className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#140D1C]/80 p-1 border border-white/10 ${className}`}>
+      {src ? (
+        <img
+          src={src}
+          alt={alt}
+          className="h-full w-full object-contain drop-shadow-md"
+          style={{
+            maskImage: 'radial-gradient(circle at center, black 70%, transparent 100%)',
+            WebkitMaskImage: 'radial-gradient(circle at center, black 70%, transparent 100%)',
+          }}
+        />
+      ) : (
+        <FlaskConical className="h-5 w-5 text-[#D8B995]/60" />
+      )}
     </div>
   );
 }
