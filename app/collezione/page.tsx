@@ -1,4 +1,128 @@
-const filteredProfumi = useMemo(() => {
+'use client';
+
+import React, { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Trash2, UserCheck, Calendar, Edit3, Check, Sun, Leaf, Snowflake, Flower2 } from 'lucide-react';
+import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
+import { Logo } from '@/components/Logo';
+import { BottlePedestal } from '@/components/BottleImage';
+import { resolveAura } from '@/components/AuraProvider';
+import { useToast } from '@/components/Toast';
+
+const PURE_FAMILIES = [
+  'Agrumata', 'Aromatica', 'Marina', 'Floreale', 'Fruttata',
+  'Verde', 'Speziata', 'Legnosa', 'Ambrata', 'Gourmand', 'Cuoiata', 'Muschiata'
+];
+
+function formatPerfumeNote(text?: string | null): string {
+  if (!text) return 'Non specificate';
+  
+  const translations: Record<string, string> = {
+    'bergamot': 'Bergamotto',
+    'lemon': 'Limone',
+    'mandarin': 'Mandarino',
+    'orange': 'Arancia',
+    'grapefruit': 'Pompelmo',
+    'neroli': 'Neroli',
+    'petitgrain': 'Petitgrain',
+    'rose': 'Rosa',
+    'jasmine': 'Gelsomino',
+    'white musk': 'Muschio Bianco',
+    'musk': 'Muschio',
+    'vanilla': 'Vaniglia',
+    'sandalwood': 'Sandalo',
+    'cedar': 'Cedro',
+    'amber': 'Ambra',
+    'ambergris': 'Ambra Grigia',
+    'patchouli': 'Patchouli',
+    'vetiver': 'Vetiver',
+    'leather': 'Cuoio',
+    'oud': 'Oud (Legno di Agar)',
+    'incense': 'Incenso',
+    'pepper': 'Pepe',
+    'pink pepper': 'Pepe Rosa',
+    'cardamom': 'Cardamomo',
+    'cinnamon': 'Cannella',
+    'iris': 'Iris',
+    'lavender': 'Lavanda',
+    'geranium': 'Geranio',
+    'tobacco': 'Tabacco',
+    'coffee': 'Caffè',
+    'cacao': 'Cacao',
+    'tonka bean': 'Fava Tonka'
+  };
+
+  let formatted = text.toLowerCase();
+  for (const [en, it] of Object.entries(translations)) {
+    const regex = new RegExp(`\\b${en}\\b`, 'gi');
+    formatted = formatted.replace(regex, it);
+  }
+
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+function getSeasonsForFamily(famiglia?: string | null) {
+  if (!famiglia) return { primavera: true, estate: true, autunno: true, inverno: true };
+  const f = famiglia.toLowerCase();
+
+  if (f.includes('agrumata') || f.includes('marina') || f.includes('verde')) {
+    return { primavera: true, estate: true, autunno: false, inverno: false };
+  }
+  if (f.includes('ambrata') || f.includes('gourmand') || f.includes('cuoiata') || f.includes('speziata')) {
+    return { primavera: false, estate: false, autunno: true, inverno: true };
+  }
+  return { primavera: true, estate: true, autunno: true, inverno: true };
+}
+
+export default function CollezionePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const vistaParam = searchParams.get('vista');
+
+  const [activeTab, setActiveTab] = useState<'collezione' | 'radar'>(vistaParam === 'radar' ? 'radar' : 'collezione');
+  const [profumi, setProfumi] = useState<Profumo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFamily, setSelectedFamily] = useState<string>('Tutte');
+  const [selectedBrand, setSelectedBrand] = useState<string>('Tutti');
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+  const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<any>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    setActiveTab(vistaParam === 'radar' ? 'radar' : 'collezione');
+  }, [vistaParam]);
+
+  useEffect(() => {
+    fetchProfumi();
+  }, []);
+
+  async function fetchProfumi() {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('profumi').select('*').order('nome', { ascending: true });
+      if (error) throw error;
+      setProfumi(data || []);
+    } catch (err: any) {
+      showToast('Impossibile caricare i profumi.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const brands = useMemo(() => {
+    const set = new Set(profumi.map((p) => p.brand).filter(Boolean));
+    return ['Tutti', ...Array.from(set)];
+  }, [profumi]);
+
+  const filteredProfumi = useMemo(() => {
     return profumi.filter((p) => {
       const matchTab = activeTab === 'radar' ? isRadarProfumo(p) : isCollezioneProfumo(p);
       if (!matchTab) return false;
@@ -184,7 +308,7 @@ const filteredProfumi = useMemo(() => {
         </section>
       )}
 
-      {/* GRIGLIA FLACONI CON FILIGRANA DEL LOGO IN BASSO A DESTRA */}
+      {/* GRIGLIA FLACONI */}
       <section className="mt-8">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
