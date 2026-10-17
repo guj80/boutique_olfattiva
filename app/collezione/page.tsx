@@ -3,10 +3,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, SlidersHorizontal, Plus, Compass, Library, X, Trash2 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
-import { BottlePedestal, SmartBottleImage } from '@/components/BottleImage';
+import { BottlePedestal } from '@/components/BottleImage';
 import { resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 
@@ -95,7 +95,8 @@ export default function CollezionePage() {
   const activeFiltersCount = (selectedFamily !== 'Tutte' ? 1 : 0) + (selectedBrand !== 'Tutti' ? 1 : 0);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-28">
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-28">
+      {/* HEADER E SELETTORE DELLE DUE VISTE (SCAFFALE / RADAR) */}
       <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
         <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
           <Link
@@ -106,48 +107,42 @@ export default function CollezionePage() {
             <ArrowLeft className="h-5 w-5 text-[#D8B995]" />
           </Link>
           <Logo className="h-7" />
-          <div className="flex sm:hidden rounded-full bg-[#140D1C] p-1 border border-white/10">
-            <button
-              onClick={() => { setActiveTab('collezione'); router.push('/collezione'); }}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeTab === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
-            >
-              Scaffale
-            </button>
-            <button
-              onClick={() => { setActiveTab('radar'); router.push('/collezione?vista=radar'); }}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeTab === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
-            >
-              Radar
-            </button>
-          </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-          <div className="hidden sm:flex rounded-full bg-[#140D1C] p-1 border border-white/10">
+        {/* Selettore Vista in evidenza */}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex rounded-full bg-[#140D1C] p-1 border border-white/10">
             <button
               onClick={() => { setActiveTab('collezione'); router.push('/collezione'); }}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${activeTab === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
+                activeTab === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+              }`}
             >
-              Scaffale
+              <Library className="h-3.5 w-3.5" />
+              <span>Scaffale ({profumi.filter(isCollezioneProfumo).length})</span>
             </button>
             <button
               onClick={() => { setActiveTab('radar'); router.push('/collezione?vista=radar'); }}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${activeTab === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'}`}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
+                activeTab === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+              }`}
             >
-              Radar (Decant)
+              <Compass className="h-3.5 w-3.5" />
+              <span>Radar ({profumi.filter(isRadarProfumo).length})</span>
             </button>
           </div>
 
           <Link
             href="/scanner"
-            className="flex items-center gap-2 rounded-full bg-[#D8B995] px-5 py-2.5 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e]"
+            className="flex items-center gap-2 rounded-full bg-[#D8B995] px-4 py-2 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e]"
           >
             <Plus className="h-4 w-4" />
-            <span>Aggiungi</span>
+            <span className="hidden sm:inline">Aggiungi</span>
           </Link>
         </div>
       </header>
 
+      {/* BARRA DI RICERCA E FILTRI */}
       <section className="mt-6 flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]" />
@@ -177,6 +172,7 @@ export default function CollezionePage() {
         </button>
       </section>
 
+      {/* CASSETTO FILTRI A SCOMPARSA */}
       {filterDrawerOpen && (
         <section className="mt-3 rounded-[24px] border border-[#D8B995]/30 bg-[#1E1428] p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 shadow-xl">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -226,11 +222,12 @@ export default function CollezionePage() {
         </section>
       )}
 
+      {/* GRIGLIA FLACONI ESPANSI CON NOMI A CAPO */}
       <section className="mt-8">
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-64 rounded-[28px] aura-skeleton" />
+              <div key={n} className="h-80 rounded-[30px] aura-skeleton" />
             ))}
           </div>
         ) : filteredProfumi.length === 0 ? (
@@ -240,7 +237,7 @@ export default function CollezionePage() {
             <p className="text-xs text-[#B8A9C9]">Prova a modificare i filtri o aggiungi un nuovo flacone.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
             {filteredProfumi.map((p) => {
               const aura = resolveAura(p.famiglia_olfattiva, p.nome);
               const imgUrl = p.url_foto_vetrina || p.immagine_url;
@@ -249,25 +246,26 @@ export default function CollezionePage() {
                 <div
                   key={p.id}
                   onClick={() => setSelectedProfumo(p)}
-                  style={{ borderColor: `${aura.primary}33` }}
-                  className="group relative flex flex-col justify-between rounded-[28px] border bg-[#1E1428]/90 p-4 transition-all duration-300 hover:scale-[1.02] hover:border-[#D8B995] cursor-pointer shadow-lg"
+                  style={{ borderColor: `${aura.primary}44` }}
+                  className="group relative flex flex-col justify-between rounded-[30px] border bg-[#1E1428]/95 p-5 transition-all duration-300 hover:scale-[1.02] hover:border-[#D8B995] cursor-pointer shadow-xl"
                 >
                   <div className="flex justify-center py-2">
-                    <div className="relative">
+                    <div className="relative w-full">
                       <div
-                        className="absolute inset-0 rounded-[24px] blur-xl opacity-40 transition-opacity group-hover:opacity-80"
+                        className="absolute inset-0 rounded-[26px] blur-2xl opacity-40 transition-opacity group-hover:opacity-80"
                         style={{ backgroundColor: aura.primary }}
                       />
-                      <BottlePedestal src={imgUrl} alt={p.nome} size="md" className="relative z-10" />
+                      {/* Podio ingrandito ed espanso */}
+                      <BottlePedestal src={imgUrl} alt={p.nome} size="lg" className="relative z-10 !h-52 w-full" />
                     </div>
                   </div>
 
                   <div className="mt-4 space-y-1 text-center">
                     <p className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider truncate">{p.brand}</p>
-                    <h3 className="font-serif text-lg text-[#F6EFE4] truncate group-hover:text-[#D8B995] transition-colors">
+                    <h3 className="font-serif text-[17px] leading-tight text-[#F6EFE4] group-hover:text-[#D8B995] transition-colors line-clamp-2">
                       {p.nome}
                     </h3>
-                    <p className="text-[11px] text-[#B8A9C9]">{p.famiglia_olfattiva}</p>
+                    <p className="text-[11px] text-[#B8A9C9] pt-0.5">{p.famiglia_olfattiva}</p>
                   </div>
                 </div>
               );
@@ -276,6 +274,7 @@ export default function CollezionePage() {
         )}
       </section>
 
+      {/* SCHEDA DETTAGLIO MODALE (CON ETICHETTE ORIGINALI: TESTA, CUORE, FONDO) */}
       {selectedProfumo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-[32px] border border-[#D8B995]/40 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar">
@@ -309,25 +308,25 @@ export default function CollezionePage() {
             )}
 
             <div className="space-y-3">
-              <h3 className="font-mono text-[11px] uppercase tracking-widest text-[#D8B995]">Evoluzione Olfattiva</h3>
+              <h3 className="font-mono text-[11px] uppercase tracking-widest text-[#D8B995]">Piramide Olfattiva</h3>
               
               <div className="space-y-2 text-xs">
                 {selectedProfumo.note_testa && (
-                  <div className="flex items-center justify-between rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
-                    <span className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider">✦ L&apos;Impatto</span>
-                    <span className="text-right text-[#F6EFE4] font-medium">{selectedProfumo.note_testa}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
+                    <span className="font-mono text-[11px] text-[#D8B995] uppercase tracking-wider font-bold">Note di Testa</span>
+                    <span className="text-left sm:text-right text-[#F6EFE4]">{selectedProfumo.note_testa}</span>
                   </div>
                 )}
                 {selectedProfumo.note_cuore && (
-                  <div className="flex items-center justify-between rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
-                    <span className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider">◆ L&apos;Anima</span>
-                    <span className="text-right text-[#F6EFE4] font-medium">{selectedProfumo.note_cuore}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
+                    <span className="font-mono text-[11px] text-[#D8B995] uppercase tracking-wider font-bold">Note di Cuore</span>
+                    <span className="text-left sm:text-right text-[#F6EFE4]">{selectedProfumo.note_cuore}</span>
                   </div>
                 )}
                 {selectedProfumo.note_fondo && (
-                  <div className="flex items-center justify-between rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
-                    <span className="font-mono text-[10px] text-[#D8B995] uppercase tracking-wider">● La Scia</span>
-                    <span className="text-right text-[#F6EFE4] font-medium">{selectedProfumo.note_fondo}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-3 border border-white/10">
+                    <span className="font-mono text-[11px] text-[#D8B995] uppercase tracking-wider font-bold">Note di Fondo</span>
+                    <span className="text-left sm:text-right text-[#F6EFE4]">{selectedProfumo.note_fondo}</span>
                   </div>
                 )}
                 {!selectedProfumo.note_testa && !selectedProfumo.note_cuore && !selectedProfumo.note_fondo && selectedProfumo.note_olfattive && (
