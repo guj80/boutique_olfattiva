@@ -10,9 +10,9 @@ import { SmartBottleImage } from '@/components/BottleImage';
 import { useToast } from '@/components/Toast';
 
 export default function DiarioPage() {
-  const [indossi, setIndossi] = useState([]);
+  const [indossi, setIndossi] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteId, setDeleteId] = useState(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -35,15 +35,15 @@ export default function DiarioPage() {
 
       if (errProfumi) throw errProfumi;
 
-      const profumiMap = new Map((profumiData || []).map((p) => [p.id, p]));
+      const profumiMap = new Map((profumiData || []).map((p: any) => [p.id, p]));
 
-      const enriched = (indossiData || []).map((item) => ({
+      const enriched = (indossiData || []).map((item: any) => ({
         ...item,
         profumi: profumiMap.get(item.profumo_id) || null,
       }));
 
       setIndossi(enriched);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Errore caricamento diario:', err);
       showToast('Impossibile caricare il diario.', 'error');
     } finally {
@@ -51,14 +51,14 @@ export default function DiarioPage() {
     }
   }
 
-  async function handleDeleteIndosso(id) {
+  async function handleDeleteIndosso(id: string) {
     try {
       const { error } = await supabase.from('indossi').delete().eq('id', id);
       if (error) throw error;
       setIndossi((prev) => prev.filter((item) => item.id !== id));
       setDeleteId(null);
       showToast('Indosso eliminato dal diario.');
-    } catch (err) {
+    } catch (err: any) {
       showToast(err?.message || "Errore durante l'eliminazione.", 'error');
     }
   }
@@ -66,8 +66,8 @@ export default function DiarioPage() {
   const stats = useMemo(() => {
     if (indossi.length === 0) return { topProfumo: '-', topMomento: '-' };
 
-    const profumiCount = {};
-    const momentiCount = {};
+    const profumiCount: Record<string, number> = {};
+    const momentiCount: Record<string, number> = {};
 
     indossi.forEach((item) => {
       const pName = item.profumi?.nome || 'Sconosciuto';
@@ -102,7 +102,6 @@ export default function DiarioPage() {
         </div>
       </header>
 
-      {/* STATISTICHE SEMPLICI */}
       <section className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="rounded-[22px] border border-white/10 bg-[#1E1428]/90 p-5">
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">Flacone più indossato</p>
@@ -114,7 +113,6 @@ export default function DiarioPage() {
         </div>
       </section>
 
-      {/* STRISCIA MENSILE / ULTIMI INDOSSI */}
       <section className="mt-6 rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-5 sm:p-6 space-y-4">
         <h2 className="text-sm font-semibold text-[#F6EFE4]">Striscia temporale recente</h2>
         <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
@@ -135,7 +133,6 @@ export default function DiarioPage() {
         </div>
       </section>
 
-      {/* TIMELINE VERTICALE */}
       <section className="mt-6 space-y-3">
         <h2 className="text-sm font-semibold text-[#F6EFE4] px-1">Timeline Storica</h2>
 
@@ -199,7 +196,6 @@ export default function DiarioPage() {
         )}
       </section>
 
-      {/* MODALE CONFERMA ELIMINAZIONE INDOSSO */}
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/80 backdrop-blur-md">
           <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#1E1428] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
