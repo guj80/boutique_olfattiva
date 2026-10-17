@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Sparkles,
@@ -17,7 +18,6 @@ import {
   X,
   LayoutGrid,
   List,
-  FlaskConical,
   Globe,
   Droplets,
   Check,
@@ -35,6 +35,10 @@ import {
   getUnifiedNotes,
   parsePrezzoEuro,
 } from '@/lib/supabase';
+import { useAura, resolveAura } from '@/components/AuraProvider';
+import { BottlePedestal, SmartBottleImage } from '@/components/BottleImage';
+import { useToast } from '@/components/Toast';
+import { springSoft, springSnappy } from '@/lib/motion';
 
 const PURE_FAMILIES = [
   'Agrumata',
@@ -127,8 +131,8 @@ function normalizeBrandName(raw?: string | null): string {
     'christian dior': 'Dior',
     'guerlain': 'Guerlain',
     'hermes': 'Hermès',
-    'penhaligon\'s': 'Penhaligon\'s',
-    'penhaligons': 'Penhaligon\'s',
+    "penhaligon's": "Penhaligon's",
+    'penhaligons': "Penhaligon's",
     'nishane': 'Nishane',
     'bdk': 'BDK Parfums',
     'bdk parfums': 'BDK Parfums',
@@ -181,7 +185,7 @@ function canonicalizeNote(rawNote: string): string | null {
   if (s.includes('lavender') || s.includes('lavand')) return 'Lavanda';
   if (s.includes('iris') || s.includes('orris') || s.includes('giaggiolo')) return 'Iris';
   if (s.includes('violet') || s.includes('violett')) return 'Violetta';
-  if (s.includes('orange blossom') || (s.includes('arancio') && s.includes('fior'))) return 'Fiori d\'Arancio';
+  if (s.includes('orange blossom') || (s.includes('arancio') && s.includes('fior'))) return "Fiori d'Arancio";
   if (s.includes('neroli')) return 'Neroli';
   if (s.includes('petitgrain')) return 'Petitgrain';
   if (s.includes('lemon') || s.includes('limon')) return 'Limone';
@@ -264,53 +268,6 @@ function extractCanonicalNotesForPerfume(p: Profumo): string[] {
   return Array.from(set);
 }
 
-function SmartBottleImage({
-  src,
-  alt,
-  className,
-  iconSize = 'w-10 h-10',
-}: {
-  src?: string | null;
-  alt: string;
-  className?: string;
-  iconSize?: string;
-}) {
-  const cleanSrc = (src || '').trim();
-  const [stage, setStage] = useState<'direct' | 'proxy' | 'failed'>('direct');
-
-  useEffect(() => {
-    setStage('direct');
-  }, [cleanSrc]);
-
-  if (!cleanSrc || stage === 'failed') {
-    return (
-      <div className="flex flex-col items-center justify-center text-zinc-600 group-hover:text-[#C5A059] transition duration-300">
-        <FlaskConical className={`${iconSize} stroke-[1.2]`} />
-      </div>
-    );
-  }
-
-  const finalSrc =
-    stage === 'direct'
-      ? cleanSrc
-      : `https://wsrv.nl/?url=${encodeURIComponent(cleanSrc)}&output=webp`;
-
-  return (
-    <img
-      src={finalSrc}
-      alt={alt}
-      referrerPolicy="no-referrer"
-      loading="lazy"
-      decoding="async"
-      className={className}
-      onError={() => {
-        if (stage === 'direct') setStage('proxy');
-        else setStage('failed');
-      }}
-    />
-  );
-}
-
 function CollezioneContent() {
   const searchParams = useSearchParams();
   const initialVista = searchParams.get('vista') === 'radar' ? 'radar' : 'collezione';
@@ -354,7 +311,9 @@ function CollezioneContent() {
   const [savingWear, setSavingWear] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<Profumo | null>(null);
-  const [statusBanner, setStatusBanner] = useState<string | null>(null);
+
+  const { showToast } = useToast();
+  const { setAuraFromProfumo } = useAura();
 
   useEffect(() => {
     const savedLayout = localStorage.getItem('boutique_layout_mode');
@@ -387,9 +346,14 @@ function CollezioneContent() {
         .order('nome', { ascending: true });
 
       if (error) throw error;
-      setProfumi((data || []) as Profumo[]);
+      const list = (data || []) as Profumo[];
+      setProfumi(list);
+      if (list.length > 0) {
+        setAuraFromProfumo(list[0]);
+      }
     } catch (err) {
       console.error('Errore caricamento collezione:', err);
+      showToast('Impossibile caricare i profumi.', 'error');
     } finally {
       setLoading(false);
     }
@@ -410,15 +374,11 @@ function CollezioneContent() {
       const rawBrand = p.brand || '';
       const cleanBrand = normalizeBrandName(rawBrand);
       brandSet.add(cleanBrand);
-      if (rawBrand !== cleanBrand) {
-        needsCleanup = true;
-      }
+      if (rawBrand !== cleanBrand) needsCleanup = true;
 
       const rawFam = (p.famiglia_olfattiva || '').trim();
       const pure = normalizeToPureFamily(rawFam);
-      if (rawFam && !(PURE_FAMILIES as readonly string[]).includes(rawFam)) {
-        needsCleanup = true;
-      }
+      if (rawFam && !(PURE_FAMILIES as readonly string[]).includes(rawFam)) needsCleanup = true;
       familyCounts[pure] = (familyCounts[pure] || 0) + 1;
 
       const cNotes = extractCanonicalNotesForPerfume(p);
@@ -482,10 +442,9 @@ function CollezioneContent() {
 
       const updatedList = await Promise.all(updates);
       setProfumi(updatedList);
-      setStatusBanner('Database allineato: Marchi, Nomi e 12 Famiglie Olfattive ripuliti.');
-      setTimeout(() => setStatusBanner(null), 3500);
+      showToast('Database allineato con successo.');
     } catch (err: any) {
-      alert(err?.message || 'Errore normalizzazione database.');
+      showToast(err?.message || 'Errore normalizzazione database.', 'error');
     } finally {
       setNormalizingDb(false);
     }
@@ -611,8 +570,9 @@ function CollezioneContent() {
       setAiAdvice(data.sommelierAdvice || null);
       setAiRecommendedIds(data.recommendedIds || []);
       setAiMotivazioni(data.motivazioniPerProfumo || {});
+      showToast('Il sommelier IA ha selezionato i flaconi.');
     } catch (err: any) {
-      alert(err?.message || 'Errore durante la consultazione IA.');
+      showToast(err?.message || 'Errore durante la consultazione IA.', 'error');
     } finally {
       setAiLoading(false);
     }
@@ -679,10 +639,9 @@ function CollezioneContent() {
       setProfumi((prev) =>
         prev.map((item) => (item.id === p.id ? { ...item, ...updatePayload } : item))
       );
-      setStatusBanner(`Aggiornato: ${updatePayload.brand} - ${updatePayload.nome}`);
-      setTimeout(() => setStatusBanner(null), 3500);
+      showToast(`Aggiornato con IA: ${cleanBrand} - ${updatePayload.nome}`);
     } catch (err: any) {
-      alert(err?.message || 'Errore verifica IA.');
+      showToast(err?.message || 'Errore verifica IA.', 'error');
     } finally {
       setEnrichingId(null);
     }
@@ -730,8 +689,9 @@ function CollezioneContent() {
         voto_complessita: aiData.voto_complessita ?? selectedProfumo.voto_complessita,
       });
       setOfficialUrlInput('');
+      showToast('Dati estratti con successo.');
     } catch (err: any) {
-      alert(err?.message || 'Impossibile estrarre i dati.');
+      showToast(err?.message || 'Impossibile estrarre i dati.', 'error');
     } finally {
       setModalExtracting(false);
     }
@@ -786,10 +746,9 @@ function CollezioneContent() {
         )
       );
       setSelectedProfumo(null);
-      setStatusBanner(`Salvato: ${payload.brand} - ${payload.nome}`);
-      setTimeout(() => setStatusBanner(null), 3000);
+      showToast(`Modifiche salvate per ${cleanBrand} - ${cleanNome}`);
     } catch (err: any) {
-      alert(`Errore salvataggio: ${err?.message}`);
+      showToast(`Errore salvataggio: ${err?.message}`, 'error');
     } finally {
       setSavingDetail(false);
     }
@@ -809,10 +768,9 @@ function CollezioneContent() {
       );
       setSelectedProfumo(null);
       setVista('collezione');
-      setStatusBanner(`${p.nome} spostato in Collezione.`);
-      setTimeout(() => setStatusBanner(null), 3500);
+      showToast(`${p.nome} spostato in Collezione.`);
     } catch (err: any) {
-      alert(err?.message || 'Errore spostamento.');
+      showToast(err?.message || 'Errore spostamento.', 'error');
     }
   }
 
@@ -833,12 +791,12 @@ function CollezioneContent() {
 
       if (error) throw error;
 
-      setStatusBanner(`Indosso registrato: ${wearProfumo.nome}`);
+      setAuraFromProfumo(wearProfumo);
+      showToast(`Oggi indossi ${wearProfumo.nome}.`);
       setWearProfumo(null);
       setNoteGiorno('');
-      setTimeout(() => setStatusBanner(null), 3000);
     } catch (err: any) {
-      alert(`Errore registrazione: ${err?.message}`);
+      showToast(`Errore registrazione: ${err?.message}`, 'error');
     } finally {
       setSavingWear(false);
     }
@@ -857,10 +815,9 @@ function CollezioneContent() {
         setSelectedProfumo(null);
       }
       setDeleteTarget(null);
-      setStatusBanner(`Eliminato con successo.`);
-      setTimeout(() => setStatusBanner(null), 3000);
+      showToast('Profumo eliminato dall’archivio.');
     } catch (err: any) {
-      alert(err?.message || 'Errore eliminazione.');
+      showToast(err?.message || 'Errore eliminazione.', 'error');
     }
   }
 
@@ -880,41 +837,30 @@ function CollezioneContent() {
     Boolean(searchQuery.trim());
 
   return (
-    <main className="min-h-screen px-4 sm:px-8 lg:px-12 py-8 max-w-7xl mx-auto w-full">
-      {/* HEADER CON MEDAGLIONE LOGO E CONTROLLI */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-6 border-b border-[#F7E7CE]/15 animate-fade-in">
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-28">
+      {/* HEADER DELLA COLLEZIONE */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 pb-6 border-b border-[#D8B995]/20">
         <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="p-2.5 rounded-xl boutique-glass text-[#F7E7CE] border border-[#C5A059]/30 hover:border-[#F7E7CE] hover:scale-105 active:scale-95 transition-all duration-200"
-            title="Home"
+            aria-label="Torna alla home"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D8B995]/30 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-[#D8B995]"
           >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-
-          <Link
-            href="/"
-            className="w-12 h-12 rounded-xl bg-[#0B0A09] border border-[#C5A059]/60 p-1 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(197,160,89,0.2)] hover:scale-105 transition"
-          >
-            <img
-              src="/logo.jpg"
-              alt="Boutique Olfattiva"
-              className="w-full h-full object-contain rounded-lg"
-            />
+            <ArrowLeft className="h-5 w-5 text-[#D8B995]" />
           </Link>
 
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#C5A059]">
-              Boutique Olfattiva
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#D8B995]">
+              Private Vault &amp; Atelier
             </p>
-            <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="font-serif text-2xl sm:text-3xl text-white">
+            <div className="flex flex-wrap items-baseline gap-3 mt-0.5">
+              <h1 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4]">
                 {vista === 'collezione'
                   ? `Collezione Privata (${collezioneList.length})`
-                  : `Radar - Testing (${radarList.length})`}
+                  : `Radar Testing (${radarList.length})`}
               </h1>
               {vista === 'collezione' && archiveStats.totalEuro > 0 && (
-                <span className="font-mono text-xs text-[#C5A059]">
+                <span className="font-mono text-xs text-[#B8A9C9]">
                   Valore stimato: €{archiveStats.totalEuro.toLocaleString('it-IT')}
                 </span>
               )}
@@ -922,49 +868,51 @@ function CollezioneContent() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-white/10">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Layout Mode Toggle */}
+          <div className="flex rounded-full bg-[#1E1428] border border-white/10 p-1">
             <button
               type="button"
               onClick={() => changeLayoutMode('dettagli')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
                 layoutMode === 'dettagli'
-                  ? 'bg-[#C5A059]/20 text-[#F7E7CE] border border-[#C5A059]/40 font-semibold'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-[#281B35] text-[#F6EFE4] border border-[#D8B995]/40'
+                  : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
               }`}
             >
-              <List className="w-3.5 h-3.5" />
+              <List className="h-3.5 w-3.5 text-[#D8B995]" />
               <span>Dettagli</span>
             </button>
             <button
               type="button"
               onClick={() => changeLayoutMode('vetrina')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
                 layoutMode === 'vetrina'
-                  ? 'bg-[#C5A059]/20 text-[#F7E7CE] border border-[#C5A059]/40 font-semibold'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-[#281B35] text-[#F6EFE4] border border-[#D8B995]/40'
+                  : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="h-3.5 w-3.5 text-[#D8B995]" />
               <span>Vetrina</span>
             </button>
           </div>
 
-          <div className="inline-flex p-1 rounded-xl bg-[#0D0D11] border border-white/10">
+          {/* Vista Collezione / Radar */}
+          <div className="flex rounded-full bg-[#1E1428] border border-white/10 p-1">
             <button
               type="button"
               onClick={() => {
                 setVista('collezione');
                 resetAllFilters();
               }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                 vista === 'collezione'
-                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-[#D8B995] text-[#140D1C]'
+                  : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Collezione ({collezioneList.length})</span>
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Collezione</span>
             </button>
             <button
               type="button"
@@ -972,41 +920,32 @@ function CollezioneContent() {
                 setVista('radar');
                 resetAllFilters();
               }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-200 ${
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                 vista === 'radar'
-                  ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-[#D8B995] text-[#140D1C]'
+                  : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
               }`}
             >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Testing ({radarList.length})</span>
+              <Compass className="h-3.5 w-3.5" />
+              <span>Radar</span>
             </button>
           </div>
 
           <Link
             href="/scanner"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold text-xs font-mono uppercase tracking-wider shadow-sm hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
+            className="flex items-center gap-1.5 rounded-full bg-[#D8B995] px-4 py-2 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e]"
           >
-            <ScanLine className="w-3.5 h-3.5" />
-            <span>+ Aggiungi</span>
+            <ScanLine className="h-3.5 w-3.5" />
+            <span>Aggiungi</span>
           </Link>
         </div>
       </div>
 
-      {statusBanner && (
-        <div className="mt-5 p-3 rounded-xl bg-[#C5A059]/20 border border-[#F7E7CE]/40 text-[#F7E7CE] flex items-center justify-between text-xs font-mono animate-slide-up">
-          <span>{statusBanner}</span>
-          <button onClick={() => setStatusBanner(null)} className="hover:scale-110 transition-transform">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* CONSOLE DI RICERCA & FILTRI PIEGHEVOLI */}
-      <section className="mt-6 boutique-glass rounded-2xl p-4 sm:p-5 space-y-3.5 animate-fade-in delay-75">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      {/* CONSOLE DI RICERCA E FILTRI PIEGHEVOLI */}
+      <section className="mt-6 rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-5 aura-shadow space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#C5A059] absolute left-4 top-1/2 -translate-y-1/2" />
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#D8B995]" />
             <input
               type="text"
               value={searchQuery}
@@ -1015,64 +954,59 @@ function CollezioneContent() {
                 if (!e.target.value.trim()) resetAiFilter();
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchQuery.split(' ').length >= 3) {
+                if (e.key === 'Enter' && searchQuery.split(' ').length >= 2) {
                   handleAskAiEngine();
                 }
               }}
-              placeholder="Cerca profumo, marchio, nota, naso o chiedi all'IA..."
-              className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-[#08080A] border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C5A059] transition-all"
+              placeholder="Cerca profumo, marchio, nota o chiedi all'IA..."
+              className="w-full rounded-[16px] border border-white/10 bg-[#140D1C] py-3 pl-11 pr-10 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-[#D8B995] focus:outline-none"
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => {
                   setSearchQuery('');
                   resetAiFilter();
                 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#B8A9C9] hover:text-[#F6EFE4]"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
 
           <button
+            type="button"
             onClick={handleAskAiEngine}
             disabled={aiLoading || !searchQuery.trim()}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 shrink-0"
+            className="flex items-center justify-center gap-2 rounded-[16px] bg-[#281B35] border border-[#D8B995]/40 px-5 py-3 text-xs font-semibold text-[#F6EFE4] transition hover:border-[#D8B995] disabled:opacity-40"
           >
             {aiLoading ? (
               <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Elaborazione...</span>
+                <RefreshCw className="h-3.5 w-3.5 animate-spin text-[#D8B995]" />
+                <span>Analisi...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="h-3.5 w-3.5 text-[#D8B995]" />
                 <span>Chiedi all&apos;IA</span>
               </>
             )}
           </button>
         </div>
 
-        {/* BARRA ORDINE ALFABETICO + PULIZIA DB */}
-        <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2 flex-wrap">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#08080A] border border-white/10 text-xs font-mono text-zinc-300">
-            <ArrowDownAZ className="w-3.5 h-3.5 text-[#C5A059]" />
+        {/* ORDINAMENTO E PULIZIA DB */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/10 text-xs">
+          <div className="flex items-center gap-2 rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-[#B8A9C9]">
+            <ArrowDownAZ className="h-4 w-4 text-[#D8B995]" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent text-white font-mono text-[11px] focus:outline-none cursor-pointer"
-              title="Criterio di ordinamento"
+              className="bg-transparent text-[#F6EFE4] focus:outline-none cursor-pointer"
             >
-              <option value="nome_asc" className="bg-[#08080A] text-white">
-                Ordine: Nome Profumo (A → Z)
-              </option>
-              <option value="nome_desc" className="bg-[#08080A] text-white">
-                Ordine: Nome Profumo (Z → A)
-              </option>
-              <option value="brand_asc" className="bg-[#08080A] text-white">
-                Ordine: Marchio (A → Z)
-              </option>
+              <option value="nome_asc" className="bg-[#140D1C]">Ordina per Nome (A → Z)</option>
+              <option value="nome_desc" className="bg-[#140D1C]">Ordina per Nome (Z → A)</option>
+              <option value="brand_asc" className="bg-[#140D1C]">Ordina per Marchio (A → Z)</option>
             </select>
           </div>
 
@@ -1081,75 +1015,53 @@ function CollezioneContent() {
               type="button"
               onClick={handleNormalizeAllDatabase}
               disabled={normalizingDb}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/30 font-mono text-[10px] uppercase hover:bg-[#C5A059]/30 transition-all shrink-0"
+              className="flex items-center gap-1.5 rounded-[14px] border border-[#D8B995]/30 bg-[#281B35] px-3.5 py-2 text-xs font-medium text-[#F6EFE4] transition hover:border-[#D8B995]"
             >
-              {normalizingDb ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
-              ) : (
-                <Check className="w-3 h-3 text-[#C5A059]" />
-              )}
-              <span>Pulisci Marchi &amp; Famiglie nel DB</span>
+              {normalizingDb ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-[#D8B995]" />}
+              <span>Allinea Marchi e Famiglie nel DB</span>
             </button>
           )}
         </div>
 
-        {/* CATEGORIA 1: MARCHIO */}
+        {/* FILTRO MARCHIO */}
         {archiveStats.sortedBrands.length > 0 && (
-          <div className="pt-2.5 border-t border-white/10">
+          <div className="pt-2 border-t border-white/10">
             <button
               type="button"
               onClick={() => setOpenBrandPanel((v) => !v)}
-              className="w-full flex items-center justify-between py-1 text-left group"
+              className="flex w-full items-center justify-between py-1 text-left text-xs font-semibold text-[#D8B995]"
             >
-              <div className="flex items-center gap-2 flex-wrap">
-                <Tag className="w-3.5 h-3.5 text-[#C5A059]" />
-                <span className="font-mono text-[11px] uppercase tracking-wider text-[#C5A059] group-hover:text-white transition">
-                  Marchio
-                </span>
-                {selectedBrand !== 'Tutti' && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/50 font-mono text-[10px] text-[#F7E7CE]">
-                    {selectedBrand}
-                  </span>
-                )}
+              <div className="flex items-center gap-2">
+                <Tag className="h-3.5 w-3.5" />
+                <span>Marchio {selectedBrand !== 'Tutti' && `(${selectedBrand})`}</span>
               </div>
-              <div className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 group-hover:text-white">
-                <span>{openBrandPanel ? 'Comprimi' : 'Espandi'}</span>
-                {openBrandPanel ? (
-                  <ChevronUp className="w-4 h-4 text-[#C5A059]" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-[#C5A059]" />
-                )}
-              </div>
+              {openBrandPanel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
-
             {openBrandPanel && (
-              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap animate-fade-in">
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => setSelectedBrand('Tutti')}
-                  className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
+                  className={`rounded-full px-3 py-1 text-xs transition ${
                     selectedBrand === 'Tutti'
-                      ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
-                      : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
+                      ? 'bg-[#D8B995] text-[#140D1C] font-semibold'
+                      : 'border border-white/10 bg-[#140D1C] text-[#B8A9C9] hover:text-[#F6EFE4]'
                   }`}
                 >
                   Tutti
                 </button>
-
-                {archiveStats.sortedBrands.map((brandName) => (
+                {archiveStats.sortedBrands.map((b) => (
                   <button
-                    key={brandName}
+                    key={b}
                     type="button"
-                    onClick={() =>
-                      setSelectedBrand(selectedBrand === brandName ? 'Tutti' : brandName)
-                    }
-                    className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
-                      selectedBrand === brandName
-                        ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
-                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#C5A059]/40'
+                    onClick={() => setSelectedBrand(selectedBrand === b ? 'Tutti' : b)}
+                    className={`rounded-full px-3 py-1 text-xs transition ${
+                      selectedBrand === b
+                        ? 'bg-[#D8B995] text-[#140D1C] font-semibold'
+                        : 'border border-white/10 bg-[#140D1C] text-[#B8A9C9] hover:border-[#D8B995]/40 hover:text-[#F6EFE4]'
                     }`}
                   >
-                    {brandName}
+                    {b}
                   </button>
                 ))}
               </div>
@@ -1157,60 +1069,42 @@ function CollezioneContent() {
           </div>
         )}
 
-        {/* CATEGORIA 2: FAMIGLIE OLFATTIVE */}
+        {/* FILTRO FAMIGLIE */}
         {archiveStats.sortedPureFamilies.length > 0 && (
-          <div className="pt-2.5 border-t border-white/10">
+          <div className="pt-2 border-t border-white/10">
             <button
               type="button"
               onClick={() => setOpenFamilyPanel((v) => !v)}
-              className="w-full flex items-center justify-between py-1 text-left group"
+              className="flex w-full items-center justify-between py-1 text-left text-xs font-semibold text-[#D8B995]"
             >
-              <div className="flex items-center gap-2 flex-wrap">
-                <Droplets className="w-3.5 h-3.5 text-[#C5A059]" />
-                <span className="font-mono text-[11px] uppercase tracking-wider text-[#C5A059] group-hover:text-white transition">
-                  Famiglie Olfattive
-                </span>
-                {selectedFamily !== 'Tutte' && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#C5A059]/20 border border-[#C5A059]/50 font-mono text-[10px] text-[#F7E7CE]">
-                    {selectedFamily}
-                  </span>
-                )}
+              <div className="flex items-center gap-2">
+                <Droplets className="h-3.5 w-3.5" />
+                <span>Famiglie Olfattive {selectedFamily !== 'Tutte' && `(${selectedFamily})`}</span>
               </div>
-              <div className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 group-hover:text-white">
-                <span>{openFamilyPanel ? 'Comprimi' : 'Espandi'}</span>
-                {openFamilyPanel ? (
-                  <ChevronUp className="w-4 h-4 text-[#C5A059]" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-[#C5A059]" />
-                )}
-              </div>
+              {openFamilyPanel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
-
             {openFamilyPanel && (
-              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap animate-fade-in">
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => setSelectedFamily('Tutte')}
-                  className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
+                  className={`rounded-full px-3 py-1 text-xs transition ${
                     selectedFamily === 'Tutte'
-                      ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
-                      : 'bg-[#08080A] text-zinc-400 border border-white/10 hover:text-white'
+                      ? 'bg-[#D8B995] text-[#140D1C] font-semibold'
+                      : 'border border-white/10 bg-[#140D1C] text-[#B8A9C9] hover:text-[#F6EFE4]'
                   }`}
                 >
                   Tutte ({activeList.length})
                 </button>
-
                 {archiveStats.sortedPureFamilies.map(([fam, count]) => (
                   <button
                     key={fam}
                     type="button"
-                    onClick={() =>
-                      setSelectedFamily(selectedFamily === fam ? 'Tutte' : fam)
-                    }
-                    className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
+                    onClick={() => setSelectedFamily(selectedFamily === fam ? 'Tutte' : fam)}
+                    className={`rounded-full px-3 py-1 text-xs transition ${
                       selectedFamily === fam
-                        ? 'bg-[#C5A059]/25 text-[#F7E7CE] border border-[#C5A059]/60 font-semibold shadow-sm'
-                        : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#C5A059]/40'
+                        ? 'bg-[#D8B995] text-[#140D1C] font-semibold'
+                        : 'border border-white/10 bg-[#140D1C] text-[#B8A9C9] hover:border-[#D8B995]/40 hover:text-[#F6EFE4]'
                     }`}
                   >
                     {fam} ({count})
@@ -1221,79 +1115,41 @@ function CollezioneContent() {
           </div>
         )}
 
-        {/* CATEGORIA 3: NOTE OLFATTIVE (MULTI-SELEZIONE) */}
+        {/* FILTRO NOTE MULTI-SELEZIONE */}
         {archiveStats.sortedNotes.length > 0 && (
-          <div className="pt-2.5 border-t border-white/10">
+          <div className="pt-2 border-t border-white/10">
             <button
               type="button"
               onClick={() => setOpenNotesPanel((v) => !v)}
-              className="w-full flex items-center justify-between py-1 text-left group"
+              className="flex w-full items-center justify-between py-1 text-left text-xs font-semibold text-[#D8B995]"
             >
-              <div className="flex items-center gap-2 flex-wrap">
-                <Filter className="w-3.5 h-3.5 text-[#F7E7CE]" />
-                <span className="font-mono text-[11px] uppercase tracking-wider text-[#F7E7CE] group-hover:text-white transition">
-                  Note Olfattive (Multi-Selezione)
-                </span>
-                {selectedNotes.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#C5A059]/25 border border-[#F7E7CE]/50 font-mono text-[10px] text-[#F7E7CE]">
-                    {selectedNotes.join(' + ')}
-                  </span>
-                )}
+              <div className="flex items-center gap-2">
+                <Filter className="h-3.5 w-3.5" />
+                <span>Note Olfattive (Multi-selezione) {selectedNotes.length > 0 && `(${selectedNotes.length})`}</span>
               </div>
-              <div className="inline-flex items-center gap-1 font-mono text-[10px] text-zinc-400 group-hover:text-white">
-                <span>{openNotesPanel ? 'Comprimi' : 'Espandi'}</span>
-                {openNotesPanel ? (
-                  <ChevronUp className="w-4 h-4 text-[#F7E7CE]" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-[#F7E7CE]" />
-                )}
-              </div>
+              {openNotesPanel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
-
             {openNotesPanel && (
-              <div className="mt-2.5 space-y-2.5 animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={noteFilterSearch}
-                      onChange={(e) => setNoteFilterSearch(e.target.value)}
-                      placeholder="Filtra nota (es. Sandalo, Muschio, Oud)..."
-                      className="px-2.5 py-1 rounded-lg bg-[#08080A] border border-white/10 text-[11px] font-mono text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C5A059] w-full sm:w-64"
-                    />
-                    {selectedNotes.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedNotes([])}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/5 text-zinc-300 hover:text-white font-mono text-[10px] shrink-0"
-                      >
-                        <span>Azzera ({selectedNotes.length})</span>
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-
-                  {archiveStats.sortedNotes.length > 16 && !noteFilterSearch.trim() && (
+              <div className="mt-2.5 space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={noteFilterSearch}
+                    onChange={(e) => setNoteFilterSearch(e.target.value)}
+                    placeholder="Filtra nota (es. Vaniglia, Oud, Rosa)..."
+                    className="flex-1 rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-1.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-[#D8B995] focus:outline-none"
+                  />
+                  {selectedNotes.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setShowAllNotes((v) => !v)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 font-mono text-[10px] uppercase self-start sm:self-auto shrink-0"
+                      onClick={() => setSelectedNotes([])}
+                      className="rounded-[14px] bg-white/5 px-3 py-1.5 text-xs text-[#B8A9C9] hover:text-[#F6EFE4]"
                     >
-                      <span>
-                        {showAllNotes
-                          ? 'Mostra principali (16)'
-                          : `Mostra tutte (${archiveStats.sortedNotes.length})`}
-                      </span>
-                      {showAllNotes ? (
-                        <ChevronUp className="w-3 h-3" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )}
+                      Azzera note
                     </button>
                   )}
                 </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex flex-wrap gap-1.5">
                   {displayedNotes.map(([noteName, count]) => {
                     const isSelected = selectedNotes.includes(noteName);
                     return (
@@ -1301,10 +1157,10 @@ function CollezioneContent() {
                         key={noteName}
                         type="button"
                         onClick={() => toggleNoteSelection(noteName)}
-                        className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-all duration-200 ${
+                        className={`rounded-full px-3 py-1 text-xs transition ${
                           isSelected
-                            ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold shadow-sm'
-                            : 'bg-[#08080A] text-zinc-300 border border-white/10 hover:border-[#C5A059]/40'
+                            ? 'bg-[#D8B995] text-[#140D1C] font-semibold'
+                            : 'border border-white/10 bg-[#140D1C] text-[#B8A9C9] hover:border-[#D8B995]/40 hover:text-[#F6EFE4]'
                         }`}
                       >
                         {noteName} ({count})
@@ -1317,64 +1173,44 @@ function CollezioneContent() {
           </div>
         )}
 
-        {/* RIEPILOGO FILTRI ATTIVI */}
         {hasActiveFilters && (
-          <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2 flex-wrap text-xs font-mono">
-            <span className="text-zinc-400">
-              Risultati: <strong className="text-white">{filteredList.length}</strong> su{' '}
-              {activeList.length} profumi
-            </span>
-            <button
-              type="button"
-              onClick={resetAllFilters}
-              className="text-[#C5A059] hover:underline text-[11px]"
-            >
+          <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs text-[#B8A9C9]">
+            <span>Risultati: <strong className="text-[#F6EFE4]">{filteredList.length}</strong> su {activeList.length}</span>
+            <button type="button" onClick={resetAllFilters} className="text-[#D8B995] hover:underline">
               Resetta tutti i filtri
             </button>
           </div>
         )}
 
         {aiAdvice && (
-          <div className="p-4 rounded-xl bg-[#08080A]/95 border border-[#C5A059]/40 space-y-1.5 animate-slide-up">
+          <div className="rounded-[18px] border border-[#D8B995]/40 bg-[#140D1C] p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059]">
-                Risposta dell&apos;IA
-              </span>
-              <button
-                onClick={resetAiFilter}
-                className="text-xs font-mono text-zinc-400 hover:text-[#F7E7CE]"
-              >
-                Mostra tutti ({activeList.length})
-              </button>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[#D8B995]">Consiglio del Sommelier IA</span>
+              <button type="button" onClick={resetAiFilter} className="text-xs text-[#B8A9C9] hover:text-[#F6EFE4]">Chiudi</button>
             </div>
-            <p className="text-xs text-[#F7E7CE] leading-relaxed">{aiAdvice}</p>
+            <p className="text-xs text-[#F6EFE4] leading-relaxed">{aiAdvice}</p>
           </div>
         )}
       </section>
 
+      {/* GRIGLIA O LISTA PROFILI */}
       <section className="mt-6">
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-64 rounded-2xl bg-zinc-900/50 border border-white/5 p-6" />
+              <div key={n} className="h-64 rounded-[24px] aura-skeleton" />
             ))}
           </div>
         ) : filteredList.length === 0 ? (
-          <div className="boutique-glass rounded-2xl p-12 text-center animate-fade-in space-y-3">
-            <p className="font-serif text-xl text-white">
-              Nessun profumo corrisponde ai filtri selezionati
-            </p>
-            <button
-              type="button"
-              onClick={resetAllFilters}
-              className="px-4 py-2 rounded-xl bg-white/5 text-xs font-mono text-[#F7E7CE] hover:bg-white/10 transition"
-            >
+          <div className="rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-12 text-center space-y-3">
+            <p className="font-serif text-xl text-[#F6EFE4]">Nessun flacone trovato con questi criteri.</p>
+            <button type="button" onClick={resetAllFilters} className="rounded-full bg-[#281B35] border border-[#D8B995]/40 px-4 py-2 text-xs font-medium text-[#F6EFE4]">
               Mostra tutta la collezione
             </button>
           </div>
         ) : layoutMode === 'vetrina' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {filteredList.map((p, idx) => {
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredList.map((p) => {
               const imgUrl = p.url_foto_vetrina || p.immagine_url;
               const cleanBrand = normalizeBrandName(p.brand);
               return (
@@ -1388,39 +1224,22 @@ function CollezioneContent() {
                     });
                     setOfficialUrlInput('');
                   }}
-                  className="boutique-glass boutique-glass-hover rounded-2xl p-4 cursor-pointer flex flex-col justify-between group text-center hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 animate-fade-in"
-                  style={{ animationDelay: `${idx * 30}ms` }}
+                  className="group relative flex flex-col justify-between rounded-[22px] border border-white/10 bg-[#1E1428]/90 p-4 cursor-pointer transition hover:border-[#D8B995]/50"
                 >
-                  <div className="w-full aspect-square rounded-xl bg-[#08080A] border border-white/10 flex items-center justify-center overflow-hidden relative mb-4">
-                    <SmartBottleImage
-                      src={imgUrl}
-                      alt={p.nome}
-                      className="w-full h-full object-contain p-3 group-hover:scale-[1.04] transition duration-300"
-                    />
-                    {p.prezzo_stimato_euro && (
-                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded font-mono text-[10px] bg-[#08080A]/90 text-[#F7E7CE] border border-[#C5A059]/40">
-                        {String(p.prezzo_stimato_euro).startsWith('€')
-                          ? p.prezzo_stimato_euro
-                          : `€${p.prezzo_stimato_euro}`}
-                      </span>
-                    )}
+                  <div className="mb-3">
+                    <BottlePedestal src={imgUrl} alt={p.nome} size="md" className="w-full" />
                   </div>
-
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
-                      {cleanBrand}
-                    </p>
-                    <h2 className="font-serif text-lg text-white font-medium mt-0.5 line-clamp-1">
-                      {p.nome}
-                    </h2>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-[#D8B995] truncate">{cleanBrand}</p>
+                    <h2 className="font-serif text-base text-[#F6EFE4] truncate mt-0.5">{p.nome}</h2>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredList.map((p, idx) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredList.map((p) => {
               const unifiedNotes = getUnifiedNotes(p);
               const aiReason = aiMotivazioni[p.id];
               const isEnriching = enrichingId === p.id;
@@ -1431,11 +1250,10 @@ function CollezioneContent() {
               return (
                 <article
                   key={p.id}
-                  className="boutique-glass boutique-glass-hover rounded-2xl p-5 flex flex-col justify-between relative group hover:scale-[1.015] transition-all duration-300 animate-fade-in"
-                  style={{ animationDelay: `${idx * 30}ms` }}
+                  className="flex flex-col justify-between rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-5 shadow-lg transition hover:border-[#D8B995]/40"
                 >
                   <div>
-                    <div className="flex items-start gap-3.5">
+                    <div className="flex items-start gap-4">
                       <div
                         onClick={() => {
                           setSelectedProfumo({
@@ -1445,142 +1263,76 @@ function CollezioneContent() {
                           });
                           setOfficialUrlInput('');
                         }}
-                        className="w-14 h-14 rounded-xl bg-[#08080A] border border-white/10 shrink-0 overflow-hidden flex items-center justify-center cursor-pointer relative"
+                        className="h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-[18px] bg-[#140D1C] p-2 flex items-center justify-center border border-white/10"
                       >
-                        <SmartBottleImage
-                          src={imgUrl}
-                          alt={p.nome}
-                          iconSize="w-6 h-6"
-                          className="w-full h-full object-contain p-1"
-                        />
+                        <SmartBottleImage src={imgUrl} alt={p.nome} iconSize="w-6 h-6" className="w-full h-full object-contain" />
                       </div>
 
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C5A059] truncate">
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-[#D8B995] truncate">
                             {cleanBrand}
                           </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {p.concentrazione && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 text-zinc-300 border border-white/10">
-                                {p.concentrazione}
-                              </span>
-                            )}
-                            {p.prezzo_stimato_euro && (
-                              <span className="px-2 py-0.5 rounded font-mono text-xs bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/35">
-                                {String(p.prezzo_stimato_euro).startsWith('€')
-                                  ? p.prezzo_stimato_euro
-                                  : `€${p.prezzo_stimato_euro}`}
-                              </span>
-                            )}
-                          </div>
+                          {p.prezzo_stimato_euro && (
+                            <span className="font-mono text-xs text-[#D8B995]">
+                              {String(p.prezzo_stimato_euro).startsWith('€') ? p.prezzo_stimato_euro : `€${p.prezzo_stimato_euro}`}
+                            </span>
+                          )}
                         </div>
-
-                        <h2 className="font-serif text-xl sm:text-2xl text-white font-semibold mt-1 tracking-tight">
+                        <h2 className="font-serif text-2xl text-[#F6EFE4] truncate mt-0.5">
                           {p.nome}
                         </h2>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5 mt-3">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/35">
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-[#281B35] border border-[#D8B995]/30 px-3 py-0.5 text-xs font-medium text-[#F6EFE4]">
                         {pureFamily}
                       </span>
                       {p.stagione_ideale && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-zinc-900 text-zinc-400 border border-white/10">
+                        <span className="rounded-full bg-[#140D1C] border border-white/10 px-3 py-0.5 text-xs text-[#B8A9C9]">
                           {p.stagione_ideale}
                         </span>
                       )}
                     </div>
 
-                    {/* BADGE NASO PROFUMIERE (PUNTO 3) */}
                     {p.naso && (
-                      <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#C5A059]/15 border border-[#C5A059]/40 text-[11px] font-mono text-[#F7E7CE]">
-                        <span className="text-[#C5A059]">👃 Naso:</span>
-                        <span>{p.naso}</span>
+                      <div className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-[#281B35]/60 border border-white/10 px-3 py-1 text-xs text-[#D8B995]">
+                        <span>Naso: {p.naso}</span>
                       </div>
                     )}
 
                     {aiReason && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/40 text-xs text-[#F7E7CE] animate-fade-in">
+                      <div className="mt-3 rounded-[16px] bg-[#281B35] border border-[#D8B995]/30 p-3 text-xs text-[#F6EFE4]">
                         {aiReason}
                       </div>
                     )}
 
-                    <div className="mt-3.5 text-xs">
+                    <div className="mt-3 text-xs text-[#B8A9C9]">
                       {p.note_testa || p.note_cuore || p.note_fondo ? (
-                        <div className="space-y-1 bg-[#08080A]/60 p-3 rounded-xl border border-white/5">
-                          {p.note_testa && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#F7E7CE] mr-1.5">
-                                Testa:
-                              </span>
-                              {p.note_testa}
-                            </p>
-                          )}
-                          {p.note_cuore && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                                Cuore:
-                              </span>
-                              {p.note_cuore}
-                            </p>
-                          )}
-                          {p.note_fondo && (
-                            <p className="text-zinc-300">
-                              <span className="font-mono text-[10px] uppercase text-amber-500/90 mr-1.5">
-                                Fondo:
-                              </span>
-                              {p.note_fondo}
-                            </p>
-                          )}
+                        <div className="space-y-1 rounded-[16px] bg-[#140D1C] p-3 border border-white/5">
+                          {p.note_testa && <p><span className="text-[#D8B995] font-mono text-[10px]">TESTA:</span> {p.note_testa}</p>}
+                          {p.note_cuore && <p><span className="text-[#D8B995] font-mono text-[10px]">CUORE:</span> {p.note_cuore}</p>}
+                          {p.note_fondo && <p><span className="text-[#D8B995] font-mono text-[10px]">FONDO:</span> {p.note_fondo}</p>}
                         </div>
                       ) : unifiedNotes ? (
-                        <p className="text-zinc-300 bg-[#08080A]/60 p-3 rounded-xl border border-white/5 line-clamp-3">
-                          <span className="font-mono text-[10px] uppercase text-[#C5A059] mr-1.5">
-                            Note:
-                          </span>
-                          {unifiedNotes}
+                        <p className="rounded-[16px] bg-[#140D1C] p-3 border border-white/5 line-clamp-2">
+                          <span className="text-[#D8B995] font-mono text-[10px]">NOTE:</span> {unifiedNotes}
                         </p>
                       ) : null}
                     </div>
-
-                    {(vista === 'radar' || p.note_mouche || p.note_pelle) && (
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-white/5">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
-                            Su Mouche
-                          </span>
-                          <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_mouche || '-'}
-                          </p>
-                        </div>
-                        <div className="p-2.5 rounded-lg bg-[#08080A]/80 border border-white/5">
-                          <span className="font-mono text-[9px] uppercase tracking-wider text-[#C5A059] block">
-                            Su Pelle
-                          </span>
-                          <p className="text-zinc-300 line-clamp-2 mt-0.5">
-                            {p.note_pelle || '-'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-[#F7E7CE]/10 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
+                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleEnrichWithAI(p)}
                         disabled={isEnriching}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#C5A059]/15 text-[#F7E7CE] border border-[#C5A059]/35 font-mono text-[11px] hover:scale-105 active:scale-95 transition-all duration-200"
+                        className="flex items-center gap-1 rounded-xl bg-[#281B35] border border-[#D8B995]/30 px-3 py-1.5 text-xs font-medium text-[#F6EFE4] transition hover:border-[#D8B995]"
                       >
-                        {isEnriching ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
-                        )}
-                        <span>{isEnriching ? '...' : 'IA'}</span>
+                        {isEnriching ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-[#D8B995]" />}
+                        <span>IA</span>
                       </button>
 
                       <button
@@ -1593,18 +1345,18 @@ function CollezioneContent() {
                           });
                           setOfficialUrlInput('');
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] hover:scale-105 active:scale-95 transition-all duration-200"
+                        className="flex items-center gap-1 rounded-xl bg-[#281B35] border border-white/10 px-3 py-1.5 text-xs font-medium text-[#F6EFE4] transition hover:border-[#D8B995]/40"
                       >
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-[#C5A059]" />
+                        <SlidersHorizontal className="h-3.5 w-3.5 text-[#D8B995]" />
                         <span>Scheda</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setWearProfumo(p)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-200 font-mono text-[11px] hover:scale-105 active:scale-95 transition-all duration-200"
+                        className="flex items-center gap-1 rounded-xl bg-[#281B35] border border-white/10 px-3 py-1.5 text-xs font-medium text-[#F6EFE4] transition hover:border-[#D8B995]/40"
                       >
-                        <Clock className="w-3.5 h-3.5 text-[#C5A059]" />
+                        <Clock className="h-3.5 w-3.5 text-[#D8B995]" />
                         <span>Indossa</span>
                       </button>
                     </div>
@@ -1613,9 +1365,9 @@ function CollezioneContent() {
                       type="button"
                       onClick={() => setDeleteTarget(p)}
                       title="Elimina"
-                      className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 hover:scale-110 active:scale-90 transition-all duration-200"
+                      className="p-2 text-[#B8A9C9] hover:text-red-400 transition"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </article>
@@ -1625,380 +1377,168 @@ function CollezioneContent() {
         )}
       </section>
 
-      {/* MODALE SCHEDA TECNICA */}
+      {/* MODALE DETTAGLIO */}
       {selectedProfumo && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="boutique-glass rounded-2xl max-w-2xl w-full p-6 sm:p-7 border border-[#C5A059]/30 my-8 max-h-[92vh] overflow-y-auto animate-scale-up">
-            <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10">
-              <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-xl bg-[#08080A] border border-[#C5A059]/30 overflow-hidden flex items-center justify-center shrink-0">
-                  <SmartBottleImage
-                    src={selectedProfumo.url_foto_vetrina || selectedProfumo.immagine_url}
-                    alt={selectedProfumo.nome}
-                    iconSize="w-6 h-6"
-                    className="w-full h-full object-contain p-1"
-                  />
-                </div>
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                    Scheda Tecnica
-                  </p>
-                  <h3 className="font-serif text-2xl text-white mt-0.5">
-                    {selectedProfumo.nome} - {selectedProfumo.brand}
-                  </h3>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/80 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-[32px] border border-[#D8B995]/30 bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] shadow-2xl max-h-[90dvh] overflow-y-auto space-y-6">
+            <div className="flex items-start justify-between pb-4 border-b border-white/10">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-[#D8B995]">Modifica Scheda</p>
+                <h3 className="font-serif text-2xl text-[#F6EFE4] mt-0.5">{selectedProfumo.nome}</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedProfumo(null)}
-                className="p-2 rounded-lg text-zinc-400 hover:text-white hover:scale-105 transition-transform"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#281B35] text-[#F6EFE4]"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="mt-4 p-3 rounded-xl bg-[#08080A] border border-[#C5A059]/30">
-              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#C5A059] mb-1.5">
-                Aggiorna da Link o Verifica DB
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
+            <div className="rounded-[20px] bg-[#140D1C] p-4 border border-white/10 space-y-3">
+              <label className="block font-mono text-[10px] uppercase tracking-widest text-[#D8B995]">Estrai da Web Ufficiale</label>
+              <div className="flex gap-2">
                 <input
                   type="text"
                   value={officialUrlInput}
                   onChange={(e) => setOfficialUrlInput(e.target.value)}
-                  placeholder="URL pagina prodotto (oppure lascia vuoto per ri-verificare nel DB)..."
-                  className="flex-1 rounded-lg bg-[#0D0D11] border border-white/10 px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-[#C5A059] transition-all"
+                  placeholder="Incolla URL pagina ufficiale..."
+                  className="flex-1 rounded-[14px] border border-white/10 bg-[#1E1428] px-3 py-2 text-xs text-[#F6EFE4] focus:border-[#D8B995] focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleModalExtractFromOfficial}
                   disabled={modalExtracting}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold hover:scale-102 transition-all shrink-0"
+                  className="flex items-center gap-1.5 rounded-[14px] bg-[#D8B995] px-4 py-2 text-xs font-bold text-[#140D1C] transition disabled:opacity-50"
                 >
-                  {modalExtracting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-3.5 h-3.5" />
-                      <span>Estrai</span>
-                    </>
-                  )}
+                  {modalExtracting ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+                  <span>Estrai</span>
                 </button>
               </div>
             </div>
 
-            <form onSubmit={handleSaveDetails} className="space-y-4 mt-4">
+            <form onSubmit={handleSaveDetails} className="space-y-4">
               {isRadarProfumo(selectedProfumo) && (
-                <div className="p-3 rounded-xl bg-[#C5A059]/15 border border-[#C5A059]/40 flex items-center justify-between gap-3 animate-fade-in">
-                  <span className="text-xs font-mono text-[#F7E7CE]">
-                    In Testing
-                  </span>
+                <div className="flex items-center justify-between rounded-[20px] bg-[#281B35] border border-[#D8B995]/40 p-4">
+                  <span className="text-xs font-mono text-[#F6EFE4]">Questo flacone è nel Radar Testing</span>
                   <button
                     type="button"
                     onClick={() => handlePromoteToCollection(selectedProfumo)}
-                    className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                    className="rounded-[14px] bg-[#D8B995] px-4 py-2 text-xs font-bold text-[#140D1C]"
                   >
-                    Sposta in Collezione
+                    Promuovi in Collezione
                   </button>
                 </div>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Marchio
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Marchio</label>
                   <input
                     type="text"
                     value={selectedProfumo.brand || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, brand: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, brand: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Nome
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Nome</label>
                   <input
                     type="text"
                     value={selectedProfumo.nome || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, nome: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, nome: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Prezzo (€)
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Prezzo stimato (€)</label>
                   <input
                     type="text"
                     value={selectedProfumo.prezzo_stimato_euro || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        prezzo_stimato_euro: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs font-mono text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, prezzo_stimato_euro: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Famiglia Olfattiva (12 Pure)
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Famiglia Olfattiva</label>
                   <select
                     value={normalizeToPureFamily(selectedProfumo.famiglia_olfattiva)}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        famiglia_olfattiva: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, famiglia_olfattiva: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   >
                     {PURE_FAMILIES.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
+                      <option key={f} value={f} className="bg-[#140D1C]">{f}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Concentrazione
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Concentrazione</label>
                   <input
                     type="text"
                     value={selectedProfumo.concentrazione || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        concentrazione: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, concentrazione: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Archivio
-                  </label>
-                  <select
-                    value={isRadarProfumo(selectedProfumo) ? 'radar' : 'collezione'}
-                    onChange={(e) =>
-                      setSelectedProfumo({ ...selectedProfumo, stato: e.target.value })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
-                  >
-                    <option value="collezione">Collezione Privata</option>
-                    <option value="radar">Radar - Testing</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    URL Immagine Flacone
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedProfumo.url_foto_vetrina || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        url_foto_vetrina: e.target.value,
-                      })
-                    }
-                    placeholder="https://..."
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white font-mono focus:border-[#C5A059] transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    👃 Naso Profumiere Ufficiale
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Naso Profumiere</label>
                   <input
                     type="text"
                     value={selectedProfumo.naso || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        naso: e.target.value,
-                      })
-                    }
-                    placeholder="Es. Quentin Bisch, Alberto Morillas..."
-                    className="w-full rounded-xl bg-[#08080A] border border-[#C5A059]/40 px-3 py-2 text-xs text-[#F7E7CE] focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, naso: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Testa
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Note di Testa</label>
                   <input
                     type="text"
                     value={selectedProfumo.note_testa || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_testa: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, note_testa: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Cuore
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Note di Cuore</label>
                   <input
                     type="text"
                     value={selectedProfumo.note_cuore || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_cuore: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, note_cuore: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                    Note di Fondo
-                  </label>
+                  <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Note di Fondo</label>
                   <input
                     type="text"
                     value={selectedProfumo.note_fondo || ''}
-                    onChange={(e) =>
-                      setSelectedProfumo({
-                        ...selectedProfumo,
-                        note_fondo: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                    onChange={(e) => setSelectedProfumo({ ...selectedProfumo, note_fondo: e.target.value })}
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                   />
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#08080A]/90 border border-white/5 space-y-3">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#F7E7CE]">
-                  Test Olfattivo
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Mouche
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_mouche || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_mouche: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white focus:border-[#C5A059] transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-mono text-[10px] text-[#C5A059] mb-1">
-                      Su Pelle
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={selectedProfumo.note_pelle || ''}
-                      onChange={(e) =>
-                        setSelectedProfumo({
-                          ...selectedProfumo,
-                          note_pelle: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-xl bg-[#0D0D11] border border-white/10 p-2.5 text-xs text-white focus:border-[#C5A059] transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-[#08080A]/70 border border-white/5 animate-fade-in">
-                {[
-                  { key: 'voto_longevita', label: 'Durata' },
-                  { key: 'voto_scia', label: 'Scia' },
-                  { key: 'voto_proiezione', label: 'Proiezione' },
-                  { key: 'voto_complessita', label: 'Complessità' },
-                ].map(({ key, label }) => {
-                  const val = Number((selectedProfumo as any)[key] ?? 8);
-                  return (
-                    <div key={key}>
-                      <div className="flex justify-between text-xs font-mono mb-1.5">
-                        <span className="text-zinc-300">{label}</span>
-                        <span className="text-[#F7E7CE] font-semibold">{val}/10</span>
-                      </div>
-                      <div className="grid grid-cols-10 gap-1">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((step) => (
-                          <button
-                            key={step}
-                            type="button"
-                            onClick={() =>
-                              setSelectedProfumo({
-                                ...selectedProfumo,
-                                [key]: step,
-                              })
-                            }
-                            className={`h-2.5 rounded-sm transition-all ${
-                              step <= val
-                                ? step >= 8
-                                  ? 'bg-[#F7E7CE] shadow-[0_0_8px_rgba(247,231,206,0.3)]'
-                                  : 'bg-[#C5A059]'
-                                : 'bg-zinc-800 hover:bg-zinc-700'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-white/10">
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                 <button
                   type="button"
-                  onClick={() => setDeleteTarget(selectedProfumo)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 font-mono text-xs hover:scale-105 active:scale-95 transition-all"
+                  onClick={() => setSelectedProfumo(null)}
+                  className="rounded-full px-5 py-2.5 text-xs font-semibold text-[#B8A9C9] hover:text-[#F6EFE4]"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Elimina Profilo</span>
+                  Annulla
                 </button>
-
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfumo(null)}
-                    className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono uppercase hover:bg-white/10 transition"
-                  >
-                    Annulla
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingDetail}
-                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold uppercase shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
-                  >
-                    {savingDetail ? 'Salvataggio...' : 'Salva Modifiche'}
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  disabled={savingDetail}
+                  className="rounded-full bg-[#D8B995] px-6 py-2.5 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e] disabled:opacity-50"
+                >
+                  {savingDetail ? 'Salvataggio...' : 'Salva Modifiche'}
+                </button>
               </div>
             </form>
           </div>
@@ -2007,40 +1547,31 @@ function CollezioneContent() {
 
       {/* MODALE INDOSSO */}
       {wearProfumo && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-[#C5A059]/30 space-y-4 animate-scale-up">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/80 backdrop-blur-md">
+          <div className="relative w-full max-w-md rounded-[32px] border border-[#D8B995]/30 bg-[#1E1428] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-[#C5A059]">
-                  Indosso
-                </p>
-                <h3 className="font-serif text-2xl text-white mt-0.5">
-                  {wearProfumo.nome}
-                </h3>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-[#D8B995]">Registra Indosso</p>
+                <h3 className="font-serif text-2xl text-[#F6EFE4] mt-0.5">{wearProfumo.nome}</h3>
               </div>
-              <button
-                onClick={() => setWearProfumo(null)}
-                className="text-zinc-400 hover:text-white hover:scale-105 transition-transform"
-              >
-                <X className="w-5 h-5" />
+              <button type="button" onClick={() => setWearProfumo(null)} className="text-[#B8A9C9] hover:text-[#F6EFE4]">
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleRecordWear} className="space-y-4">
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1.5">
-                  Momento
-                </label>
+                <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1.5">Momento</label>
                 <div className="grid grid-cols-4 gap-2">
                   {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as const).map((m) => (
                     <button
-                      type="button"
                       key={m}
+                      type="button"
                       onClick={() => setMomentoGiornata(m)}
-                      className={`py-2 rounded-xl font-mono text-xs border transition-all ${
+                      className={`rounded-[12px] py-2 text-xs font-semibold transition ${
                         momentoGiornata === m
-                          ? 'bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-bold border-transparent'
-                          : 'bg-[#08080A] text-zinc-400 border-white/10'
+                          ? 'bg-[#D8B995] text-[#140D1C]'
+                          : 'border border-white/10 bg-[#140D1C] text-[#B8A9C9]'
                       }`}
                     >
                       {m}
@@ -2050,47 +1581,23 @@ function CollezioneContent() {
               </div>
 
               <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Contesto
-                </label>
+                <label className="block font-mono text-[10px] uppercase text-[#D8B995] mb-1">Contesto</label>
                 <select
                   value={contestoOutfit}
                   onChange={(e) => setContestoOutfit(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-white/10 px-3 py-2 text-xs text-white focus:border-[#C5A059] transition-all"
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 >
-                  <option value="Ufficio">Ufficio</option>
-                  <option value="Aperitivo">Aperitivo</option>
-                  <option value="Cena">Cena</option>
-                  <option value="Serata">Serata</option>
-                  <option value="Evento">Evento</option>
+                  <option value="Ufficio" className="bg-[#140D1C]">Ufficio</option>
+                  <option value="Aperitivo" className="bg-[#140D1C]">Aperitivo</option>
+                  <option value="Cena" className="bg-[#140D1C]">Cena</option>
+                  <option value="Serata" className="bg-[#140D1C]">Serata</option>
+                  <option value="Evento" className="bg-[#140D1C]">Evento</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-[#C5A059] mb-1">
-                  Note
-                </label>
-                <textarea
-                  rows={2}
-                  value={noteGiorno}
-                  onChange={(e) => setNoteGiorno(e.target.value)}
-                  className="w-full rounded-xl bg-[#08080A] border border-white/10 p-2.5 text-xs text-white focus:border-[#C5A059] transition-all"
-                />
-              </div>
-
               <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setWearProfumo(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingWear}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#F7E7CE] to-[#C5A059] text-[#08080A] font-mono text-xs font-bold"
-                >
+                <button type="button" onClick={() => setWearProfumo(null)} className="px-4 py-2 text-xs text-[#B8A9C9]">Annulla</button>
+                <button type="submit" disabled={savingWear} className="rounded-full bg-[#D8B995] px-5 py-2 text-xs font-bold text-[#140D1C]">
                   {savingWear ? '...' : 'Conferma'}
                 </button>
               </div>
@@ -2101,27 +1608,13 @@ function CollezioneContent() {
 
       {/* MODALE CONFERMA ELIMINAZIONE */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div className="boutique-glass rounded-2xl max-w-md w-full p-6 border border-red-500/30 space-y-4 animate-scale-up">
-            <h3 className="font-serif text-xl text-white">
-              Eliminare definitivamente {deleteTarget.brand ? `${deleteTarget.brand} - ` : ''}{deleteTarget.nome}?
-            </h3>
-            <p className="text-xs text-zinc-400">
-              Questa operazione cancellerà il profumo dal database Supabase.
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/80 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#1E1428] p-6 text-[#F6EFE4] space-y-4">
+            <h3 className="font-serif text-xl text-[#F6EFE4]">Eliminare definitivamente {deleteTarget.nome}?</h3>
+            <p className="text-xs text-[#B8A9C9]">Questa operazione rimuoverà il flacone dall&apos;archivio Supabase.</p>
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-xl bg-white/5 text-zinc-300 text-xs font-mono"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-semibold hover:scale-105 active:scale-95 transition-all"
-              >
-                Conferma Eliminazione
-              </button>
+              <button type="button" onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-xs text-[#B8A9C9]">Annulla</button>
+              <button type="button" onClick={confirmDelete} className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white">Conferma Eliminazione</button>
             </div>
           </div>
         </div>
@@ -2132,13 +1625,7 @@ function CollezioneContent() {
 
 export default function CollezionePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center text-[#C5A059] font-mono text-xs animate-pulse">
-          Caricamento...
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-[#D8B995] font-mono text-xs">Caricamento...</div>}>
       <CollezioneContent />
     </Suspense>
   );
