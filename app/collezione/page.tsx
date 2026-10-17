@@ -60,7 +60,6 @@ function formatPerfumeNote(text?: string | null): string {
     formatted = formatted.replace(regex, it);
   }
 
-  // Rende la prima lettera maiuscola per pulizia estetica
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
@@ -297,7 +296,7 @@ export default function CollezionePage() {
         </section>
       )}
 
-      {/* GRIGLIA FLACONI CON IL SIGILLO DEL LOGO SOLO NELLA COLLEZIONE */}
+      {/* GRIGLIA FLACONI CON FILIGRANA DEL LOGO IN BASSO A DESTRA */}
       <section className="mt-8">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
@@ -335,7 +334,7 @@ export default function CollezionePage() {
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-40 transition-opacity group-hover:opacity-80"
                         style={{ backgroundColor: aura.primary }}
                       />
-                      {/* Mostra il sigillo del logo solo se siamo nella vista Collezione */}
+                      {/* Logo filigranato in basso a destra solo nella collezione */}
                       <BottlePedestal src={imgUrl} alt={p.nome} size="lg" className="relative z-10 !h-52 w-full" showSigil={isCollezione} />
                     </div>
                   </div>
@@ -461,10 +460,11 @@ export default function CollezionePage() {
                   <p className="text-xs text-[#B8A9C9] mt-1">{selectedProfumo.concentrazione || 'Eau de Parfum'} • {selectedProfumo.famiglia_olfattiva}</p>
 
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                    {(selectedProfumo as any).naso_profumiere && (
+                    {/* Naso Profumiere collegato esattamente al campo 'naso' di Supabase */}
+                    {(selectedProfumo as any).naso && (
                       <div className="inline-flex items-center gap-1.5 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 text-xs text-[#D8B995]">
                         <UserCheck className="h-3.5 w-3.5" />
-                        <span>Naso: {(selectedProfumo as any).naso_profumiere}</span>
+                        <span>Naso: {(selectedProfumo as any).naso}</span>
                       </div>
                     )}
                     {(selectedProfumo as any).anno_lancio && (
