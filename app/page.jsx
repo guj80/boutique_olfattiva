@@ -2,43 +2,66 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Compass, Library, Sparkles, Plus, Send, RefreshCw, CloudRain, Briefcase, Moon, Sun } from 'lucide-react';
+import {
+  Compass,
+  Library,
+  Sparkles,
+  Plus,
+  Send,
+  RefreshCw,
+  CloudRain,
+  Briefcase,
+  Moon,
+  Sun,
+} from 'lucide-react';
 import { supabase, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
-import { useAura, resolveAura } from '@/components/AuraProvider';
+import { useAura, resolveAura, SECTION_THEMES } from '@/components/AuraProvider';
 
 const QUICK_PROMPTS = [
-  { label: 'Serata Elegante', query: 'Fragranza magnetica e strutturata per una serata elegante o evento formale', icon: Moon },
-  { label: 'Giornata Piovosa', query: 'Fragranza avvolgente, legnosa o ambrata ideale per clima freddo o piovoso', icon: CloudRain },
-  { label: 'Atelier & Lavoro', query: 'Fragranza pulita, raffinata e misurata ideale per ambiente professionale', icon: Briefcase },
-  { label: 'Luce & Energia', query: 'Fragranza luminosa, agrumata, aromatica o fresca per il giorno', icon: Sun },
+  {
+    label: 'Serata Elegante',
+    query: 'Fragranza magnetica e strutturata per una serata elegante o evento formale',
+    icon: Moon,
+  },
+  {
+    label: 'Clima Freddo / Pioggia',
+    query: 'Fragranza avvolgente, legnosa, speziata o ambrata ideale per clima freddo o piovoso',
+    icon: CloudRain,
+  },
+  {
+    label: 'Giornata Professionale',
+    query: 'Fragranza pulita, raffinata e misurata ideale per il giorno',
+    icon: Briefcase,
+  },
+  {
+    label: 'Luce & Freschezza',
+    query: 'Fragranza luminosa, agrumata, aromatica o marina',
+    icon: Sun,
+  },
 ];
 
 export default function Home() {
   const [profumi, setProfumi] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Stato Motore di Suggerimenti IA
   const [aiQuery, setAiQuery] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState('');
 
-  const { aura, setAuraFromProfumo } = useAura();
+  const { aura, setAuraFromProfumo, setCustomAura } = useAura();
 
   useEffect(() => {
+    setCustomAura(SECTION_THEMES.atelier);
     async function fetchHomeData() {
       try {
         const { data } = await supabase
           .from('profumi')
           .select('*')
           .order('created_at', { ascending: false });
-        const list = data || [];
-        setProfumi(list);
-        if (list.length > 0) {
-          setAuraFromProfumo(list[0]);
-        }
+        setProfumi(data || []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -46,7 +69,7 @@ export default function Home() {
       }
     }
     fetchHomeData();
-  }, [setAuraFromProfumo]);
+  }, [setCustomAura]);
 
   async function handleAskAi(customQuery) {
     const q = (customQuery ?? aiQuery).trim();
@@ -91,38 +114,13 @@ export default function Home() {
   const ultimeAcquisizioni = profumi.slice(0, 4);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-10 pb-36 space-y-10">
-      {/* INTESTAZIONE CON LOGO VETTORIALE MONOCROMATICO A TEMA */}
-      <header className="flex flex-col items-center text-center space-y-4 pt-4 pb-6 border-b border-white/10">
-        <div className="relative p-3">
-          <div
-            style={{
-              background: `radial-gradient(circle at center, ${aura.primary}38 0%, transparent 70%)`,
-            }}
-            className="absolute inset-0 rounded-full blur-xl transition-all duration-700"
-          />
-          <div
-            style={{ borderColor: `${aura.primary}50` }}
-            className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full border bg-[#1E1428]/90 shadow-2xl transition-colors duration-700"
-          >
-            <Logo showText={false} className="h-12" />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <h1 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-wide">
-            L&apos;Aura
-          </h1>
-          <p
-            style={{ color: aura.primary }}
-            className="font-mono text-[11px] uppercase tracking-[0.22em] transition-colors duration-700"
-          >
-            Haute Parfumerie &amp; Niche Atelier
-          </p>
-        </div>
+    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-36 space-y-10">
+      {/* IL TUO LOGO LIBERO E IN RISALTO (ZERO GABBIE, ZERO SCRITTE) */}
+      <header className="flex flex-col items-center justify-center pt-4 pb-2">
+        <Logo className="h-28 sm:h-32" />
       </header>
 
-      {/* MOTORE DI SUGGERIMENTI IA AVANZATO (RIPRISTINATO E POTENZIATO) */}
+      {/* MOTORE DI SUGGERIMENTI IA AVANZATO */}
       <section
         style={{ borderColor: `${aura.primary}35` }}
         className="relative overflow-hidden rounded-[28px] border bg-gradient-to-b from-[#1E1428]/95 to-[#140D1C]/95 p-6 sm:p-8 shadow-2xl space-y-5 transition-colors duration-700"
@@ -131,17 +129,10 @@ export default function Home() {
           <div className="flex items-center gap-2.5">
             <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
             <h2 className="font-serif text-xl sm:text-2xl text-[#F6EFE4]">
-              Consulenza Olfattiva dell&apos;Atelier
+              Selezione Olfattiva Su Misura
             </h2>
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-            Zero-Hallucination Engine
-          </span>
         </div>
-
-        <p className="text-xs text-[#B8A9C9] leading-relaxed">
-          Indica l&apos;occasione, il clima o lo stato d&apos;animo. Il motore analizza esclusivamente le piramidi olfattive reali presenti nella tua collezione.
-        </p>
 
         <div className="flex flex-wrap gap-2">
           {QUICK_PROMPTS.map((item) => {
@@ -172,7 +163,7 @@ export default function Home() {
             type="text"
             value={aiQuery}
             onChange={(e) => setAiQuery(e.target.value)}
-            placeholder="Es. Cena autunnale, vorrei una nota di tabacco, oud o ambra..."
+            placeholder="Descrivi occasione, meteo o stato d'animo..."
             className="flex-1 rounded-[18px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:border-white/30 focus:outline-none"
           />
           <button
@@ -186,13 +177,11 @@ export default function Home() {
             ) : (
               <Send className="h-3.5 w-3.5" />
             )}
-            <span>Analizza Collezione</span>
+            <span>Suggerisci</span>
           </button>
         </form>
 
-        {aiError && (
-          <p className="text-xs text-red-400 font-mono">{aiError}</p>
-        )}
+        {aiError && <p className="text-xs text-red-400 font-mono">{aiError}</p>}
 
         {aiResult && (
           <div className="pt-4 border-t border-white/10 space-y-4 animate-fade-in">
@@ -242,65 +231,79 @@ export default function Home() {
         )}
       </section>
 
-      {/* NAVIGAZIONE COLLEZIONE E RADAR (SENZA PAROLA "SCAFFALE") */}
+      {/* COLLEZIONE E RADAR CON I RISPETTIVI COLORI AMBIENTE */}
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Link
           href="/collezione"
-          style={{ borderColor: `${aura.primary}35` }}
+          style={{ borderColor: `${SECTION_THEMES.collezione.primary}40` }}
           className="group relative flex flex-col justify-between overflow-hidden rounded-[28px] border bg-gradient-to-b from-[#1E1428] to-[#140D1C] p-6 transition-all duration-300 hover:scale-[1.01] shadow-xl"
         >
           <div className="flex items-center justify-between">
             <div
-              style={{ color: aura.primary, borderColor: `${aura.primary}30` }}
+              style={{
+                color: SECTION_THEMES.collezione.primary,
+                borderColor: `${SECTION_THEMES.collezione.primary}35`,
+              }}
               className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#140D1C] border"
             >
               <Library className="h-5 w-5" />
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
+            <span
+              style={{ color: SECTION_THEMES.collezione.primary }}
+              className="font-mono text-[10px] uppercase tracking-widest"
+            >
               {collezioneCount} Flaconi
             </span>
           </div>
           <div className="mt-7 space-y-1">
-            <h2 className="font-serif text-2xl text-[#F6EFE4]">La Collezione</h2>
+            <h2 className="font-serif text-2xl text-[#F6EFE4]">Collezione</h2>
             <p className="text-xs text-[#B8A9C9]">
-              I flaconi d&apos;autore custoditi nella boutique.
+              I flaconi interi custoditi nella tua raccolta.
             </p>
           </div>
         </Link>
 
         <Link
           href="/collezione?vista=radar"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-[#1E1428] to-[#140D1C] p-6 transition-all duration-300 hover:scale-[1.01] shadow-xl"
+          style={{ borderColor: `${SECTION_THEMES.radar.primary}40` }}
+          className="group relative flex flex-col justify-between overflow-hidden rounded-[28px] border bg-gradient-to-b from-[#1E1428] to-[#140D1C] p-6 transition-all duration-300 hover:scale-[1.01] shadow-xl"
         >
           <div className="flex items-center justify-between">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#140D1C] text-[#9B7EDE] border border-[#9B7EDE]/30">
+            <div
+              style={{
+                color: SECTION_THEMES.radar.primary,
+                borderColor: `${SECTION_THEMES.radar.primary}35`,
+              }}
+              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#140D1C] border"
+            >
               <Compass className="h-5 w-5" />
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#9B7EDE]">
-              {radarCount} In Esplorazione
+            <span
+              style={{ color: SECTION_THEMES.radar.primary }}
+              className="font-mono text-[10px] uppercase tracking-widest"
+            >
+              {radarCount} In Valutazione
             </span>
           </div>
           <div className="mt-7 space-y-1">
-            <h2 className="font-serif text-2xl text-[#F6EFE4]">Il Radar</h2>
+            <h2 className="font-serif text-2xl text-[#F6EFE4]">Radar</h2>
             <p className="text-xs text-[#B8A9C9]">
-              Campioni da 2ml/5ml, decant e scoperte in fase di valutazione.
+              Testing, decant e pianificazione acquisti per formato (≥ 30ml).
             </p>
           </div>
         </Link>
       </section>
 
-      {/* ULTIME ACQUISIZIONI (MINIATURE PURE SENZA SIGILLO) */}
+      {/* ULTIME ACQUISIZIONI */}
       <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
-          <h3 className="font-serif text-xl text-[#F6EFE4]">
-            Ultime Acquisizioni dell&apos;Atelier
-          </h3>
+          <h3 className="font-serif text-xl text-[#F6EFE4]">Ultime Acquisizioni</h3>
           <Link
             href="/collezione"
             style={{ color: aura.primary }}
             className="text-xs font-mono uppercase tracking-wider hover:underline"
           >
-            Esplora →
+            Vedi tutte →
           </Link>
         </div>
 
@@ -312,7 +315,7 @@ export default function Home() {
           </div>
         ) : ultimeAcquisizioni.length === 0 ? (
           <div className="rounded-[24px] border border-white/10 bg-[#1E1428] p-8 text-center text-xs text-[#B8A9C9]">
-            Nessuna creazione registrata nell&apos;Atelier.
+            Nessun flacone registrato.
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -324,7 +327,6 @@ export default function Home() {
                 <Link
                   key={p.id}
                   href="/collezione"
-                  onMouseEnter={() => setAuraFromProfumo(p)}
                   style={{ borderColor: `${pAura.primary}30` }}
                   className="group relative flex flex-col justify-between rounded-[24px] border bg-[#1E1428]/90 p-4 transition hover:scale-[1.02]"
                 >
@@ -353,17 +355,6 @@ export default function Home() {
             })}
           </div>
         )}
-      </section>
-
-      <section className="flex justify-center pt-2">
-        <Link
-          href="/scanner"
-          style={{ backgroundColor: aura.primary }}
-          className="flex items-center gap-2.5 rounded-full px-8 py-3.5 text-xs font-bold text-[#140D1C] transition hover:opacity-90 shadow-xl"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Acquisisci Nuova Creazione</span>
-        </Link>
       </section>
     </main>
   );
