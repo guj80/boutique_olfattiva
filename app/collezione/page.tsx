@@ -113,14 +113,13 @@ export default function CollezionePage() {
     }
   }
 
-  // FUNZIONE AI RADAR: STIMA PREZZI PER FORMATO >= 30ML (ESCLUDE SEMPRE CAMPIONCINI)
   async function handleFetchFormatsPrices(p: Profumo) {
     setLoadingPrices(true);
     try {
       const prompt = `Sei un esperto di listini ufficiali di alta profumeria di nicchia e artistica.
-Indica i formati di vendita ufficiali (ESCLUSIVAMENTE da 30 ml in su: es. 30ml, 50ml, 70ml, 75ml, 100ml) e i relativi prezzi di listino in Euro per il profumo "${p.brand} - ${p.nome}".
-REGOLA TASSATIVA: Ignora ed escludi qualsiasi formato inferiore a 30ml (vietato inserire 2ml, 5ml, 10ml, discovery set o campioncini).
-Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (includendo solo i formati realmente esistenti per questo brand):
+Indica i formati di vendita ufficiali (ESCLUSIVAMENTE da 30 ml in su: es. 30ml, 50ml, 70ml, 75ml, 100ml) e i relativi prezzi di listino ufficiali in Euro (sito ufficiale della Maison o concessionari autorizzati, escluso eBay o usato) per il profumo "${p.brand} - ${p.nome}".
+REGOLA TASSATIVA: Ignora ed escludi qualsiasi formato inferiore a 30ml (vietato inserire 2ml, 5ml, 10ml o campioncini).
+Rispondi SOLO con una stringa sintetica in questo formato esatto:
 "50ml: €190 • 100ml: €265"`;
 
       const res = await fetch('/api/gemini', {
@@ -211,7 +210,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
 
       if (error) throw error;
 
-      showToast('Scheda aggiornata con successo.');
+      showToast('Scheda aggiornata.');
       setIsEditing(false);
       fetchProfumi();
       setSelectedProfumo({ ...selectedProfumo, ...editForm });
@@ -225,21 +224,21 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
-      <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-6 border-b border-white/10">
-        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
+      {/* HEADER UNIFORMATO A SINISTRA CON LOGO MONOCROMATICO GRANDE E IN RISALTO */}
+      <header className="flex items-center justify-between gap-4 pb-6 border-b border-white/10">
+        <div className="flex items-center gap-4">
           <Link
             href="/"
             aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-white/40"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#161024] text-[#F6EFE4] transition hover:border-white/40"
           >
             <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
           </Link>
-          {/* Logo monocolore dinamico basato sul tema della schermata */}
-          <Logo className="h-11" monochrome={true} />
+          <Logo variant="mono" className="h-12" />
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <div className="flex rounded-full bg-[#140D1C] p-1 border border-white/10">
+        <div className="flex items-center gap-2.5">
+          <div className="flex rounded-full bg-[#0E0A16] p-1 border border-white/10">
             <button
               onClick={() => {
                 setActiveTab('collezione');
@@ -251,9 +250,9 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                   ? { backgroundColor: SECTION_THEMES.collezione.primary }
                   : undefined
               }
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
+              className={`flex items-center gap-2 rounded-full px-3.5 sm:px-4 py-2 text-xs font-semibold transition ${
                 activeTab === 'collezione'
-                  ? 'text-[#140D1C]'
+                  ? 'text-[#08060C]'
                   : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
               }`}
             >
@@ -271,9 +270,9 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                   ? { backgroundColor: SECTION_THEMES.radar.primary }
                   : undefined
               }
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
+              className={`flex items-center gap-2 rounded-full px-3.5 sm:px-4 py-2 text-xs font-semibold transition ${
                 activeTab === 'radar'
-                  ? 'text-[#140D1C]'
+                  ? 'text-[#08060C]'
                   : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
               }`}
             >
@@ -285,10 +284,10 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
           <Link
             href="/scanner"
             style={{ backgroundColor: aura.primary }}
-            className="flex items-center justify-center h-9 w-9 rounded-full text-[#140D1C] transition hover:opacity-90"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90"
             title="Acquisisci"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 stroke-[2.5]" />
           </Link>
         </div>
       </header>
@@ -302,7 +301,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Filtra per maison, creazione o nota olfattiva..."
-            className="w-full rounded-[18px] border border-white/10 bg-[#1E1428]/90 pl-11 pr-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-white/30 focus:outline-none"
+            className="w-full rounded-[18px] border border-white/10 bg-[#161024]/90 pl-11 pr-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-white/30 focus:outline-none"
           />
           {searchQuery && (
             <button
@@ -322,7 +321,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
               ? { borderColor: aura.primary, color: aura.primary }
               : undefined
           }
-          className="flex items-center gap-2.5 rounded-[18px] border border-white/10 bg-[#1E1428]/90 px-5 py-3 text-xs font-semibold text-[#F6EFE4] transition"
+          className="flex items-center gap-2.5 rounded-[18px] border border-white/10 bg-[#161024]/90 px-5 py-3 text-xs font-semibold text-[#F6EFE4] transition"
         >
           <SlidersHorizontal className="h-4 w-4" />
           <span>Filtri {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}</span>
@@ -330,7 +329,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
       </section>
 
       {filterDrawerOpen && (
-        <section className="mt-3 rounded-[24px] border border-white/15 bg-[#1E1428] p-5 space-y-4 shadow-xl">
+        <section className="mt-3 rounded-[24px] border border-white/15 bg-[#161024] p-5 space-y-4 shadow-xl">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <h3
               style={{ color: aura.primary }}
@@ -362,8 +361,8 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                     }
                     className={`rounded-full px-3 py-1 text-xs transition ${
                       selectedBrand === b
-                        ? 'text-[#140D1C] font-bold'
-                        : 'bg-[#140D1C] text-[#B8A9C9] border border-white/10 hover:text-white'
+                        ? 'text-[#08060C] font-bold'
+                        : 'bg-[#0E0A16] text-[#B8A9C9] border border-white/10 hover:text-white'
                     }`}
                   >
                     {b}
@@ -386,8 +385,8 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                   }
                   className={`rounded-full px-3 py-1 text-xs transition ${
                     selectedFamily === 'Tutte'
-                      ? 'text-[#140D1C] font-bold'
-                      : 'bg-[#140D1C] text-[#B8A9C9] border border-white/10 hover:text-white'
+                      ? 'text-[#08060C] font-bold'
+                      : 'bg-[#0E0A16] text-[#B8A9C9] border border-white/10 hover:text-white'
                   }`}
                 >
                   Tutte
@@ -401,8 +400,8 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                     }
                     className={`rounded-full px-3 py-1 text-xs transition ${
                       selectedFamily === f
-                        ? 'text-[#140D1C] font-bold'
-                        : 'bg-[#140D1C] text-[#B8A9C9] border border-white/10 hover:text-white'
+                        ? 'text-[#08060C] font-bold'
+                        : 'bg-[#0E0A16] text-[#B8A9C9] border border-white/10 hover:text-white'
                     }`}
                   >
                     {f}
@@ -423,7 +422,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
             ))}
           </div>
         ) : filteredProfumi.length === 0 ? (
-          <div className="rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-16 text-center space-y-3">
+          <div className="rounded-[28px] border border-white/10 bg-[#161024]/90 p-16 text-center space-y-3">
             <Compass
               style={{ color: aura.primary }}
               className="h-10 w-10 mx-auto opacity-50"
@@ -448,7 +447,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                     setIsEditing(false);
                   }}
                   style={{ borderColor: `${pAura.primary}40` }}
-                  className="group relative flex flex-col justify-between rounded-[30px] border bg-[#1E1428]/95 p-5 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
+                  className="group relative flex flex-col justify-between rounded-[30px] border bg-[#161024]/95 p-5 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
                 >
                   <div className="flex justify-center py-2">
                     <div className="relative w-full">
@@ -480,10 +479,9 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                       {p.famiglia_olfattiva}
                     </p>
 
-                    {/* NEL RADAR MOSTRA SUBITO I PREZZI PER FORMATO (>=30ML) */}
                     {activeTab === 'radar' && p.prezzo_stimato_euro && (
                       <div className="pt-2">
-                        <span className="inline-block rounded-full bg-[#140D1C] border border-[#A855F7]/40 px-2.5 py-1 font-mono text-[10px] text-[#E9D5FF] line-clamp-1">
+                        <span className="inline-block rounded-full bg-[#0E0A16] border border-purple-400/40 px-2.5 py-1 font-mono text-[10px] text-purple-200 line-clamp-1">
                           {p.prezzo_stimato_euro}
                         </span>
                       </div>
@@ -508,16 +506,16 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
           const isRadarItem = isRadarProfumo(selectedProfumo);
 
           return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/85 backdrop-blur-md animate-in fade-in duration-200">
               <div
                 style={{ borderColor: `${modalAura.primary}55` }}
-                className="relative w-full max-w-lg max-h-[86dvh] overflow-y-auto rounded-[32px] border bg-[#1E1428] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16"
+                className="relative w-full max-w-lg max-h-[86dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16"
               >
                 <div className="absolute right-5 top-5 flex items-center gap-2 z-20">
                   <button
                     onClick={() => setIsEditing(!isEditing)}
                     style={{ color: modalAura.primary }}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#140D1C] hover:text-white border border-white/10 transition"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] hover:text-white border border-white/10 transition"
                     title="Modifica scheda"
                   >
                     <Edit3 className="h-4 w-4" />
@@ -526,8 +524,13 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                     onClick={() => {
                       setSelectedProfumo(null);
                       setIsEditing(false);
+                      setCustomAura(
+                        activeTab === 'radar'
+                          ? SECTION_THEMES.radar
+                          : SECTION_THEMES.collezione
+                      );
                     }}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#140D1C] text-[#B8A9C9] hover:text-white border border-white/10 transition"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] text-[#B8A9C9] hover:text-white border border-white/10 transition"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -550,7 +553,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                             onChange={(e) =>
                               setEditForm({ ...editForm, brand: e.target.value })
                             }
-                            className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                            className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                           />
                         </div>
                         <div>
@@ -563,7 +566,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                             onChange={(e) =>
                               setEditForm({ ...editForm, nome: e.target.value })
                             }
-                            className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                            className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                           />
                         </div>
                       </div>
@@ -579,7 +582,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                             onChange={(e) =>
                               setEditForm({ ...editForm, naso: e.target.value })
                             }
-                            className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                            className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                           />
                         </div>
                         <div>
@@ -591,7 +594,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                             onChange={(e) =>
                               setEditForm({ ...editForm, stato: e.target.value })
                             }
-                            className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                            className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                           >
                             <option value="collezione">Collezione</option>
                             <option value="radar">Radar</option>
@@ -613,7 +616,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                             })
                           }
                           placeholder="Es. 50ml: €190 • 100ml: €260"
-                          className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                          className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                         />
                       </div>
 
@@ -627,7 +630,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           onChange={(e) =>
                             setEditForm({ ...editForm, url_foto_vetrina: e.target.value })
                           }
-                          className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                          className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                         />
                       </div>
 
@@ -641,7 +644,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           onChange={(e) =>
                             setEditForm({ ...editForm, note_testa: e.target.value })
                           }
-                          className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                          className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                         />
                       </div>
                       <div>
@@ -654,7 +657,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           onChange={(e) =>
                             setEditForm({ ...editForm, note_cuore: e.target.value })
                           }
-                          className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                          className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                         />
                       </div>
                       <div>
@@ -667,7 +670,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           onChange={(e) =>
                             setEditForm({ ...editForm, note_fondo: e.target.value })
                           }
-                          className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                          className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                         />
                       </div>
                     </div>
@@ -682,7 +685,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                       <button
                         onClick={handleSaveEdit}
                         style={{ backgroundColor: modalAura.primary }}
-                        className="flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#140D1C]"
+                        className="flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#08060C]"
                       >
                         <Check className="h-3.5 w-3.5" />
                         <span>Salva</span>
@@ -701,7 +704,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                       </h3>
                       <div className="space-y-2 text-xs">
                         {selectedProfumo.note_testa && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-2.5 border border-white/10">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
                             <span
                               style={{ color: modalAura.primary }}
                               className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
@@ -714,7 +717,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           </div>
                         )}
                         {selectedProfumo.note_cuore && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-2.5 border border-white/10">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
                             <span
                               style={{ color: modalAura.primary }}
                               className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
@@ -727,7 +730,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           </div>
                         )}
                         {selectedProfumo.note_fondo && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#140D1C] px-4 py-2.5 border border-white/10">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
                             <span
                               style={{ color: modalAura.primary }}
                               className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
@@ -743,14 +746,14 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           !selectedProfumo.note_cuore &&
                           !selectedProfumo.note_fondo &&
                           selectedProfumo.note_olfattive && (
-                            <div className="rounded-[16px] bg-[#140D1C] p-3.5 border border-white/10 text-center text-[#F6EFE4]">
+                            <div className="rounded-[16px] bg-[#0E0A16] p-3.5 border border-white/10 text-center text-[#F6EFE4]">
                               {formatPerfumeNote(selectedProfumo.note_olfattive)}
                             </div>
                           )}
                       </div>
                     </div>
 
-                    {/* 2. PODIO CON SIGILLO D'AUTORE + DATI ANAGRAFICI REALI */}
+                    {/* 2. PODIO CON SIGILLO D'AUTORE + DATI ANAGRAFICI */}
                     <div className="flex flex-col items-center text-center pt-2">
                       <div className="relative mb-4">
                         <div
@@ -787,7 +790,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                         {selectedProfumo.naso && (
                           <div
                             style={{ borderColor: `${modalAura.primary}40` }}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-[#140D1C] px-3.5 py-1.5 border font-mono text-[11px] text-[#F6EFE4]"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-[#0E0A16] px-3.5 py-1.5 border font-mono text-[11px] text-[#F6EFE4]"
                           >
                             <UserCheck
                               style={{ color: modalAura.primary }}
@@ -797,7 +800,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           </div>
                         )}
                         {pAny.anno_lancio && (
-                          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#140D1C] px-3.5 py-1.5 border border-white/10 font-mono text-[11px] text-[#B8A9C9]">
+                          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#0E0A16] px-3.5 py-1.5 border border-white/10 font-mono text-[11px] text-[#B8A9C9]">
                             <Calendar
                               style={{ color: modalAura.primary }}
                               className="h-3.5 w-3.5"
@@ -807,21 +810,21 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                         )}
                       </div>
 
-                      {/* SEZIONE RADAR: PREZZI DISTINTI PER FORMATI >= 30ML CON AI */}
+                      {/* SEZIONE RADAR: PREZZI DISTINTI PER FORMATO >= 30ML */}
                       {isRadarItem && (
-                        <div className="mt-4 w-full rounded-2xl bg-[#140D1C] p-4 border border-[#A855F7]/35 space-y-2.5">
+                        <div className="mt-4 w-full rounded-2xl bg-[#0E0A16] p-4 border border-purple-400/35 space-y-2.5">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 text-[#A855F7]">
+                            <div className="flex items-center gap-1.5 text-purple-300">
                               <Tag className="h-3.5 w-3.5" />
                               <span className="font-mono text-[10px] uppercase tracking-wider">
-                                Pianificazione Acquisto (Formati ≥ 30ml)
+                                Listino Formati Ufficiali (≥ 30ml)
                               </span>
                             </div>
                             <button
                               type="button"
                               onClick={() => handleFetchFormatsPrices(selectedProfumo)}
                               disabled={loadingPrices}
-                              className="inline-flex items-center gap-1.5 rounded-full bg-[#A855F7] px-3 py-1 font-mono text-[10px] font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-purple-400 px-3 py-1 font-mono text-[10px] font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
                             >
                               {loadingPrices ? (
                                 <RefreshCw className="h-3 w-3 animate-spin" />
@@ -829,20 +832,20 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                                 <Sparkles className="h-3 w-3" />
                               )}
                               <span>
-                                {loadingPrices ? 'Ricerca listini...' : 'Calcola Prezzi Formati AI'}
+                                {loadingPrices ? 'Ricerca...' : 'Calcola Prezzi Formati AI'}
                               </span>
                             </button>
                           </div>
                           <p className="font-mono text-xs text-[#F6EFE4] text-left">
                             {selectedProfumo.prezzo_stimato_euro
                               ? selectedProfumo.prezzo_stimato_euro
-                              : 'Premi "Calcola Prezzi Formati AI" per estrarre i prezzi dei formati da 30ml, 50ml, 100ml (esclusi campioncini).'}
+                              : 'Premi "Calcola Prezzi Formati AI" per estrarre i prezzi ufficiali da 30ml, 50ml, 100ml (esclusi campioncini).'}
                           </p>
                         </div>
                       )}
 
                       {/* 3. LE 4 STAGIONI */}
-                      <div className="mt-4 w-full grid grid-cols-4 gap-2 rounded-2xl bg-[#140D1C]/90 p-2.5 border border-white/10">
+                      <div className="mt-4 w-full grid grid-cols-4 gap-2 rounded-2xl bg-[#0E0A16]/90 p-2.5 border border-white/10">
                         <div
                           className={`flex flex-col items-center gap-1 rounded-xl py-2 transition ${
                             seasons.primavera
@@ -912,7 +915,7 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
                           setIsEditing(false);
                         }}
                         style={{ backgroundColor: modalAura.primary }}
-                        className="rounded-full px-6 py-2.5 text-xs font-bold text-[#140D1C] transition hover:opacity-90"
+                        className="rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90"
                       >
                         Chiudi
                       </button>
@@ -925,8 +928,8 @@ Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (in
         })()}
 
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/90 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#1E1428] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/90 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#161024] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
             <h3 className="font-serif text-xl text-[#F6EFE4]">
               Rimuovere questa creazione?
             </h3>
