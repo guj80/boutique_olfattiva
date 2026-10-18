@@ -1,0 +1,130 @@
+const TECHNICAL_NOTES_DICTIONARY: Record<string, string> = {
+  'bergamot': 'Bergamotto',
+  'calabrian bergamot': 'Bergamotto di Calabria',
+  'lemon': 'Limone',
+  'sicilian lemon': 'Limone di Sicilia',
+  'mandarin': 'Mandarino',
+  'mandarin orange': 'Mandarino',
+  'blood orange': 'Arancia Rossa',
+  'bitter orange': 'Arancia Amara',
+  'orange': 'Arancia',
+  'grapefruit': 'Pompelmo',
+  'lime': 'Lime',
+  'yuzu': 'Yuzu',
+  'neroli': 'Neroli',
+  'petitgrain': 'Petitgrain',
+  'orange blossom': 'Fiore d\'Arancio',
+  'rose': 'Rosa',
+  'damask rose': 'Rosa Damascena',
+  'bulgarian rose': 'Rosa Bulgara',
+  'taif rose': 'Rosa di Taif',
+  'jasmine': 'Gelsomino',
+  'jasmine sambac': 'Gelsomino Sambac',
+  'tuberose': 'Tuberosa',
+  'iris': 'Iris',
+  'orris': 'Burro d\'Iris (Orris)',
+  'orris root': 'Radice di Iris',
+  'violet': 'Violetta',
+  'ylang-ylang': 'Ylang-Ylang',
+  'osmanthus': 'Osmanto',
+  'lavender': 'Lavanda',
+  'geranium': 'Geranio',
+  'white musk': 'Muschio Bianco',
+  'musk': 'Muschio',
+  'ambroxan': 'Ambroxan',
+  'iso e super': 'Iso E Super',
+  'cashmeran': 'Cashmeran',
+  'akigalawood': 'Akigalawood',
+  'georgywood': 'Georgywood',
+  'vanilla': 'Vaniglia',
+  'bourbon vanilla': 'Vaniglia Bourbon',
+  'madagascar vanilla': 'Vaniglia del Madagascar',
+  'tonka bean': 'Fava Tonka',
+  'sandalwood': 'Sandalo',
+  'australian sandalwood': 'Sandalo Australiano',
+  'cedar': 'Legno di Cedro',
+  'atlas cedar': 'Cedro dell\'Atlante',
+  'virginia cedar': 'Cedro della Virginia',
+  'guaiac wood': 'Legno di Guaiaco',
+  'agarwood': 'Oud (Legno di Agar)',
+  'oud': 'Oud (Legno di Agar)',
+  'amber': 'Ambra',
+  'ambergris': 'Ambra Grigia',
+  'amberwood': 'Legno d\'Ambra',
+  'patchouli': 'Patchouli',
+  'vetiver': 'Vetiver',
+  'haitian vetiver': 'Vetiver di Haiti',
+  'oakmoss': 'Muschio di Quercia',
+  'leather': 'Cuoio',
+  'suede': 'Pelle Scamosciata (Suede)',
+  'saffron': 'Zafferano',
+  'incense': 'Incenso (Olibano)',
+  'olibanum': 'Olibano (Incenso)',
+  'myrrh': 'Mirra',
+  'labdanum': 'Labdano',
+  'benzoin': 'Benzoino',
+  'elemi': 'Resina di Elemi',
+  'black pepper': 'Pepe Nero',
+  'pink pepper': 'Pepe Rosa',
+  'sichuan pepper': 'Pepe di Sichuan',
+  'pepper': 'Pepe',
+  'cardamom': 'Cardamomo',
+  'cinnamon': 'Cannella',
+  'nutmeg': 'Noce Moscata',
+  'clove': 'Chiodi di Garofano',
+  'ginger': 'Zenzero',
+  'coriander': 'Coriandolo',
+  'cumin': 'Cumino',
+  'juniper berries': 'Bacche di Ginepro',
+  'tobacco': 'Foglie di Tabacco',
+  'honey': 'Miele',
+  'coffee': 'Caffè',
+  'cacao': 'Cacao Assoluto',
+  'praline': 'Pralina',
+  'caramel': 'Caramello',
+  'almond': 'Mandorla Amara',
+  'fig': 'Fico',
+  'pear': 'Pera',
+  'peach': 'Pesca',
+  'plum': 'Prugna',
+  'black currant': 'Ribes Nero',
+  'raspberry': 'Lampone',
+  'apple': 'Mela',
+  'sea notes': 'Note Marine',
+  'seaweed': 'Alghe Marine',
+  'salt': 'Sale Marino',
+  'cypress': 'Cipresso',
+  'pine': 'Pino',
+  'sage': 'Salvia Sclarea',
+  'rosemary': 'Rosmarino',
+  'mint': 'Menta',
+  'green tea': 'Tè Verde',
+  'black tea': 'Tè Nero',
+  'mate': 'Assoluta di Mate',
+  'rum': 'Rum',
+  'cognac': 'Cognac',
+  'whiskey': 'Whisky',
+};
+
+export function formatPerfumeNote(text?: string | null): string {
+  if (!text || !text.trim()) return 'Non dichiarate';
+
+  // Ordina le chiavi dalla più lunga alla più corta per non spezzare parole composte (es. "pink pepper" prima di "pepper")
+  const sortedEntries = Object.entries(TECHNICAL_NOTES_DICTIONARY).sort(
+    (a, b) => b[0].length - a[0].length
+  );
+
+  return text
+    .split(',')
+    .map((rawNote) => {
+      let note = rawNote.trim();
+      if (!note) return '';
+      for (const [en, it] of sortedEntries) {
+        const regex = new RegExp(`^${en}$|\\b${en}\\b`, 'gi');
+        note = note.replace(regex, it);
+      }
+      return note.charAt(0).toUpperCase() + note.slice(1);
+    })
+    .filter(Boolean)
+    .join(', ');
+}
