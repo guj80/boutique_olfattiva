@@ -250,7 +250,7 @@ export default function ScannerPage() {
           >
             <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
           </Link>
-          <Logo className="h-7" />
+          <Logo className="h-12" />
         </div>
         <Link
           href="/collezione"
