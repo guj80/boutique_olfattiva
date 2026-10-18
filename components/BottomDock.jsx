@@ -4,12 +4,12 @@ import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Sparkles, Library, ScanLine, Compass, CalendarHeart } from 'lucide-react';
-import { useAura } from './AuraProvider';
+import { useAura, SECTION_THEMES } from './AuraProvider';
 
 function BottomDockInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { aura, hideDock } = useAura();
+  const { aura, setCustomAura, hideDock } = useAura();
 
   if (pathname.startsWith('/login') || pathname.startsWith('/signup')) return null;
   if (hideDock) return null;
@@ -29,11 +29,11 @@ function BottomDockInner() {
       : 'atelier';
 
   const items = [
-    { key: 'atelier', label: 'Atelier', href: '/', icon: Sparkles },
-    { key: 'collezione', label: 'Collezione', href: '/collezione', icon: Library },
-    { key: 'scanner', label: 'Acquisisci', href: '/scanner', icon: ScanLine, center: true },
-    { key: 'radar', label: 'Radar', href: '/collezione?vista=radar', icon: Compass },
-    { key: 'diario', label: 'Diario', href: '/diario', icon: CalendarHeart },
+    { key: 'atelier', label: 'Atelier', href: '/', icon: Sparkles, theme: SECTION_THEMES.atelier },
+    { key: 'collezione', label: 'Collezione', href: '/collezione', icon: Library, theme: SECTION_THEMES.collezione },
+    { key: 'scanner', label: '', href: '/scanner', icon: ScanLine, center: true, theme: SECTION_THEMES.scanner },
+    { key: 'radar', label: 'Radar', href: '/collezione?vista=radar', icon: Compass, theme: SECTION_THEMES.radar },
+    { key: 'diario', label: 'Diario', href: '/diario', icon: CalendarHeart, theme: SECTION_THEMES.diario },
   ];
 
   return (
@@ -44,7 +44,7 @@ function BottomDockInner() {
     >
       <div
         style={{ borderColor: `${aura.primary}35` }}
-        className="pointer-events-auto flex items-center gap-1.5 rounded-full border bg-[#140D1C]/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.75)] backdrop-blur-xl transition-colors duration-700"
+        className="pointer-events-auto flex items-center gap-1.5 rounded-full border bg-[#140D1C]/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-colors duration-700"
       >
         {items.map((item) => {
           const Icon = item.icon;
@@ -55,9 +55,10 @@ function BottomDockInner() {
               <Link
                 key={item.key}
                 href={item.href}
-                aria-label={item.label}
+                onClick={() => setCustomAura(item.theme)}
+                aria-label="Scanner"
                 style={{ backgroundColor: aura.primary }}
-                className="relative mx-1 flex h-13 w-13 p-3.5 items-center justify-center rounded-full text-[#140D1C] shadow-lg transition hover:scale-105"
+                className="relative mx-1.5 flex h-12 w-12 items-center justify-center rounded-full text-[#140D1C] shadow-lg transition hover:scale-105"
               >
                 <Icon className="relative z-10 h-5 w-5 stroke-[2.2]" />
               </Link>
@@ -68,7 +69,7 @@ function BottomDockInner() {
             <Link
               key={item.key}
               href={item.href}
-              aria-label={item.label}
+              onClick={() => setCustomAura(item.theme)}
               style={
                 isActive
                   ? { borderColor: `${aura.primary}50`, color: '#F6EFE4' }
