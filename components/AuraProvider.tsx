@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Profumo } from '@/lib/supabase';
 
 export interface AuraPair {
@@ -10,31 +10,30 @@ export interface AuraPair {
   familyLabel: string;
 }
 
-// AMBIENTI CROMATICI DISTINTI PER OGNI SEZIONE DEL MENU
 export const SECTION_THEMES: Record<string, AuraPair> = {
   atelier: {
-    primary: '#38BDF8',   // Blu Zaffiro / Ciano luminoso
-    secondary: '#0F172A', // Blu Notte profondo
+    primary: '#10B981',   // Smeraldo Neon coerente col logo originale in Home
+    secondary: '#1E1035', // Viola/Notte profondo
     familyLabel: 'Atelier',
   },
   collezione: {
-    primary: '#10B981',   // Smeraldo Imperiale
-    secondary: '#06281E', // Verde Abissale
+    primary: '#38BDF8',   // Blu Talisman / Ciano Scultoreo
+    secondary: '#0B1D3A', // Blu Abissale
     familyLabel: 'Collezione',
   },
   scanner: {
-    primary: '#F59E0B',   // Ambra / Oro Scultoreo
+    primary: '#F59E0B',   // Ambra / Oro Liquido (Naxos)
     secondary: '#291507', // Mogano Scuro
     familyLabel: 'Scanner',
   },
   radar: {
-    primary: '#A855F7',   // Viola Ametista
+    primary: '#C084FC',   // Ametista Luminoso
     secondary: '#240B36', // Indaco Notturno
     familyLabel: 'Radar',
   },
   diario: {
-    primary: '#F43F5E',   // Rubino Imperiale
-    secondary: '#2D0A16', // Bordeaux Abissale
+    primary: '#FB7185',   // Rubino Chiaro ad alto contrasto (zero effetto tono su tono)
+    secondary: '#280917', // Bordeaux Abissale
     familyLabel: 'Diario',
   },
 };
@@ -42,7 +41,7 @@ export const SECTION_THEMES: Record<string, AuraPair> = {
 const FAMILY_RULES: Array<{ keywords: string[]; pair: AuraPair }> = [
   {
     keywords: ['legnos', 'ambrat', 'wood', 'amber', 'oud', 'sandal', 'cedr', 'patchouli', 'vetiver'],
-    pair: { primary: '#E07A38', secondary: '#592212', familyLabel: 'Legnoso Ambrato' },
+    pair: { primary: '#F59E0B', secondary: '#592212', familyLabel: 'Legnoso Ambrato' },
   },
   {
     keywords: ['agrum', 'fresc', 'citr', 'bergamot', 'limon', 'neroli', 'verde', 'pulit'],
@@ -50,11 +49,11 @@ const FAMILY_RULES: Array<{ keywords: string[]; pair: AuraPair }> = [
   },
   {
     keywords: ['speziat', 'boozy', 'cald', 'spic', 'rum', 'cognac', 'cannell', 'pepe', 'cardamom', 'tabacc'],
-    pair: { primary: '#F43F5E', secondary: '#4C1127', familyLabel: 'Speziato Caldo' },
+    pair: { primary: '#FB7185', secondary: '#4C1127', familyLabel: 'Speziato Caldo' },
   },
   {
     keywords: ['gourmand', 'vanigl', 'dolc', 'caff', 'cioccol', 'caramel', 'mandorl', 'miele', 'fava tonka'],
-    pair: { primary: '#F59E0B', secondary: '#4A2511', familyLabel: 'Gourmand' },
+    pair: { primary: '#FBBF24', secondary: '#4A2511', familyLabel: 'Gourmand' },
   },
   {
     keywords: ['marin', 'aromat', 'acquat', 'sale', 'ozon', 'lavand', 'salvia', 'rosmarin', 'foug'],
@@ -62,22 +61,20 @@ const FAMILY_RULES: Array<{ keywords: string[]; pair: AuraPair }> = [
   },
   {
     keywords: ['cuoi', 'incens', 'fumos', 'leath', 'smok', 'resine', 'mirra', 'labdan', 'animal', 'musch'],
-    pair: { primary: '#A855F7', secondary: '#2E1065', familyLabel: 'Cuoiato Muschiato' },
+    pair: { primary: '#C084FC', secondary: '#2E1065', familyLabel: 'Cuoiato Muschiato' },
   },
   {
     keywords: ['fiorit', 'floreal', 'fruttat', 'rosa', 'gelsomin', 'iris', 'tuber', 'peon', 'violett', 'ylang'],
-    pair: { primary: '#EC4899', secondary: '#500724', familyLabel: 'Floreale' },
+    pair: { primary: '#F472B6', secondary: '#500724', familyLabel: 'Floreale' },
   },
 ];
 
 const FALLBACK_PALETTES: Array<[string, string]> = [
   ['#38BDF8', '#172554'],
-  ['#10B981', '#06281E'],
-  ['#A855F7', '#2E1065'],
-  ['#F43F5E', '#4C1127'],
-  ['#E07A38', '#592212'],
-  ['#F59E0B', '#4A2511'],
-  ['#EC4899', '#500724'],
+  ['#34D399', '#06281E'],
+  ['#C084FC', '#2E1065'],
+  ['#FB7185', '#4C1127'],
+  ['#F59E0B', '#592212'],
 ];
 
 function hashString(str: string): number {
@@ -147,7 +144,7 @@ export function resolveAura(famiglia?: string | null, nome?: string | null): Aur
   const raw = `${famiglia || ''}`.toLowerCase().trim();
   const cleanName = (nome || '').trim();
   const nameHash = cleanName ? hashString(cleanName) : 0;
-  const hueOffset = cleanName ? (nameHash % 25) - 12 : 0;
+  const hueOffset = cleanName ? (nameHash % 20) - 10 : 0;
 
   if (raw) {
     for (const rule of FAMILY_RULES) {
@@ -198,7 +195,6 @@ export function AuraProvider({ children }: { children: React.ReactNode }) {
   const [activeProfumo, setActiveProfumo] = useState<Profumo | null>(null);
   const [hideDock, setHideDock] = useState(false);
 
-  // Cambio automatico di ambiente cromatico in base al menu visitato
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -250,7 +246,7 @@ export function AuraProvider({ children }: { children: React.ReactNode }) {
             '--aura-2': aura.secondary,
           } as React.CSSProperties
         }
-        className="min-h-[100dvh] w-full bg-[#140D1C] text-[#F6EFE4] transition-colors duration-700"
+        className="min-h-[100dvh] w-full bg-[#08060C] text-[#F6EFE4] transition-colors duration-700"
       >
         {children}
       </div>
