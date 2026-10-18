@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef } from 'react';
@@ -10,16 +9,14 @@ import {
   Camera,
   Sparkles,
   RefreshCw,
-  CheckCircle2,
-  ShieldCheck,
-  Compass,
   Image as ImageIcon,
-  Trash2,
   Search,
   FlaskConical,
+  UserCheck,
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
+import { useAura, resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 
 const PURE_FAMILIES = [
@@ -56,6 +53,7 @@ export default function ScannerPage() {
   const [modelSource, setModelSource] = useState<string>('');
   const [targetStato, setTargetStato] = useState<'collezione' | 'radar'>('collezione');
 
+  const { aura, setCustomAura } = useAura();
   const { showToast } = useToast();
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -101,11 +99,11 @@ export default function ScannerPage() {
     if (e) e.preventDefault();
 
     if (mode === 'url' && !inputUrl.trim()) {
-      showToast('Inserisci un link valido.', 'error');
+      showToast('Inserisci un link ufficiale valido.', 'error');
       return;
     }
     if (mode === 'name' && !inputName.trim()) {
-      showToast('Inserisci Marchio e Nome del profumo.', 'error');
+      showToast('Inserisci Maison e Nome della creazione.', 'error');
       return;
     }
     if (mode === 'photo' && !imagePreview) {
@@ -138,21 +136,21 @@ export default function ScannerPage() {
         throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
-      setModelSource(data._modelUsed || 'neural-engine');
-      setDraft({
+      const extractedDraft: Partial<Profumo> = {
         nome: data.nome || '',
         brand: data.brand || '',
-        concentrazione: data.concentrazione || 'Eau de Parfum',
+        concentrazione: data.concentrazione || 'Extrait de Parfum',
         famiglia_olfattiva: data.famiglia_olfattiva || 'Legnosa',
+        naso: data.naso || '',
         note_testa: data.note_testa || '',
         note_cuore: data.note_cuore || '',
         note_fondo: data.note_fondo || '',
         note_olfattive: data.note_olfattive || '',
-        descrizione_ai: data.descrizione_ai || '',
+        descrizione_ai: '',
         prezzo_stimato_euro: data.prezzo_stimato_euro || '€150',
         formato_ml: Number(data.formato_ml) || 100,
-        stagione_ideale: data.stagione_ideale || 'Tutte le stagioni',
-        occasione_ideale: data.occasione_ideale || 'Serata',
+        stagione_ideale: data.stagione_ideale || '',
+        occasione_ideale: data.occasione_ideale || '',
         voto_longevita: Number(data.voto_longevita) || 8,
         voto_scia: Number(data.voto_scia) || 8,
         voto_proiezione: Number(data.voto_proiezione) || 8,
@@ -160,8 +158,12 @@ export default function ScannerPage() {
         url_foto_vetrina: data.url_foto_vetrina || (mode === 'photo' ? imagePreview : null),
         note_mouche: '',
         note_pelle: '',
-      });
-      showToast('Scheda estratta con successo.');
+      };
+
+      setModelSource(data._modelUsed || 'neural-engine');
+      setDraft(extractedDraft);
+      setCustomAura(resolveAura(extractedDraft.famiglia_olfattiva, extractedDraft.nome));
+      showToast('Scheda tecnica acquisita.');
     } catch (err: any) {
       showToast(err?.message || "Impossibile completare l'estrazione.", 'error');
     } finally {
@@ -172,7 +174,7 @@ export default function ScannerPage() {
   async function handleSaveToSupabase(e: React.FormEvent) {
     e.preventDefault();
     if (!draft || !draft.nome || !draft.brand) {
-      showToast('Assicurati che Marchio e Nome siano compilati.', 'error');
+      showToast('Assicurati che Maison e Nome siano compilati.', 'error');
       return;
     }
 
@@ -184,16 +186,18 @@ export default function ScannerPage() {
           .filter(Boolean)
           .join(', ');
 
+      // Mappatura rigorosa sulla colonna "naso" della tabella "profumi"
       const fullPayload: Record<string, any> = {
-        nome: draft.nome!.trim(),
-        brand: draft.brand!.trim(),
-        concentrazione: draft.concentrazione || 'Eau de Parfum',
+        nome: draft.nome.trim(),
+        brand: draft.brand.trim(),
+        concentrazione: draft.concentrazione || 'Extrait de Parfum',
         famiglia_olfattiva: draft.famiglia_olfattiva || 'Legnosa',
+        naso: draft.naso && draft.naso.trim() ? draft.naso.trim() : null,
         note_testa: draft.note_testa || '',
         note_cuore: draft.note_cuore || '',
         note_fondo: draft.note_fondo || '',
         note_olfattive: unifiedNotes,
-        descrizione_ai: draft.descrizione_ai || '',
+        descrizione_ai: '',
         prezzo_stimato_euro: draft.prezzo_stimato_euro || '€150',
         formato_ml: Number(draft.formato_ml) || 100,
         stagione_ideale: draft.stagione_ideale || '',
@@ -216,6 +220,7 @@ export default function ScannerPage() {
             nome: fullPayload.nome,
             brand: fullPayload.brand,
             famiglia_olfattiva: fullPayload.famiglia_olfattiva,
+            naso: fullPayload.naso,
             note_olfattive: fullPayload.note_olfattive,
             stato: targetStato,
           },
@@ -223,7 +228,7 @@ export default function ScannerPage() {
         if (fallbackErr) throw fallbackErr;
       }
 
-      showToast('Profumo salvato correttamente.');
+      showToast('Creazione registrata nell\'Atelier.');
       router.push(
         targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione'
       );
@@ -235,53 +240,60 @@ export default function ScannerPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 sm:px-8 py-8 pb-28">
-      <header className="flex items-center justify-between gap-4 pb-6 border-b border-[#D8B995]/20">
+    <main className="mx-auto w-full max-w-3xl px-4 sm:px-8 py-8 pb-36">
+      <header className="flex items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div className="flex items-center gap-4">
           <Link
             href="/"
             aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D8B995]/30 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-[#D8B995]"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-white/40"
           >
-            <ArrowLeft className="h-5 w-5 text-[#D8B995]" />
+            <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
           </Link>
           <Logo className="h-7" />
         </div>
         <Link
           href="/collezione"
-          className="rounded-full border border-[#D8B995]/30 bg-[#1E1428] px-4 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:border-[#D8B995]"
+          style={{ borderColor: `${aura.primary}40` }}
+          className="rounded-full border bg-[#1E1428] px-4 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:border-white/40"
         >
-          Vai a Collezione
+          La Collezione
         </Link>
       </header>
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-5 sm:p-6 aura-shadow space-y-5">
+      <section
+        style={{ borderColor: `${aura.primary}30` }}
+        className="mt-6 rounded-[28px] border bg-[#1E1428]/90 p-5 sm:p-6 aura-shadow space-y-5"
+      >
         <div className="grid grid-cols-3 gap-2 rounded-full bg-[#140D1C] p-1.5 border border-white/10">
           <button
             type="button"
             onClick={() => setMode('name')}
+            style={mode === 'name' ? { backgroundColor: aura.primary } : undefined}
             className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
-              mode === 'name' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+              mode === 'name' ? 'text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
           >
             <Search className="h-3.5 w-3.5" />
-            <span>Nome</span>
+            <span>Ricerca</span>
           </button>
           <button
             type="button"
             onClick={() => setMode('photo')}
+            style={mode === 'photo' ? { backgroundColor: aura.primary } : undefined}
             className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
-              mode === 'photo' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+              mode === 'photo' ? 'text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
           >
             <Camera className="h-3.5 w-3.5" />
-            <span>Foto</span>
+            <span>Flacone</span>
           </button>
           <button
             type="button"
             onClick={() => setMode('url')}
+            style={mode === 'url' ? { backgroundColor: aura.primary } : undefined}
             className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
-              mode === 'url' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+              mode === 'url' ? 'text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
           >
             <Link2 className="h-3.5 w-3.5" />
@@ -291,24 +303,29 @@ export default function ScannerPage() {
 
         {mode === 'name' && (
           <form onSubmit={handleExtract} className="space-y-3">
-            <label className="block text-xs font-medium text-[#B8A9C9]">
-              Marchio e Nome del Profumo
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
+              Maison e Nome della Creazione
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
                 value={inputName}
                 onChange={(e) => setInputName(e.target.value)}
-                placeholder="Es. Orto Parisi Megamare, Byredo Gypsy Water..."
-                className="flex-1 rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:border-[#D8B995] focus:outline-none"
+                placeholder="Es. Ex Nihilo Blue Talisman, Xerjoff Naxos..."
+                className="flex-1 rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:border-white/30 focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={extracting || !inputName.trim()}
-                className="flex items-center justify-center gap-2 rounded-[16px] bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e] disabled:opacity-40"
+                style={{ backgroundColor: aura.primary }}
+                className="flex items-center justify-center gap-2 rounded-[16px] px-6 py-3 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-40"
               >
-                {extracting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                <span>Estrai</span>
+                {extracting ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                <span>Cataloga</span>
               </button>
             </div>
           </form>
@@ -316,42 +333,70 @@ export default function ScannerPage() {
 
         {mode === 'photo' && (
           <div className="space-y-4">
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
-            <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
 
             {!imagePreview ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
                   type="button"
                   onClick={() => cameraInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-[#D8B995]/50"
+                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-white/30"
                 >
-                  <Camera className="h-6 w-6 text-[#D8B995]" />
+                  <Camera style={{ color: aura.primary }} className="h-6 w-6" />
                   <span className="text-sm font-semibold text-[#F6EFE4]">Scatta Foto</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => galleryInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-[#D8B995]/50"
+                  className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-white/30"
                 >
-                  <ImageIcon className="h-6 w-6 text-[#D8B995]" />
-                  <span className="text-sm font-semibold text-[#F6EFE4]">Carica da Galleria</span>
+                  <ImageIcon style={{ color: aura.primary }} className="h-6 w-6" />
+                  <span className="text-sm font-semibold text-[#F6EFE4]">
+                    Seleziona da Libreria
+                  </span>
                 </button>
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[20px] bg-[#140D1C] p-4 border border-white/10">
                 <div className="flex items-center gap-4">
-                  <img src={imagePreview} alt="Anteprima" className="h-16 w-16 rounded-xl object-contain bg-black p-1" />
+                  <img
+                    src={imagePreview}
+                    alt="Anteprima"
+                    className="h-16 w-16 rounded-xl object-contain bg-transparent p-1"
+                  />
                   <div>
-                    <p className="text-sm font-semibold text-[#F6EFE4]">Immagine pronta</p>
-                    <button type="button" onClick={() => setImagePreview(null)} className="text-xs text-red-400 mt-1">Rimuovi</button>
+                    <p className="text-sm font-semibold text-[#F6EFE4]">
+                      Acquisizione visiva pronta
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setImagePreview(null)}
+                      className="text-xs text-red-400 mt-1"
+                    >
+                      Rimuovi
+                    </button>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleExtract()}
                   disabled={extracting}
-                  className="rounded-full bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C]"
+                  style={{ backgroundColor: aura.primary }}
+                  className="rounded-full px-6 py-3 text-xs font-bold text-[#140D1C]"
                 >
                   {extracting ? 'Analisi...' : 'Avvia Riconoscimento'}
                 </button>
@@ -362,7 +407,9 @@ export default function ScannerPage() {
 
         {mode === 'url' && (
           <form onSubmit={handleExtract} className="space-y-3">
-            <label className="block text-xs font-medium text-[#B8A9C9]">Incolla Link Ufficiale</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
+              URL Pagina Ufficiale della Maison
+            </label>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="url"
@@ -374,7 +421,8 @@ export default function ScannerPage() {
               <button
                 type="submit"
                 disabled={extracting || !inputUrl.trim()}
-                className="rounded-[16px] bg-[#D8B995] px-6 py-3 text-xs font-bold text-[#140D1C]"
+                style={{ backgroundColor: aura.primary }}
+                className="rounded-[16px] px-6 py-3 text-xs font-bold text-[#140D1C]"
               >
                 {extracting ? 'Lettura...' : 'Estrai'}
               </button>
@@ -384,19 +432,33 @@ export default function ScannerPage() {
       </section>
 
       {draft && (
-        <section className="mt-6 rounded-[28px] border border-[#D8B995]/40 bg-[#1E1428]/95 p-6 space-y-5">
+        <section
+          style={{ borderColor: `${aura.primary}45` }}
+          className="mt-6 rounded-[28px] border bg-[#1E1428]/95 p-6 space-y-5 shadow-2xl"
+        >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#140D1C] border border-white/10">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#140D1C] border border-white/10">
                 {draft.url_foto_vetrina ? (
-                  <img src={draft.url_foto_vetrina} alt="" className="h-full w-full object-contain p-1" />
+                  <img
+                    src={draft.url_foto_vetrina}
+                    alt=""
+                    className="h-full w-full object-contain p-1.5"
+                  />
                 ) : (
-                  <FlaskConical className="h-5 w-5 text-[#D8B995]" />
+                  <FlaskConical style={{ color: aura.primary }} className="h-5 w-5" />
                 )}
               </div>
               <div>
-                <span className="font-mono text-[10px] text-[#D8B995]">Fonte: {modelSource}</span>
-                <h2 className="font-serif text-2xl text-[#F6EFE4]">{draft.brand} — {draft.nome}</h2>
+                <span
+                  style={{ color: aura.primary }}
+                  className="font-mono text-[10px] uppercase tracking-wider"
+                >
+                  Fonte: {modelSource}
+                </span>
+                <h2 className="font-serif text-2xl text-[#F6EFE4]">
+                  {draft.brand} — {draft.nome}
+                </h2>
               </div>
             </div>
 
@@ -404,8 +466,13 @@ export default function ScannerPage() {
               <button
                 type="button"
                 onClick={() => setTargetStato('collezione')}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  targetStato === 'collezione' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'
+                style={
+                  targetStato === 'collezione'
+                    ? { backgroundColor: aura.primary }
+                    : undefined
+                }
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                  targetStato === 'collezione' ? 'text-[#140D1C]' : 'text-[#B8A9C9]'
                 }`}
               >
                 Collezione
@@ -413,8 +480,11 @@ export default function ScannerPage() {
               <button
                 type="button"
                 onClick={() => setTargetStato('radar')}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  targetStato === 'radar' ? 'bg-[#D8B995] text-[#140D1C]' : 'text-[#B8A9C9]'
+                style={
+                  targetStato === 'radar' ? { backgroundColor: aura.primary } : undefined
+                }
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                  targetStato === 'radar' ? 'text-[#140D1C]' : 'text-[#B8A9C9]'
                 }`}
               >
                 Radar
@@ -423,9 +493,14 @@ export default function ScannerPage() {
           </div>
 
           <form onSubmit={handleSaveToSupabase} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Marchio</label>
+                <label
+                  style={{ color: aura.primary }}
+                  className="block text-[10px] font-mono uppercase mb-1"
+                >
+                  Maison
+                </label>
                 <input
                   type="text"
                   value={draft.brand || ''}
@@ -434,7 +509,12 @@ export default function ScannerPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Nome</label>
+                <label
+                  style={{ color: aura.primary }}
+                  className="block text-[10px] font-mono uppercase mb-1"
+                >
+                  Creazione
+                </label>
                 <input
                   type="text"
                   value={draft.nome || ''}
@@ -443,16 +523,81 @@ export default function ScannerPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-mono uppercase text-[#D8B995] mb-1">Famiglia</label>
+                <label
+                  style={{ color: aura.primary }}
+                  className="block text-[10px] font-mono uppercase mb-1"
+                >
+                  Famiglia Pura
+                </label>
                 <select
                   value={draft.famiglia_olfattiva || 'Legnosa'}
-                  onChange={(e) => setDraft({ ...draft, famiglia_olfattiva: e.target.value })}
+                  onChange={(e) => {
+                    const nextFam = e.target.value;
+                    setDraft({ ...draft, famiglia_olfattiva: nextFam });
+                    setCustomAura(resolveAura(nextFam, draft.nome));
+                  }}
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 >
                   {PURE_FAMILIES.map((f) => (
-                    <option key={f} value={f} className="bg-[#140D1C]">{f}</option>
+                    <option key={f} value={f} className="bg-[#140D1C]">
+                      {f}
+                    </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label
+                  style={{ color: aura.primary }}
+                  className="block text-[10px] font-mono uppercase mb-1"
+                >
+                  Naso (Maître Parfumeur)
+                </label>
+                <div className="relative">
+                  <UserCheck className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#B8A9C9]" />
+                  <input
+                    type="text"
+                    value={draft.naso || ''}
+                    onChange={(e) => setDraft({ ...draft, naso: e.target.value })}
+                    placeholder="Non dichiarato"
+                    className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] pl-8 pr-3 py-2 text-xs text-[#F6EFE4]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-[#B8A9C9] mb-1">
+                  Note di Testa
+                </label>
+                <input
+                  type="text"
+                  value={draft.note_testa || ''}
+                  onChange={(e) => setDraft({ ...draft, note_testa: e.target.value })}
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-[#B8A9C9] mb-1">
+                  Note di Cuore
+                </label>
+                <input
+                  type="text"
+                  value={draft.note_cuore || ''}
+                  onChange={(e) => setDraft({ ...draft, note_cuore: e.target.value })}
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-[#B8A9C9] mb-1">
+                  Note di Fondo
+                </label>
+                <input
+                  type="text"
+                  value={draft.note_fondo || ''}
+                  onChange={(e) => setDraft({ ...draft, note_fondo: e.target.value })}
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
+                />
               </div>
             </div>
 
@@ -467,9 +612,10 @@ export default function ScannerPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-full bg-[#D8B995] px-6 py-2 text-xs font-bold text-[#140D1C] transition hover:bg-[#c2a27e] disabled:opacity-50"
+                style={{ backgroundColor: aura.primary }}
+                className="rounded-full px-6 py-2 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-50"
               >
-                {saving ? 'Salvataggio...' : 'Conferma e Salva'}
+                {saving ? 'Registrazione...' : 'Conferma e Custodisci'}
               </button>
             </div>
           </form>
