@@ -2,21 +2,31 @@
 
 import React from 'react';
 import { FlaskConical } from 'lucide-react';
+import { useAura } from './AuraProvider';
+import { Logo } from './Logo';
 
 interface BottlePedestalProps {
   src?: string | null;
   alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  showSigil?: boolean; // Mostra il logo come sigillo sulla base del podio grande
+  showSigil?: boolean; // ATTIVO ESCLUSIVAMENTE NELLA MODALE DI DETTAGLIO
 }
 
-export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '', showSigil = false }: BottlePedestalProps) {
+export function BottlePedestal({
+  src,
+  alt = 'Flacone',
+  size = 'md',
+  className = '',
+  showSigil = false,
+}: BottlePedestalProps) {
+  const { aura } = useAura();
+
   const sizeClasses = {
     sm: 'h-16 w-16',
     md: 'h-28 w-24',
     lg: 'h-52 w-full',
-    xl: 'h-72 w-60',
+    xl: 'h-72 w-64',
   }[size];
 
   const iconSizes = {
@@ -27,26 +37,40 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
   }[size];
 
   return (
-    <div className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses} ${className}`}>
-      {/* Alone cromatico reattivo di sottofondo */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.18)_0%,transparent_75%)] pointer-events-none" />
+    <div
+      className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses} ${className}`}
+    >
+      {/* Alone cromatico profondo e calibrato */}
+      <div
+        style={{
+          background: `radial-gradient(circle at center, ${aura.primary}22 0%, transparent 72%)`,
+        }}
+        className="absolute inset-0 pointer-events-none transition-all duration-700"
+      />
 
       {src ? (
         <div className="relative z-10 h-full w-full p-2 flex items-center justify-center">
           <img
             src={src}
             alt={alt}
-            className="max-h-full max-w-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.8)] transition-transform duration-500 hover:scale-105"
+            className="max-h-full max-w-full object-contain drop-shadow-[0_16px_28px_rgba(0,0,0,0.85)] transition-transform duration-500 hover:scale-105"
           />
         </div>
       ) : (
-        <FlaskConical className={`${iconSizes} text-[#D8B995]/60 transition-transform duration-500 hover:scale-110`} />
+        <FlaskConical
+          style={{ color: aura.primary }}
+          className={`${iconSizes} opacity-60 transition-transform duration-500`}
+        />
       )}
 
-      {/* Sigillo del logo posizionato con classe alla base del podio (Solo nella modale di dettaglio) */}
+      {/* Sigillo d'Autore: impresso esclusivamente alla base del podio nella scheda di dettaglio */}
       {showSigil && (
-        <div className="absolute bottom-2.5 right-3 z-20 flex h-7 w-7 items-center justify-center overflow-hidden rounded-md border border-[#D8B995]/30 bg-[#140D1C]/90 shadow-md backdrop-blur-sm">
-          <img src="/logo.jpg" alt="Logo L'Aura" className="h-full w-full object-cover opacity-90" />
+        <div
+          style={{ borderColor: `${aura.primary}40` }}
+          className="absolute bottom-2 right-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border bg-[#140D1C]/90 p-1.5 shadow-xl backdrop-blur-md"
+          title="Sigillo d'Autore L'Aura"
+        >
+          <Logo showText={false} className="h-full w-full" />
         </div>
       )}
     </div>
@@ -60,13 +84,21 @@ interface SmartBottleImageProps {
   iconSize?: string;
 }
 
-export function SmartBottleImage({ src, alt = 'Profumo', className = '', iconSize = 'h-5 w-5' }: SmartBottleImageProps) {
+export function SmartBottleImage({
+  src,
+  alt = 'Flacone',
+  className = '',
+  iconSize = 'h-5 w-5',
+}: SmartBottleImageProps) {
+  const { aura } = useAura();
   return (
-    <div className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#140D1C]/90 p-1.5 border border-white/10 ${className}`}>
+    <div
+      className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#140D1C]/90 p-1.5 border border-white/10 ${className}`}
+    >
       {src ? (
         <img src={src} alt={alt} className="h-full w-full object-contain drop-shadow-md" />
       ) : (
-        <FlaskConical className={`${iconSize} text-[#D8B995]/60`} />
+        <FlaskConical style={{ color: aura.primary }} className={`${iconSize} opacity-60`} />
       )}
     </div>
   );
