@@ -20,12 +20,15 @@ import {
   Leaf,
   Snowflake,
   Flower2,
+  Sparkles,
+  RefreshCw,
+  Tag,
 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
 import { Logo } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
-import { resolveAura, useAura } from '@/components/AuraProvider';
+import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 
 const PURE_FAMILIES = [
@@ -79,13 +82,16 @@ export default function CollezionePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [loadingPrices, setLoadingPrices] = useState(false);
 
-  const { aura, setAuraFromProfumo } = useAura();
+  const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
 
   useEffect(() => {
-    setActiveTab(vistaParam === 'radar' ? 'radar' : 'collezione');
-  }, [vistaParam]);
+    const isRadar = vistaParam === 'radar';
+    setActiveTab(isRadar ? 'radar' : 'collezione');
+    setCustomAura(isRadar ? SECTION_THEMES.radar : SECTION_THEMES.collezione);
+  }, [vistaParam, setCustomAura]);
 
   useEffect(() => {
     fetchProfumi();
@@ -104,6 +110,45 @@ export default function CollezionePage() {
       showToast('Impossibile caricare la collezione.', 'error');
     } finally {
       setLoading(false);
+    }
+  }
+
+  // FUNZIONE AI RADAR: STIMA PREZZI PER FORMATO >= 30ML (ESCLUDE SEMPRE CAMPIONCINI)
+  async function handleFetchFormatsPrices(p: Profumo) {
+    setLoadingPrices(true);
+    try {
+      const prompt = `Sei un esperto di listini ufficiali di alta profumeria di nicchia e artistica.
+Indica i formati di vendita ufficiali (ESCLUSIVAMENTE da 30 ml in su: es. 30ml, 50ml, 70ml, 75ml, 100ml) e i relativi prezzi di listino in Euro per il profumo "${p.brand} - ${p.nome}".
+REGOLA TASSATIVA: Ignora ed escludi qualsiasi formato inferiore a 30ml (vietato inserire 2ml, 5ml, 10ml, discovery set o campioncini).
+Rispondi SOLO con una stringa sintetica ed elegante in questo formato esatto (includendo solo i formati realmente esistenti per questo brand):
+"50ml: €190 • 100ml: €265"`;
+
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.text) throw new Error('Impossibile recuperare i listini.');
+
+      const cleanPrices = String(data.text)
+        .replace(/^["']|["']$/g, '')
+        .replace(/\n/g, ' • ')
+        .trim();
+
+      await supabase
+        .from('profumi')
+        .update({ prezzo_stimato_euro: cleanPrices })
+        .eq('id', p.id);
+
+      const updated = { ...p, prezzo_stimato_euro: cleanPrices };
+      setSelectedProfumo(updated);
+      setProfumi((prev) => prev.map((item) => (item.id === p.id ? updated : item)));
+      showToast('Listino formati (≥ 30ml) aggiornato.');
+    } catch (err: any) {
+      showToast(err?.message || 'Errore recupero prezzi per formato.', 'error');
+    } finally {
+      setLoadingPrices(false);
     }
   }
 
@@ -155,6 +200,7 @@ export default function CollezionePage() {
           concentrazione: editForm.concentrazione,
           famiglia_olfattiva: editForm.famiglia_olfattiva,
           naso: editForm.naso || null,
+          prezzo_stimato_euro: editForm.prezzo_stimato_euro || null,
           url_foto_vetrina: editForm.url_foto_vetrina,
           note_testa: editForm.note_testa,
           note_cuore: editForm.note_cuore,
@@ -188,7 +234,8 @@ export default function CollezionePage() {
           >
             <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
           </Link>
-          <Logo className="h-7" />
+          {/* Logo monocolore dinamico basato sul tema della schermata */}
+          <Logo className="h-11" monochrome={true} />
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -196,10 +243,13 @@ export default function CollezionePage() {
             <button
               onClick={() => {
                 setActiveTab('collezione');
+                setCustomAura(SECTION_THEMES.collezione);
                 router.push('/collezione');
               }}
               style={
-                activeTab === 'collezione' ? { backgroundColor: aura.primary } : undefined
+                activeTab === 'collezione'
+                  ? { backgroundColor: SECTION_THEMES.collezione.primary }
+                  : undefined
               }
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
                 activeTab === 'collezione'
@@ -213,9 +263,14 @@ export default function CollezionePage() {
             <button
               onClick={() => {
                 setActiveTab('radar');
+                setCustomAura(SECTION_THEMES.radar);
                 router.push('/collezione?vista=radar');
               }}
-              style={activeTab === 'radar' ? { backgroundColor: aura.primary } : undefined}
+              style={
+                activeTab === 'radar'
+                  ? { backgroundColor: SECTION_THEMES.radar.primary }
+                  : undefined
+              }
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${
                 activeTab === 'radar'
                   ? 'text-[#140D1C]'
@@ -230,10 +285,10 @@ export default function CollezionePage() {
           <Link
             href="/scanner"
             style={{ backgroundColor: aura.primary }}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold text-[#140D1C] transition hover:opacity-90"
+            className="flex items-center justify-center h-9 w-9 rounded-full text-[#140D1C] transition hover:opacity-90"
+            title="Acquisisci"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Acquisisci</span>
           </Link>
         </div>
       </header>
@@ -281,7 +336,7 @@ export default function CollezionePage() {
               style={{ color: aura.primary }}
               className="text-xs font-mono uppercase tracking-widest"
             >
-              Selezione per Maison e Famiglia Olfattiva Pura
+              Filtra per Maison e Famiglia Olfattiva
             </h3>
             <button
               onClick={() => {
@@ -319,7 +374,7 @@ export default function CollezionePage() {
 
             <div>
               <p className="text-[11px] font-mono uppercase text-[#B8A9C9] mb-2">
-                Famiglia Olfattiva Pura
+                Famiglia Olfattiva
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <button
@@ -359,7 +414,7 @@ export default function CollezionePage() {
         </section>
       )}
 
-      {/* GRIGLIA FLACONI (MINIATURE PURE SENZA SIGILLO SOVRAPPOSTO) */}
+      {/* GRIGLIA FLACONI */}
       <section className="mt-8">
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
@@ -376,9 +431,6 @@ export default function CollezionePage() {
             <h2 className="font-serif text-2xl text-[#F6EFE4]">
               Nessuna creazione trovata
             </h2>
-            <p className="text-xs text-[#B8A9C9]">
-              Modifica i parametri di ricerca o acquisisci un nuovo flacone.
-            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
@@ -404,7 +456,6 @@ export default function CollezionePage() {
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
                         style={{ backgroundColor: pAura.primary }}
                       />
-                      {/* showSigil={false} TASSATIVO NELLA GRIGLIA */}
                       <BottlePedestal
                         src={imgUrl}
                         alt={p.nome}
@@ -428,6 +479,15 @@ export default function CollezionePage() {
                     <p className="font-mono text-[10px] text-[#B8A9C9] pt-0.5">
                       {p.famiglia_olfattiva}
                     </p>
+
+                    {/* NEL RADAR MOSTRA SUBITO I PREZZI PER FORMATO (>=30ML) */}
+                    {activeTab === 'radar' && p.prezzo_stimato_euro && (
+                      <div className="pt-2">
+                        <span className="inline-block rounded-full bg-[#140D1C] border border-[#A855F7]/40 px-2.5 py-1 font-mono text-[10px] text-[#E9D5FF] line-clamp-1">
+                          {p.prezzo_stimato_euro}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -436,7 +496,7 @@ export default function CollezionePage() {
         )}
       </section>
 
-      {/* SCHEDA DI DETTAGLIO (MODALE CON SIGILLO D'AUTORE SUL PODIO E PIRAMIDE IN PRIMO PIANO) */}
+      {/* SCHEDA DI DETTAGLIO MODALE */}
       {selectedProfumo &&
         (() => {
           const modalAura = resolveAura(
@@ -445,6 +505,7 @@ export default function CollezionePage() {
           );
           const seasons = getSeasonsForFamily(selectedProfumo.famiglia_olfattiva);
           const pAny = selectedProfumo as any;
+          const isRadarItem = isRadarProfumo(selectedProfumo);
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/85 backdrop-blur-md animate-in fade-in duration-200">
@@ -481,7 +542,7 @@ export default function CollezionePage() {
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
                           <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
-                            Maison (Brand)
+                            Maison
                           </label>
                           <input
                             type="text"
@@ -494,7 +555,7 @@ export default function CollezionePage() {
                         </div>
                         <div>
                           <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
-                            Nome Creazione
+                            Creazione
                           </label>
                           <input
                             type="text"
@@ -510,7 +571,7 @@ export default function CollezionePage() {
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
                           <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
-                            Naso (Maître Parfumeur)
+                            Naso
                           </label>
                           <input
                             type="text"
@@ -523,7 +584,7 @@ export default function CollezionePage() {
                         </div>
                         <div>
                           <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
-                            Destinazione
+                            Sezione
                           </label>
                           <select
                             value={editForm.stato || 'collezione'}
@@ -532,10 +593,28 @@ export default function CollezionePage() {
                             }
                             className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
                           >
-                            <option value="collezione">Collezione (Flacone)</option>
-                            <option value="radar">Radar (Sample / Testing)</option>
+                            <option value="collezione">Collezione</option>
+                            <option value="radar">Radar</option>
                           </select>
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                          Prezzi per Formato (≥ 30ml)
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.prezzo_stimato_euro || ''}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              prezzo_stimato_euro: e.target.value,
+                            })
+                          }
+                          placeholder="Es. 50ml: €190 • 100ml: €260"
+                          className="w-full rounded-[14px] bg-[#140D1C] border border-white/10 p-2.5 text-[#F6EFE4]"
+                        />
                       </div>
 
                       <div>
@@ -612,13 +691,13 @@ export default function CollezionePage() {
                   </div>
                 ) : (
                   <>
-                    {/* 1. PIRAMIDE OLFATTIVA SUBITO IN CIMA E IN PRIMO PIANO */}
+                    {/* 1. PIRAMIDE OLFATTIVA SUBITO IN CIMA */}
                     <div className="space-y-2.5 pt-2">
                       <h3
                         style={{ color: modalAura.primary }}
                         className="font-mono text-[10px] uppercase tracking-[0.2em]"
                       >
-                        Piramide Olfattiva Certificata
+                        Piramide Olfattiva
                       </h3>
                       <div className="space-y-2 text-xs">
                         {selectedProfumo.note_testa && (
@@ -678,7 +757,6 @@ export default function CollezionePage() {
                           className="absolute inset-0 rounded-[36px] blur-2xl opacity-55"
                           style={{ backgroundColor: modalAura.primary }}
                         />
-                        {/* showSigil={true} ESCLUSIVAMENTE QUI SUL PODIO DEL DETTAGLIO */}
                         <BottlePedestal
                           src={
                             selectedProfumo.url_foto_vetrina ||
@@ -705,7 +783,6 @@ export default function CollezionePage() {
                         {selectedProfumo.famiglia_olfattiva}
                       </p>
 
-                      {/* BADGE NASO E ANNO DI LANCIO */}
                       <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                         {selectedProfumo.naso && (
                           <div
@@ -730,7 +807,41 @@ export default function CollezionePage() {
                         )}
                       </div>
 
-                      {/* 3. LE 4 STAGIONI CON INDICATORI A GRADIENTE VISIVO OGGETTIVO */}
+                      {/* SEZIONE RADAR: PREZZI DISTINTI PER FORMATI >= 30ML CON AI */}
+                      {isRadarItem && (
+                        <div className="mt-4 w-full rounded-2xl bg-[#140D1C] p-4 border border-[#A855F7]/35 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-[#A855F7]">
+                              <Tag className="h-3.5 w-3.5" />
+                              <span className="font-mono text-[10px] uppercase tracking-wider">
+                                Pianificazione Acquisto (Formati ≥ 30ml)
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleFetchFormatsPrices(selectedProfumo)}
+                              disabled={loadingPrices}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-[#A855F7] px-3 py-1 font-mono text-[10px] font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-50"
+                            >
+                              {loadingPrices ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-3 w-3" />
+                              )}
+                              <span>
+                                {loadingPrices ? 'Ricerca listini...' : 'Calcola Prezzi Formati AI'}
+                              </span>
+                            </button>
+                          </div>
+                          <p className="font-mono text-xs text-[#F6EFE4] text-left">
+                            {selectedProfumo.prezzo_stimato_euro
+                              ? selectedProfumo.prezzo_stimato_euro
+                              : 'Premi "Calcola Prezzi Formati AI" per estrarre i prezzi dei formati da 30ml, 50ml, 100ml (esclusi campioncini).'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 3. LE 4 STAGIONI */}
                       <div className="mt-4 w-full grid grid-cols-4 gap-2 rounded-2xl bg-[#140D1C]/90 p-2.5 border border-white/10">
                         <div
                           className={`flex flex-col items-center gap-1 rounded-xl py-2 transition ${
@@ -819,9 +930,6 @@ export default function CollezionePage() {
             <h3 className="font-serif text-xl text-[#F6EFE4]">
               Rimuovere questa creazione?
             </h3>
-            <p className="text-xs text-[#B8A9C9]">
-              Il flacone verrà rimosso definitivamente dall&apos;Atelier.
-            </p>
             <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setDeleteConfirmId(null)}
