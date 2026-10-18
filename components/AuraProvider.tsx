@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Profumo } from '@/lib/supabase';
 
 export interface AuraPair {
@@ -9,10 +10,33 @@ export interface AuraPair {
   familyLabel: string;
 }
 
-const DEFAULT_AURA: AuraPair = {
-  primary: '#38BDF8',   // Blu Talisman scultoreo
-  secondary: '#2A123D', // Viola abissale #140D1C / #1E1428
-  familyLabel: 'Atelier',
+// AMBIENTI CROMATICI DISTINTI PER OGNI SEZIONE DEL MENU
+export const SECTION_THEMES: Record<string, AuraPair> = {
+  atelier: {
+    primary: '#38BDF8',   // Blu Zaffiro / Ciano luminoso
+    secondary: '#0F172A', // Blu Notte profondo
+    familyLabel: 'Atelier',
+  },
+  collezione: {
+    primary: '#10B981',   // Smeraldo Imperiale
+    secondary: '#06281E', // Verde Abissale
+    familyLabel: 'Collezione',
+  },
+  scanner: {
+    primary: '#F59E0B',   // Ambra / Oro Scultoreo
+    secondary: '#291507', // Mogano Scuro
+    familyLabel: 'Scanner',
+  },
+  radar: {
+    primary: '#A855F7',   // Viola Ametista
+    secondary: '#240B36', // Indaco Notturno
+    familyLabel: 'Radar',
+  },
+  diario: {
+    primary: '#F43F5E',   // Rubino Imperiale
+    secondary: '#2D0A16', // Bordeaux Abissale
+    familyLabel: 'Diario',
+  },
 };
 
 const FAMILY_RULES: Array<{ keywords: string[]; pair: AuraPair }> = [
@@ -48,10 +72,10 @@ const FAMILY_RULES: Array<{ keywords: string[]; pair: AuraPair }> = [
 
 const FALLBACK_PALETTES: Array<[string, string]> = [
   ['#38BDF8', '#172554'],
-  ['#E07A38', '#592212'],
+  ['#10B981', '#06281E'],
   ['#A855F7', '#2E1065'],
   ['#F43F5E', '#4C1127'],
-  ['#34D399', '#114232'],
+  ['#E07A38', '#592212'],
   ['#F59E0B', '#4A2511'],
   ['#EC4899', '#500724'],
 ];
@@ -147,7 +171,7 @@ export function resolveAura(famiglia?: string | null, nome?: string | null): Aur
     };
   }
 
-  return DEFAULT_AURA;
+  return SECTION_THEMES.atelier;
 }
 
 interface AuraContextValue {
@@ -160,7 +184,7 @@ interface AuraContextValue {
 }
 
 const AuraContext = createContext<AuraContextValue>({
-  aura: DEFAULT_AURA,
+  aura: SECTION_THEMES.atelier,
   activeProfumo: null,
   setAuraFromProfumo: () => {},
   setCustomAura: () => {},
@@ -169,16 +193,35 @@ const AuraContext = createContext<AuraContextValue>({
 });
 
 export function AuraProvider({ children }: { children: React.ReactNode }) {
-  const [aura, setAura] = useState<AuraPair>(DEFAULT_AURA);
+  const pathname = usePathname();
+  const [aura, setAura] = useState<AuraPair>(SECTION_THEMES.atelier);
   const [activeProfumo, setActiveProfumo] = useState<Profumo | null>(null);
   const [hideDock, setHideDock] = useState(false);
 
+  // Cambio automatico di ambiente cromatico in base al menu visitato
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const isRadar = params.get('vista') === 'radar';
+      if (pathname.startsWith('/collezione') && isRadar) {
+        setAura(SECTION_THEMES.radar);
+        return;
+      }
+    }
+    if (pathname.startsWith('/collezione')) {
+      setAura(SECTION_THEMES.collezione);
+    } else if (pathname.startsWith('/scanner')) {
+      setAura(SECTION_THEMES.scanner);
+    } else if (pathname.startsWith('/diario')) {
+      setAura(SECTION_THEMES.diario);
+    } else {
+      setAura(SECTION_THEMES.atelier);
+    }
+  }, [pathname]);
+
   const setAuraFromProfumo = useCallback((profumo: Profumo | null) => {
     setActiveProfumo(profumo);
-    if (!profumo) {
-      setAura(DEFAULT_AURA);
-      return;
-    }
+    if (!profumo) return;
     setAura(resolveAura(profumo.famiglia_olfattiva, profumo.nome));
   }, []);
 
