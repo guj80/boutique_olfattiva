@@ -23,21 +23,28 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: 'Boutique Olfattiva',
-  description: 'La tua collezione di profumi, viva.',
-  themeColor: '#140D1C',
+  title: 'LG',
+  description: 'High Perfumery Collection',
+  themeColor: '#08060C',
   viewport: { width: 'device-width', initialScale: 1, viewportFit: 'cover' },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Boutique Olfattiva',
+    title: 'LG',
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="it" className={`dark ${bricolage.variable} ${instrumentSerif.variable}`}>
-      <body className="antialiased selection:bg-[#D8B995] selection:text-[#140D1C]">
+    <html
+      lang="it"
+      style={{ backgroundColor: '#08060C' }}
+      className={`dark bg-[#08060C] ${bricolage.variable} ${instrumentSerif.variable}`}
+    >
+      <body
+        style={{ backgroundColor: '#08060C' }}
+        className="bg-[#08060C] text-[#F6EFE4] antialiased selection:bg-[#10B981] selection:text-[#08060C]"
+      >
         <AuraProvider>
           <ToastProvider>
             <SpruzzoProvider>
