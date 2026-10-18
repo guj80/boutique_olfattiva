@@ -8,10 +8,9 @@ interface BottlePedestalProps {
   alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  showSigil?: boolean;
 }
 
-export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '', showSigil = false }: BottlePedestalProps) {
+export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = '' }: BottlePedestalProps) {
   const sizeClasses = {
     sm: 'h-16 w-16',
     md: 'h-28 w-24',
@@ -41,13 +40,6 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
         </div>
       ) : (
         <FlaskConical className={`${iconSizes} text-[#D8B995]/60 transition-transform duration-500 hover:scale-110`} />
-      )}
-
-      {/* Filigrana reale del logo in basso a destra (Solo nella Collezione principale) */}
-      {showSigil && (
-        <div className="absolute bottom-2.5 right-2.5 z-20 flex h-7 w-7 items-center justify-center overflow-hidden rounded-md border border-[#D8B995]/30 bg-[#140D1C]/85 shadow-md backdrop-blur-sm opacity-85 transition-opacity hover:opacity-100">
-          <img src="/logo.jpg" alt="Logo L'Aura" className="h-full w-full object-cover" />
-        </div>
       )}
     </div>
   );
