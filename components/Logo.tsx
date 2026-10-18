@@ -4,64 +4,82 @@ import React from 'react';
 import { useAura } from './AuraProvider';
 
 export function Logo({
-  className = 'h-8',
-  showText = true,
+  className = 'h-16',
+  monochrome = true,
 }: {
   className?: string;
+  monochrome?: boolean;
   showText?: boolean;
 }) {
   const { aura } = useAura();
+  const strokeColor = monochrome ? aura.primary : '#34D399';
 
   return (
-    <div className={`inline-flex items-center gap-2.5 select-none ${className}`}>
+    <div className={`relative inline-flex items-center justify-center select-none ${className}`}>
+      {/* Bagliore diffuso posteriore senza alcuna cornice o gabbia */}
+      <div
+        style={{
+          background: `radial-gradient(circle at center, ${strokeColor}45 0%, transparent 70%)`,
+        }}
+        className="pointer-events-none absolute -inset-4 blur-xl transition-colors duration-700"
+      />
+
       <svg
-        viewBox="0 0 36 36"
+        viewBox="0 0 200 200"
         fill="none"
-        className="h-full w-auto shrink-0 transition-colors duration-700"
-        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        className="relative z-10 h-full w-auto overflow-visible transition-all duration-700"
+        style={{
+          filter: `drop-shadow(0 0 12px ${strokeColor}55)`,
+        }}
+        aria-label="Logo LG"
       >
-        {/* Collo e tappo scultoreo monocromatico */}
-        <rect
-          x="13"
-          y="2.5"
-          width="10"
-          height="4.5"
-          rx="1.5"
-          fill={aura.primary}
-        />
+        {/* Tappo trapezoidale superiore con intaglio centrale */}
         <path
-          d="M15.5 7h5v3h-5z"
-          fill={aura.primary}
-          fillOpacity="0.75"
+          d="M84 18 H116 L112 38 H88 Z"
+          stroke={strokeColor}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
-        {/* Corpo sfaccettato del flacone */}
+        {/* Collo del flacone con fessura orizzontale */}
         <rect
-          x="6"
-          y="10"
-          width="24"
-          height="23"
-          rx="8"
-          fill="#140D1C"
-          stroke={aura.primary}
-          strokeWidth="1.6"
+          x="80"
+          y="38"
+          width="40"
+          height="16"
+          rx="4"
+          stroke={strokeColor}
+          strokeWidth="8"
+          strokeLinejoin="round"
         />
-        {/* Sigillo interno centrale */}
-        <circle
-          cx="18"
-          cy="21.5"
-          r="5.5"
-          fill={aura.primary}
-          fillOpacity="0.15"
-          stroke={aura.primary}
-          strokeWidth="1.2"
+
+        {/* Spalla destra e arco superiore della G */}
+        <path
+          d="M72 64 C96 50, 144 62, 162 98"
+          stroke={strokeColor}
+          strokeWidth="9"
+          strokeLinecap="round"
         />
-        <circle cx="18" cy="21.5" r="2" fill={aura.primary} />
+
+        {/* Lettera L interna (verticale + base orizzontale) */}
+        <path
+          d="M58 68 V152 H102"
+          stroke={strokeColor}
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Parete esterna sinistra, base inferiore e risalita con taglio orizzontale della G */}
+        <path
+          d="M44 82 C34 110, 36 146, 38 176 H118 C146 176, 162 154, 164 126 H112"
+          stroke={strokeColor}
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
-      {showText && (
-        <span className="font-serif text-xl tracking-wide text-[#F6EFE4]">
-          L&apos;Aura
-        </span>
-      )}
     </div>
   );
 }
