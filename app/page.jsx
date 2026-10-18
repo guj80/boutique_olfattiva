@@ -3,13 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Compass, Library, Sparkles, Plus, Feather } from 'lucide-react';
-import { supabase, Profumo } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
-import { resolveAura } from '@/components/AuraProvider';
 
 export default function Home() {
-  const [profumi, setProfumi] = useState<Profumo[]>([]);
+  const [profumi, setProfumi] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,7 +27,6 @@ export default function Home() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-10 pb-36 space-y-12">
-      {/* HEADER DELLA BOUTIQUE CON LOGO MAESTOSO IN APERTURA */}
       <header className="flex flex-col items-center text-center space-y-4 pt-6 pb-6 border-b border-[#D8B995]/20">
         <div className="relative p-4">
           <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(216,185,149,0.25)_0%,transparent_70%)] blur-xl" />
@@ -43,7 +41,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* MANIFESTO / ISPIRAZIONE DEL CURATORE (Al posto del profumo del giorno) */}
       <section className="relative overflow-hidden rounded-[28px] border border-[#D8B995]/30 bg-gradient-to-r from-[#1E1428] via-[#241732] to-[#1E1428] p-8 text-center shadow-2xl">
         <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-[#D8B995]/10 blur-3xl" />
         <div className="absolute -right-10 -bottom-10 h-32 w-32 rounded-full bg-[#9B7EDE]/10 blur-3xl" />
@@ -57,7 +54,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ACCESSO RAPIDO (SCAFFALE & RADAR) */}
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Link
           href="/collezione"
@@ -94,7 +90,6 @@ export default function Home() {
         </Link>
       </section>
 
-      {/* LE ULTIME VOCI DELL'ATELIER (Nuove uscite / ultimi inseriti) */}
       <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -141,7 +136,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* AZIONE RAPIDA */}
       <section className="flex justify-center pt-2">
         <Link
           href="/scanner"
