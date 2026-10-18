@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase, Profumo, Momento, isCollezioneProfumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
-import { resolveAura, useAura } from '@/components/AuraProvider';
+import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { SmartBottleImage } from '@/components/BottleImage';
 import { useToast } from '@/components/Toast';
 
@@ -35,19 +35,19 @@ export default function DiarioPage() {
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Stato per inserimento Diario Multiplo Giornaliero
   const [selectedProfumoId, setSelectedProfumoId] = useState<string>('');
   const [selectedMomento, setSelectedMomento] = useState<Momento>('Mattina');
   const [contestoOutfit, setContestoOutfit] = useState<string>('');
   const [noteGiorno, setNoteGiorno] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { aura, setAuraFromProfumo } = useAura();
+  const { aura, setCustomAura } = useAura();
   const { showToast } = useToast();
 
   useEffect(() => {
+    setCustomAura(SECTION_THEMES.diario);
     fetchDiario();
-  }, []);
+  }, [setCustomAura]);
 
   async function fetchDiario() {
     setLoading(true);
@@ -74,9 +74,8 @@ export default function DiarioPage() {
       }));
 
       setIndossi(enriched);
-    } catch (err) {
-      console.error('Errore caricamento diario:', err);
-      showToast('Impossibile caricare il diario olfattivo.', 'error');
+    } catch {
+      showToast('Impossibile caricare il diario.', 'error');
     } finally {
       setLoading(false);
     }
@@ -85,13 +84,12 @@ export default function DiarioPage() {
   async function handleAddIndosso(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedProfumoId) {
-      showToast('Seleziona una fragranza.', 'error');
+      showToast('Seleziona una creazione.', 'error');
       return;
     }
 
     setSubmitting(true);
     try {
-      // Inserimento multiplo senza alcuna sovrascrittura nello stesso giorno
       const { error } = await supabase.from('indossi').insert([
         {
           profumo_id: selectedProfumoId,
@@ -103,12 +101,9 @@ export default function DiarioPage() {
 
       if (error) throw error;
 
-      const chosen = profumi.find((p) => p.id === selectedProfumoId);
-      if (chosen) setAuraFromProfumo(chosen);
-
       setContestoOutfit('');
       setNoteGiorno('');
-      showToast(`Indosso (${selectedMomento}) registrato nel Diario.`);
+      showToast(`Indosso (${selectedMomento}) registrato.`);
       fetchDiario();
     } catch (err: any) {
       showToast(err?.message || 'Errore nella registrazione.', 'error');
@@ -129,7 +124,6 @@ export default function DiarioPage() {
     }
   }
 
-  // STATISTICHE EVOLUTE DELLA BOUTIQUE E DELL'ATELIER
   const boutiqueStats = useMemo(() => {
     const flaconiCollezione = profumi.filter(isCollezioneProfumo);
     const maisonsSet = new Set(profumi.map((p) => p.brand).filter(Boolean));
@@ -166,28 +160,29 @@ export default function DiarioPage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-36 space-y-8">
+      {/* HEADER UNIFORMATO A SINISTRA CON LOGO GRANDE E AD ALTO CONTRASTO */}
       <header className="flex items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div className="flex items-center gap-4">
           <Link
             href="/"
             aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-white/40"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#161024] text-[#F6EFE4] transition hover:border-white/40"
           >
             <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
           </Link>
-          <Logo className="h-7" />
+          <Logo variant="mono" className="h-12" />
         </div>
         <span
           style={{ color: aura.primary }}
           className="font-mono text-xs uppercase tracking-widest"
         >
-          Diario &amp; Metriche d&apos;Atelier
+          Diario &amp; Statistiche
         </span>
       </header>
 
-      {/* STATISTICHE DELLA COLLEZIONE CON SIMBOLI D'ALTA PROFUMERIA */}
+      {/* STATISTICHE CON SIMBOLI D'ALTA PROFUMERIA */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-4 space-y-2">
+        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
               Signature Scent
@@ -199,7 +194,7 @@ export default function DiarioPage() {
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-4 space-y-2">
+        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
               Accordo Dominante
@@ -211,7 +206,7 @@ export default function DiarioPage() {
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-4 space-y-2">
+        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
               Maisons &amp; Nasi
@@ -223,34 +218,31 @@ export default function DiarioPage() {
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-4 space-y-2">
+        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-              Rituali Registrati
+              Indossi Totali
             </span>
             <FlaskConical style={{ color: aura.primary }} className="h-4 w-4" />
           </div>
           <p className="font-serif text-xl text-[#F6EFE4]">
-            {boutiqueStats.totaleIndossi} Indossi
+            {boutiqueStats.totaleIndossi} Rituali
           </p>
         </div>
       </section>
 
-      {/* REGISTRAZIONE DIARIO MULTIPLO (MATTINA / POMERIGGIO / SERA / NOTTE SENZA SOVRASCRITTURE) */}
+      {/* REGISTRAZIONE DIARIO MULTIPLO */}
       <section
-        style={{ borderColor: `${aura.primary}35` }}
-        className="rounded-[28px] border bg-[#1E1428]/95 p-6 space-y-5 shadow-xl"
+        style={{ borderColor: `${aura.primary}40` }}
+        className="rounded-[28px] border bg-[#161024]/95 p-6 space-y-5 shadow-xl"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
             <h2 className="font-serif text-xl text-[#F6EFE4]">
-              Registra Indosso Giornaliero Multiplo
+              Registra Indosso Giornaliero
             </h2>
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-            Layering &amp; Cambio Fragranza
-          </span>
         </div>
 
         <form onSubmit={handleAddIndosso} className="space-y-4">
@@ -262,10 +254,10 @@ export default function DiarioPage() {
               <select
                 value={selectedProfumoId}
                 onChange={(e) => setSelectedProfumoId(e.target.value)}
-                className="w-full rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-xs text-[#F6EFE4] focus:outline-none"
+                className="w-full rounded-[16px] border border-white/10 bg-[#0E0A16] px-4 py-3 text-xs text-[#F6EFE4] focus:outline-none"
               >
                 {profumi.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-[#140D1C]">
+                  <option key={p.id} value={p.id} className="bg-[#0E0A16]">
                     {p.brand} — {p.nome}
                   </option>
                 ))}
@@ -288,8 +280,8 @@ export default function DiarioPage() {
                       style={active ? { backgroundColor: aura.primary } : undefined}
                       className={`flex flex-col items-center justify-center gap-1 rounded-[14px] py-2 text-[10px] font-mono transition ${
                         active
-                          ? 'text-[#140D1C] font-bold'
-                          : 'bg-[#140D1C] text-[#B8A9C9] border border-white/10 hover:text-white'
+                          ? 'text-[#08060C] font-bold'
+                          : 'bg-[#0E0A16] text-[#B8A9C9] border border-white/10 hover:text-white'
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -306,15 +298,15 @@ export default function DiarioPage() {
               type="text"
               value={contestoOutfit}
               onChange={(e) => setContestoOutfit(e.target.value)}
-              placeholder="Occasione o tenuta (es. Abito sartoriale, Cena, Atelier...)"
-              className="w-full rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45"
+              placeholder="Occasione o tenuta..."
+              className="w-full rounded-[16px] border border-white/10 bg-[#0E0A16] px-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45"
             />
             <input
               type="text"
               value={noteGiorno}
               onChange={(e) => setNoteGiorno(e.target.value)}
-              placeholder="Annotazioni olfattive sulla pelle o evoluzione..."
-              className="w-full rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45"
+              placeholder="Annotazioni olfattive sulla pelle..."
+              className="w-full rounded-[16px] border border-white/10 bg-[#0E0A16] px-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45"
             />
           </div>
 
@@ -323,7 +315,7 @@ export default function DiarioPage() {
               type="submit"
               disabled={submitting || profumi.length === 0}
               style={{ backgroundColor: aura.primary }}
-              className="flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-40"
+              className="flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-40"
             >
               <Plus className="h-4 w-4" />
               <span>{submitting ? 'Registrazione...' : 'Aggiungi al Diario'}</span>
@@ -332,7 +324,7 @@ export default function DiarioPage() {
         </form>
       </section>
 
-      {/* REGISTRO STORICO DEGLI INDOSSI */}
+      {/* ARCHIVIO DEGLI INDOSSI */}
       <section className="space-y-3">
         <h2 className="font-serif text-xl text-[#F6EFE4] px-1">
           Archivio degli Indossi
@@ -345,12 +337,9 @@ export default function DiarioPage() {
             ))}
           </div>
         ) : indossi.length === 0 ? (
-          <div className="rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-12 text-center space-y-2">
+          <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-12 text-center space-y-2">
             <p className="font-serif text-xl text-[#F6EFE4]">
               Nessun indosso registrato
-            </p>
-            <p className="text-xs text-[#B8A9C9]">
-              Utilizza il pannello superiore per registrare le fragranze indossate nella giornata.
             </p>
           </div>
         ) : (
@@ -368,7 +357,7 @@ export default function DiarioPage() {
                 <div
                   key={item.id}
                   style={{ borderColor: `${pAura.primary}38` }}
-                  className="flex items-center justify-between gap-4 rounded-[22px] border bg-[#1E1428]/90 p-4 transition"
+                  className="flex items-center justify-between gap-4 rounded-[22px] border bg-[#161024]/90 p-4 transition"
                 >
                   <div className="flex items-center gap-4 min-w-0">
                     <SmartBottleImage
@@ -412,14 +401,11 @@ export default function DiarioPage() {
       </section>
 
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/80 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#1E1428] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/80 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#161024] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
             <h3 className="font-serif text-xl text-[#F6EFE4]">
               Rimuovere questo indosso?
             </h3>
-            <p className="text-xs text-[#B8A9C9]">
-              La voce verrà eliminata dall&apos;archivio del diario.
-            </p>
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
