@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Compass,
-  Library,
   Sparkles,
   Plus,
   Send,
@@ -13,6 +11,7 @@ import {
   Briefcase,
   Moon,
   Sun,
+  ArrowUpRight,
 } from 'lucide-react';
 import { supabase, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
@@ -51,7 +50,7 @@ export default function Home() {
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState('');
 
-  const { aura, setAuraFromProfumo, setCustomAura } = useAura();
+  const { aura, setCustomAura } = useAura();
 
   useEffect(() => {
     setCustomAura(SECTION_THEMES.atelier);
@@ -93,17 +92,13 @@ export default function Home() {
         .map((id) => profumi.find((p) => p.id === id))
         .filter(Boolean);
 
-      if (recommendedBottles.length > 0) {
-        setAuraFromProfumo(recommendedBottles[0]);
-      }
-
       setAiResult({
         advice: data.sommelierAdvice,
         motivazioni: data.motivazioniPerProfumo || {},
         bottles: recommendedBottles,
       });
     } catch (e) {
-      setAiError(e?.message || 'Impossibile completare la consulenza tecnica.');
+      setAiError(e?.message || 'Impossibile completare la selezione.');
     } finally {
       setAiLoading(false);
     }
@@ -114,22 +109,19 @@ export default function Home() {
   const ultimeAcquisizioni = profumi.slice(0, 4);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-36 space-y-10">
-      {/* IL TUO LOGO LIBERO E IN RISALTO (ZERO GABBIE, ZERO SCRITTE) */}
+    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-6 pb-36 space-y-10">
+      {/* IL TUO LOGO ORIGINALE BICOLORE IN RISALTO ASSOLUTO (NON CAMBIA COL TEMA, ZERO SCRITTE) */}
       <header className="flex flex-col items-center justify-center pt-4 pb-2">
-        <Logo className="h-28 sm:h-32" />
+        <Logo variant="bicolor" className="h-32 sm:h-36" />
       </header>
 
       {/* MOTORE DI SUGGERIMENTI IA AVANZATO */}
-      <section
-        style={{ borderColor: `${aura.primary}35` }}
-        className="relative overflow-hidden rounded-[28px] border bg-gradient-to-b from-[#1E1428]/95 to-[#140D1C]/95 p-6 sm:p-8 shadow-2xl space-y-5 transition-colors duration-700"
-      >
+      <section className="relative overflow-hidden rounded-[30px] border border-emerald-500/25 bg-gradient-to-b from-[#161024]/95 to-[#0B0813]/95 p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
-            <h2 className="font-serif text-xl sm:text-2xl text-[#F6EFE4]">
-              Selezione Olfattiva Su Misura
+            <Sparkles className="h-5 w-5 text-[#10B981]" />
+            <h2 className="font-serif text-2xl text-[#F6EFE4]">
+              Consulenza Olfattiva
             </h2>
           </div>
         </div>
@@ -143,9 +135,9 @@ export default function Home() {
                 type="button"
                 onClick={() => handleAskAi(item.query)}
                 disabled={aiLoading || profumi.length === 0}
-                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#140D1C]/90 px-3.5 py-1.5 font-mono text-[11px] text-[#F6EFE4] transition hover:border-white/30 disabled:opacity-40"
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-[#120D1D] px-4 py-2 font-mono text-[11px] text-[#F6EFE4] transition hover:border-emerald-400/50 disabled:opacity-40"
               >
-                <Icon style={{ color: aura.primary }} className="h-3.5 w-3.5" />
+                <Icon className="h-3.5 w-3.5 text-[#10B981]" />
                 <span>{item.label}</span>
               </button>
             );
@@ -163,21 +155,20 @@ export default function Home() {
             type="text"
             value={aiQuery}
             onChange={(e) => setAiQuery(e.target.value)}
-            placeholder="Descrivi occasione, meteo o stato d'animo..."
-            className="flex-1 rounded-[18px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:border-white/30 focus:outline-none"
+            placeholder="Occasione, clima o accordo ricercato..."
+            className="flex-1 rounded-[18px] border border-white/10 bg-[#0D0915] px-4 py-3.5 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:border-emerald-400/50 focus:outline-none"
           />
           <button
             type="submit"
             disabled={aiLoading || !aiQuery.trim() || profumi.length === 0}
-            style={{ backgroundColor: aura.primary }}
-            className="flex items-center justify-center gap-2 rounded-[18px] px-6 py-3 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-40"
+            className="flex items-center justify-center gap-2 rounded-[18px] bg-[#10B981] px-6 py-3.5 text-xs font-bold text-[#08060C] transition hover:bg-[#34D399] disabled:opacity-40"
           >
             {aiLoading ? (
               <RefreshCw className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-3.5 w-3.5" />
             )}
-            <span>Suggerisci</span>
+            <span>Analizza</span>
           </button>
         </form>
 
@@ -185,7 +176,7 @@ export default function Home() {
 
         {aiResult && (
           <div className="pt-4 border-t border-white/10 space-y-4 animate-fade-in">
-            <p className="text-xs sm:text-sm text-[#F6EFE4] leading-relaxed bg-[#140D1C]/80 p-4 rounded-[18px] border border-white/10">
+            <p className="text-xs sm:text-sm text-[#F6EFE4] leading-relaxed bg-[#0D0915] p-4 rounded-[18px] border border-white/10">
               {aiResult.advice}
             </p>
 
@@ -198,7 +189,7 @@ export default function Home() {
                       key={b.id}
                       href="/collezione"
                       style={{ borderColor: `${bAura.primary}45` }}
-                      className="flex items-center gap-4 rounded-[20px] border bg-[#140D1C]/90 p-3.5 transition hover:scale-[1.01]"
+                      className="flex items-center gap-4 rounded-[20px] border bg-[#0D0915] p-3.5 transition hover:scale-[1.01]"
                     >
                       <BottlePedestal
                         src={b.url_foto_vetrina || b.immagine_url}
@@ -231,65 +222,94 @@ export default function Home() {
         )}
       </section>
 
-      {/* COLLEZIONE E RADAR CON I RISPETTIVI COLORI AMBIENTE */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* PORTALI SCENOGRAFICI COLLEZIONE & RADAR CON GRAFICA OLFATTIVA DEDICATA */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {/* CARD COLLEZIONE */}
         <Link
           href="/collezione"
-          style={{ borderColor: `${SECTION_THEMES.collezione.primary}40` }}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-[28px] border bg-gradient-to-b from-[#1E1428] to-[#140D1C] p-6 transition-all duration-300 hover:scale-[1.01] shadow-xl"
+          className="group relative h-56 overflow-hidden rounded-[32px] border border-sky-400/30 bg-[#0B1528] p-7 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:border-sky-400/70 shadow-2xl"
         >
-          <div className="flex items-center justify-between">
-            <div
-              style={{
-                color: SECTION_THEMES.collezione.primary,
-                borderColor: `${SECTION_THEMES.collezione.primary}35`,
-              }}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#140D1C] border"
-            >
-              <Library className="h-5 w-5" />
+          {/* Grafica vettoriale artistica di sottofondo: Flaconi Scultorei & Essenze */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(56,189,248,0.28)_0%,rgba(11,21,40,0.92)_70%)]" />
+          <svg
+            viewBox="0 0 220 220"
+            fill="none"
+            className="pointer-events-none absolute -right-6 -bottom-8 h-52 w-52 opacity-25 transition-transform duration-700 group-hover:scale-110"
+          >
+            <rect x="65" y="25" width="44" height="18" rx="4" stroke="#38BDF8" strokeWidth="3.5" />
+            <path d="M77 43 H97 V58 H77 Z" stroke="#38BDF8" strokeWidth="3.5" />
+            <rect x="42" y="58" width="90" height="125" rx="22" stroke="#38BDF8" strokeWidth="4" />
+            <circle cx="87" cy="120" r="24" stroke="#38BDF8" strokeWidth="3" strokeDasharray="4 4" />
+            <path d="M150 85 C175 65, 195 95, 175 130 C160 155, 145 170, 145 185" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-400/15 border border-sky-400/40 backdrop-blur-md">
+              {/* Icona custom Flacone d'Autore */}
+              <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7 text-sky-300" stroke="currentColor" strokeWidth="1.8">
+                <path d="M9 3h6v3H9z" />
+                <path d="M10 6h4v2h-4z" />
+                <rect x="5" y="8" width="14" height="13" rx="4" />
+                <circle cx="12" cy="14.5" r="2.5" />
+              </svg>
             </div>
-            <span
-              style={{ color: SECTION_THEMES.collezione.primary }}
-              className="font-mono text-[10px] uppercase tracking-widest"
-            >
-              {collezioneCount} Flaconi
-            </span>
+
+            <div className="flex items-center gap-1.5 rounded-full bg-sky-400/15 border border-sky-400/30 px-3.5 py-1.5 backdrop-blur-md">
+              <span className="font-mono text-xs font-bold text-sky-300">
+                {collezioneCount}
+              </span>
+              <ArrowUpRight className="h-4 w-4 text-sky-300 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </div>
           </div>
-          <div className="mt-7 space-y-1">
-            <h2 className="font-serif text-2xl text-[#F6EFE4]">Collezione</h2>
-            <p className="text-xs text-[#B8A9C9]">
-              I flaconi interi custoditi nella tua raccolta.
-            </p>
+
+          <div className="relative z-10">
+            <h2 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-wide">
+              Collezione
+            </h2>
           </div>
         </Link>
 
+        {/* CARD RADAR */}
         <Link
           href="/collezione?vista=radar"
-          style={{ borderColor: `${SECTION_THEMES.radar.primary}40` }}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-[28px] border bg-gradient-to-b from-[#1E1428] to-[#140D1C] p-6 transition-all duration-300 hover:scale-[1.01] shadow-xl"
+          className="group relative h-56 overflow-hidden rounded-[32px] border border-purple-400/30 bg-[#1B0C2E] p-7 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:border-purple-400/70 shadow-2xl"
         >
-          <div className="flex items-center justify-between">
-            <div
-              style={{
-                color: SECTION_THEMES.radar.primary,
-                borderColor: `${SECTION_THEMES.radar.primary}35`,
-              }}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#140D1C] border"
-            >
-              <Compass className="h-5 w-5" />
+          {/* Grafica vettoriale artistica di sottofondo: Onde Olfattive, Molecole & Note */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(192,132,252,0.3)_0%,rgba(27,12,46,0.92)_70%)]" />
+          <svg
+            viewBox="0 0 220 220"
+            fill="none"
+            className="pointer-events-none absolute -right-6 -bottom-6 h-52 w-52 opacity-25 transition-transform duration-700 group-hover:scale-110"
+          >
+            <circle cx="110" cy="110" r="80" stroke="#C084FC" strokeWidth="3" strokeDasharray="6 6" />
+            <circle cx="110" cy="110" r="52" stroke="#C084FC" strokeWidth="3.5" />
+            <circle cx="110" cy="110" r="22" stroke="#C084FC" strokeWidth="4" />
+            <path d="M110 30 L110 190 M30 110 L190 110" stroke="#C084FC" strokeWidth="2.5" opacity="0.6" />
+            <circle cx="148" cy="72" r="8" fill="#C084FC" />
+          </svg>
+
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-400/15 border border-purple-400/40 backdrop-blur-md">
+              {/* Icona custom Esplorazione Olfattiva / Ampolla */}
+              <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7 text-purple-300" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="12" cy="12" r="9" />
+                <polygon points="14.5,9.5 9.5,11.5 11.5,14.5 14.5,9.5" fill="currentColor" />
+                <circle cx="12" cy="12" r="2" />
+              </svg>
             </div>
-            <span
-              style={{ color: SECTION_THEMES.radar.primary }}
-              className="font-mono text-[10px] uppercase tracking-widest"
-            >
-              {radarCount} In Valutazione
-            </span>
+
+            <div className="flex items-center gap-1.5 rounded-full bg-purple-400/15 border border-purple-400/30 px-3.5 py-1.5 backdrop-blur-md">
+              <span className="font-mono text-xs font-bold text-purple-300">
+                {radarCount}
+              </span>
+              <ArrowUpRight className="h-4 w-4 text-purple-300 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </div>
           </div>
-          <div className="mt-7 space-y-1">
-            <h2 className="font-serif text-2xl text-[#F6EFE4]">Radar</h2>
-            <p className="text-xs text-[#B8A9C9]">
-              Testing, decant e pianificazione acquisti per formato (≥ 30ml).
-            </p>
+
+          <div className="relative z-10">
+            <h2 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-wide">
+              Radar
+            </h2>
           </div>
         </Link>
       </section>
@@ -297,13 +317,12 @@ export default function Home() {
       {/* ULTIME ACQUISIZIONI */}
       <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
-          <h3 className="font-serif text-xl text-[#F6EFE4]">Ultime Acquisizioni</h3>
+          <h3 className="font-serif text-2xl text-[#F6EFE4]">Ultime Acquisizioni</h3>
           <Link
             href="/collezione"
-            style={{ color: aura.primary }}
-            className="text-xs font-mono uppercase tracking-wider hover:underline"
+            className="text-xs font-mono uppercase tracking-wider text-[#10B981] hover:underline"
           >
-            Vedi tutte →
+            Esplora →
           </Link>
         </div>
 
@@ -314,7 +333,7 @@ export default function Home() {
             ))}
           </div>
         ) : ultimeAcquisizioni.length === 0 ? (
-          <div className="rounded-[24px] border border-white/10 bg-[#1E1428] p-8 text-center text-xs text-[#B8A9C9]">
+          <div className="rounded-[24px] border border-white/10 bg-[#161024] p-8 text-center text-xs text-[#B8A9C9]">
             Nessun flacone registrato.
           </div>
         ) : (
@@ -327,8 +346,8 @@ export default function Home() {
                 <Link
                   key={p.id}
                   href="/collezione"
-                  style={{ borderColor: `${pAura.primary}30` }}
-                  className="group relative flex flex-col justify-between rounded-[24px] border bg-[#1E1428]/90 p-4 transition hover:scale-[1.02]"
+                  style={{ borderColor: `${pAura.primary}35` }}
+                  className="group relative flex flex-col justify-between rounded-[24px] border bg-[#161024]/90 p-4 transition hover:scale-[1.02]"
                 >
                   <div className="flex justify-center py-2">
                     <BottlePedestal
