@@ -10,7 +10,7 @@ interface BottlePedestalProps {
   alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  showSigil?: boolean; // ATTIVO ESCLUSIVAMENTE NELLA MODALE DI DETTAGLIO
+  showSigil?: boolean;
 }
 
 export function BottlePedestal({
@@ -38,12 +38,11 @@ export function BottlePedestal({
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses} ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses}${className}`}
     >
-      {/* Alone cromatico profondo e calibrato */}
       <div
         style={{
-          background: `radial-gradient(circle at center, ${aura.primary}22 0%, transparent 72%)`,
+          background: `radial-gradient(circle at center, ${aura.primary}24 0%, transparent 72%)`,
         }}
         className="absolute inset-0 pointer-events-none transition-all duration-700"
       />
@@ -63,14 +62,13 @@ export function BottlePedestal({
         />
       )}
 
-      {/* Sigillo d'Autore: impresso esclusivamente alla base del podio nella scheda di dettaglio */}
+      {/* Sigillo d'Autore vettoriale (Solo nella modale di dettaglio) */}
       {showSigil && (
         <div
-          style={{ borderColor: `${aura.primary}40` }}
-          className="absolute bottom-2 right-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border bg-[#140D1C]/90 p-1.5 shadow-xl backdrop-blur-md"
-          title="Sigillo d'Autore L'Aura"
+          style={{ borderColor: `${aura.primary}45` }}
+          className="absolute bottom-2 right-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border bg-[#0E0A14]/90 p-1.5 shadow-xl backdrop-blur-md"
         >
-          <Logo showText={false} className="h-full w-full" />
+          <Logo variant="mono" className="h-full w-full" />
         </div>
       )}
     </div>
@@ -93,7 +91,7 @@ export function SmartBottleImage({
   const { aura } = useAura();
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#140D1C]/90 p-1.5 border border-white/10 ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#0E0A14]/90 p-1.5 border border-white/10 ${className}`}
     >
       {src ? (
         <img src={src} alt={alt} className="h-full w-full object-contain drop-shadow-md" />
