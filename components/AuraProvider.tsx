@@ -10,51 +10,50 @@ export interface AuraPair {
 }
 
 const DEFAULT_AURA: AuraPair = {
-  primary: '#D8B995',
-  secondary: '#3A1F4D',
+  primary: '#38BDF8',   // Blu Talisman scultoreo
+  secondary: '#2A123D', // Viola abissale #140D1C / #1E1428
   familyLabel: 'Atelier',
 };
 
 const FAMILY_RULES: Array<{ keywords: string[]; pair: AuraPair }> = [
   {
     keywords: ['legnos', 'ambrat', 'wood', 'amber', 'oud', 'sandal', 'cedr', 'patchouli', 'vetiver'],
-    pair: { primary: '#E8893A', secondary: '#8B3A1E', familyLabel: 'Legnoso Ambrato' },
+    pair: { primary: '#E07A38', secondary: '#592212', familyLabel: 'Legnoso Ambrato' },
   },
   {
     keywords: ['agrum', 'fresc', 'citr', 'bergamot', 'limon', 'neroli', 'verde', 'pulit'],
-    pair: { primary: '#EAD75A', secondary: '#7FBF8E', familyLabel: 'Agrumato Fresco' },
+    pair: { primary: '#34D399', secondary: '#114232', familyLabel: 'Agrumato Verde' },
   },
   {
     keywords: ['speziat', 'boozy', 'cald', 'spic', 'rum', 'cognac', 'cannell', 'pepe', 'cardamom', 'tabacc'],
-    pair: { primary: '#E5484D', secondary: '#7A1F3D', familyLabel: 'Speziato Caldo' },
+    pair: { primary: '#F43F5E', secondary: '#4C1127', familyLabel: 'Speziato Caldo' },
   },
   {
     keywords: ['gourmand', 'vanigl', 'dolc', 'caff', 'cioccol', 'caramel', 'mandorl', 'miele', 'fava tonka'],
-    pair: { primary: '#F2B07B', secondary: '#B5563A', familyLabel: 'Gourmand' },
+    pair: { primary: '#F59E0B', secondary: '#4A2511', familyLabel: 'Gourmand' },
   },
   {
     keywords: ['marin', 'aromat', 'acquat', 'sale', 'ozon', 'lavand', 'salvia', 'rosmarin', 'foug'],
-    pair: { primary: '#5CC8E8', secondary: '#2F5FD0', familyLabel: 'Marino Aromatico' },
+    pair: { primary: '#38BDF8', secondary: '#172554', familyLabel: 'Marino Aromatico' },
   },
   {
-    keywords: ['cuoi', 'incens', 'fumos', 'leath', 'smok', 'resine', 'mirra', 'labdan', 'animal'],
-    pair: { primary: '#A58BD6', secondary: '#3A2A5E', familyLabel: 'Cuoiato Incensato' },
+    keywords: ['cuoi', 'incens', 'fumos', 'leath', 'smok', 'resine', 'mirra', 'labdan', 'animal', 'musch'],
+    pair: { primary: '#A855F7', secondary: '#2E1065', familyLabel: 'Cuoiato Muschiato' },
   },
   {
-    keywords: ['fiorit', 'floreal', 'rosa', 'gelsomin', 'iris', 'tuber', 'peon', 'violett', 'ylang'],
-    pair: { primary: '#F59BC0', secondary: '#B84C8F', familyLabel: 'Fiorito' },
+    keywords: ['fiorit', 'floreal', 'fruttat', 'rosa', 'gelsomin', 'iris', 'tuber', 'peon', 'violett', 'ylang'],
+    pair: { primary: '#EC4899', secondary: '#500724', familyLabel: 'Floreale' },
   },
 ];
 
 const FALLBACK_PALETTES: Array<[string, string]> = [
-  ['#E8893A', '#8B3A1E'],
-  ['#EAD75A', '#7FBF8E'],
-  ['#E5484D', '#7A1F3D'],
-  ['#F2B07B', '#B5563A'],
-  ['#5CC8E8', '#2F5FD0'],
-  ['#A58BD6', '#3A2A5E'],
-  ['#F59BC0', '#B84C8F'],
-  ['#D8B995', '#3A1F4D'],
+  ['#38BDF8', '#172554'],
+  ['#E07A38', '#592212'],
+  ['#A855F7', '#2E1065'],
+  ['#F43F5E', '#4C1127'],
+  ['#34D399', '#114232'],
+  ['#F59E0B', '#4A2511'],
+  ['#EC4899', '#500724'],
 ];
 
 function hashString(str: string): number {
@@ -101,7 +100,9 @@ function shiftHexHue(hex: string, degreeDelta: number): string {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
-  let r1 = 0, g1 = 0, b1 = 0;
+  let r1 = 0,
+    g1 = 0,
+    b1 = 0;
 
   if (h < 60) [r1, g1, b1] = [c, x, 0];
   else if (h < 120) [r1, g1, b1] = [x, c, 0];
@@ -111,7 +112,9 @@ function shiftHexHue(hex: string, degreeDelta: number): string {
   else [r1, g1, b1] = [c, 0, x];
 
   const toHex = (n: number) =>
-    Math.round((n + m) * 255).toString(16).padStart(2, '0');
+    Math.round((n + m) * 255)
+      .toString(16)
+      .padStart(2, '0');
 
   return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`;
 }
