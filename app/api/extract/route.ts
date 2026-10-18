@@ -6,6 +6,7 @@ import {
   extractJsonFromAiText,
   GeminiPart,
 } from '@/lib/gemini-engine';
+import { formatPerfumeNote } from '@/lib/dictionary';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,6 @@ function getSupabaseServer() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-// Pulisce gli URL dai parametri di tracking (gclid, gad_source, utm, ecc.) e ancore (#)
 function sanitizeProductUrl(rawUrl: string): string {
   try {
     const u = new URL(rawUrl.trim());
@@ -75,7 +75,6 @@ function sanitizeProductUrl(rawUrl: string): string {
   }
 }
 
-// Converte qualsiasi URL immagine (anche relativo o //cdn...) in un URL https:// assoluto e pulito
 function resolveImageUrl(candidate: string | null | undefined, pageUrl: string): string | null {
   if (!candidate) return null;
   const cleaned = candidate
@@ -98,7 +97,6 @@ function resolveImageUrl(candidate: string | null | undefined, pageUrl: string):
   }
 }
 
-// Estrae l'immagine principale del prodotto dall'HTML (og:image, twitter:image, JSON-LD Product, PrestaShop/Shopify)
 function extractProductImageFromHtml(html: string, pageUrl: string): string | null {
   const metaPatterns = [
     /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i,
@@ -118,7 +116,6 @@ function extractProductImageFromHtml(html: string, pageUrl: string): string | nu
     }
   }
 
-  // Cerca nei blocchi JSON-LD (usati da Shopify, PrestaShop, Magento, Fragrantica)
   const ldJsonMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
   if (ldJsonMatches) {
     for (const block of ldJsonMatches) {
@@ -160,7 +157,6 @@ async function fetchWebMetadataWithBypass(rawUrl: string): Promise<{
   const url = sanitizeProductUrl(rawUrl);
   let foundOgImage: string | null = null;
 
-  // Se l'utente ha incollato direttamente il link di un file immagine (.jpg, .png, .webp)
   if (/\.(jpe?g|png|webp|avif)(\?.*)?$/i.test(url)) {
     return {
       textSnippet: `Link immagine diretto fornito: ${url}`,
@@ -223,14 +219,16 @@ async function fetchWebMetadataWithBypass(rawUrl: string): Promise<{
     if (readerRes.ok) {
       const readerText = (await readerRes.text()).slice(0, 6000);
 
-      // Se il fetch diretto non aveva trovato l'immagine, la estrae dal Markdown di Jina Reader!
+      // REGEX CORRETTA: jpg|jpeg|png|webp
       if (!foundOgImage) {
         const mdImages = Array.from(
-          readerText.matchAll(/!\[[^\]]*\]\((https?:\/\/[^\s)]+\.(?:jpg\vert{}jpeg\vert{}png\vert{}webp)[^\s)]*)\)/gi)
+          readerText.matchAll(
+            /!\[[^\]]*\]\((https?:\/\/[^\s)]+\.(?:jpg\vert{}jpeg\vert{}png\vert{}webp)[^\s)]*)\)/gi
+          )
         );
         const goodImg = mdImages
           .map((m) => m[1])
-          .find((imgUrl) => !/logo|icon|flag|avatar|payment|banner|sprite/i.test(imgUrl));
+          .find((imgUrl) => !/logo|icon|flag|avatar|payment|banner|sprite|box/i.test(imgUrl));
         if (goodImg) {
           foundOgImage = resolveImageUrl(goodImg, url);
         }
@@ -304,7 +302,6 @@ export async function POST(req: Request) {
 
     const searchTarget = (queryName || `${brand || ''} ${nome || ''}`).trim();
 
-    // LIVELLO 1: Cerca nei 59.325+ profumi su Supabase (solo quando non viene passato un URL specifico)
     if (supabase && searchTarget.length >= 2 && !imageBase64 && !url) {
       try {
         const { data: matches } = await supabase.rpc('search_perfume_exact', {
@@ -340,7 +337,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // LIVELLO 2: Costruzione Contesto
     if (url && typeof url === 'string' && url.trim().startsWith('http')) {
       const cleanUrl = sanitizeProductUrl(url);
       const slugInfo = parseUrlSlugInfo(cleanUrl);
@@ -361,13 +357,13 @@ Ecco i dati UFFICIALI CERTIFICATI estratti dal database per questo profumo:
 - Note di Cuore Ufficiali (Middle Notes): ${dbVerifiedRecord.middle_notes || 'Non dichiarate'}
 - Note di Fondo Ufficiali (Base Notes): ${dbVerifiedRecord.base_notes || 'Non dichiarate'}
 
-ORDINE TASSATIVO: Traduci fedelmente in italiano le note di testa, cuore e fondo qui sopra SENZA AGGIUNGERE NESSUNA NOTA NON PRESENTE NELLA SCHEDA CERTIFICATA.`;
+ORDINE TASSATIVO: Traduci fedelmente in italiano tecnico le note di testa, cuore e fondo qui sopra SENZA AGGIUNGERE NESSUNA NOTA NON PRESENTE NELLA SCHEDA CERTIFICATA.`;
     } else if (searchTarget) {
       const liveWebSnippet = await searchLiveWebForPerfume(searchTarget);
       needsGoogleSearchGrounding = true;
-      contextSource = `MODALITA: Profumo di Nicchia / Nuova Uscita ("${searchTarget}").
+      contextSource = `MODALITA: Profumo di Nicchia / Alta Profumeria ("${searchTarget}").
 ${liveWebSnippet}
-Estrai la piramide olfattiva UFFICIALE reale di "${searchTarget}" basandoti sui risultati web qui sopra e sulla tua conoscenza verificata del catalogo ufficiale del brand.`;
+Estrai la piramide olfattiva UFFICIALE reale di "${searchTarget}" basandoti sui risultati web qui sopra e sulla tua conoscenza verificata del catalogo ufficiale della Maison.`;
     } else if (imageBase64) {
       contextSource = `MODALITA: Analisi Visiva Flacone / Campioncino. Leggi brand e nome dall'immagine allegata e restituisci la piramide olfattiva ufficiale esatta.`;
     } else {
@@ -377,8 +373,8 @@ Estrai la piramide olfattiva UFFICIALE reale di "${searchTarget}" basandoti sui 
       );
     }
 
-    const systemPrompt = `Sei un catalogatore tecnico di profumeria artistica e di nicchia con obbligo di precisione assoluta (Zero-Hallucination).
-VIETATO INVENTARE NOTE OLFATTIVE O NASI PROFUMIERI. Non usare toni poetici: sii oggettivo, tecnico e rigoroso.
+    const systemPrompt = `Sei un catalogatore tecnico di alta profumeria artistica e di nicchia con obbligo di precisione assoluta (Zero-Hallucination).
+VIETATO INVENTARE NOTE OLFATTIVE, DESCRIZIONI POETICHE O NASI PROFUMIERI.
 
 ${contextSource}
 
@@ -387,28 +383,19 @@ Devi scegliere ESCLUSIVAMENTE UNA SOLA PAROLA tra queste 12 Famiglie Olfattive P
 "Agrumata", "Aromatica", "Marina", "Floreale", "Fruttata", "Verde", "Speziata", "Legnosa", "Ambrata", "Gourmand", "Cuoiata", "Muschiata".
 
 REGOLA TASSATIVA PER "naso":
-Inserisci il nome del Maître Parfumeur (Naso) SOLO SE è ufficialmente dichiarato e verificato al 100%. Se non è noto con certezza assoluta, restituisci stringa vuota "".
+Inserisci il nome del Maître Parfumeur (colonna "naso") SOLO SE è ufficialmente dichiarato e verificato al 100%. Se non è noto con certezza assoluta, restituisci stringa vuota "".
 
 Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
 {
   "nome": "Nome ufficiale esatto del profumo (senza brand)",
-  "brand": "Nome ufficiale del Brand",
+  "brand": "Nome ufficiale della Maison",
   "concentrazione": "Es. Extrait de Parfum, Eau de Parfum, Eau de Toilette",
   "famiglia_olfattiva": "Una sola tra: Agrumata, Aromatica, Marina, Floreale, Fruttata, Verde, Speziata, Legnosa, Ambrata, Gourmand, Cuoiata, Muschiata",
   "note_testa": "Note di testa ufficiali in italiano separate da virgola",
   "note_cuore": "Note di cuore ufficiali in italiano separate da virgola",
   "note_fondo": "Note di fondo ufficiali in italiano separate da virgola",
   "note_olfattive": "Elenco completo delle note in italiano separate da virgola",
-  "descrizione_ai": "Analisi tecnica e oggettiva del profilo olfattivo basata SOLO sulle note reali presenti (max 2 frasi)",
-  "prezzo_stimato_euro": "Prezzo di listino in Euro nel formato €XXX",
-  "formato_ml": 100,
-  "stagione_ideale": "Es. Primavera / Estate, oppure Autunno / Inverno",
-  "occasione_ideale": "Es. Ufficio, Aperitivo, Cena, Serata, Evento",
   "naso": "Nome del Naso profumiere ufficiale oppure stringa vuota",
-  "voto_longevita": 8,
-  "voto_scia": 8,
-  "voto_proiezione": 8,
-  "voto_complessita": 8,
   "url_foto_vetrina": "${discoveredImage || ''}"
 }`;
 
@@ -441,7 +428,6 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       modelUsed = retry.modelUsed;
     }
 
-    // LIVELLO 3: Giudice Anti-Allucinazione Groq Llama 3.3 70B
     if (process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY) {
       const judgePrompt = dbVerifiedRecord
         ? `Confronta DATI_ORIGINALI_DB con JSON_ITALIANO. Assicurati che non sia stata aggiunta nessuna nota olfattiva inesistente nei DATI_ORIGINALI_DB. Se trovi una nota inventata, rimuovila. Restituisci SOLO il JSON completo.\nDATI_ORIGINALI_DB: Top: ${dbVerifiedRecord.top_notes || 'N/A'} | Middle: ${dbVerifiedRecord.middle_notes || 'N/A'} | Base: ${dbVerifiedRecord.base_notes || 'N/A'}\nJSON_ITALIANO: ${JSON.stringify(parsed)}`
@@ -465,11 +451,13 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       ? parsed.famiglia_olfattiva
       : normalizeFamilyServer(dbVerifiedRecord?.main_accords || parsed.famiglia_olfattiva);
 
+    const normTesta = parsed.note_testa ? formatPerfumeNote(parsed.note_testa) : '';
+    const normCuore = parsed.note_cuore ? formatPerfumeNote(parsed.note_cuore) : '';
+    const normFondo = parsed.note_fondo ? formatPerfumeNote(parsed.note_fondo) : '';
+
     const unifiedNotes =
-      parsed.note_olfattive ||
-      [parsed.note_testa, parsed.note_cuore, parsed.note_fondo]
-        .filter(Boolean)
-        .join(', ');
+      [normTesta, normCuore, normFondo].filter(Boolean).join(', ') ||
+      (parsed.note_olfattive ? formatPerfumeNote(parsed.note_olfattive) : '');
 
     const finalImageUrl =
       discoveredImage ||
@@ -483,52 +471,26 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
         : parsed.naso) || null;
 
     const finalPayload = {
-      nome: dbVerifiedRecord?.name || parsed.nome || nome || 'Fragranza',
-      brand: dbVerifiedRecord?.brand || parsed.brand || brand || 'Brand',
-      concentrazione: dbVerifiedRecord?.concentration || parsed.concentrazione || 'Eau de Parfum',
+      nome: dbVerifiedRecord?.name || parsed.nome || nome || 'Creazione',
+      brand: dbVerifiedRecord?.brand || parsed.brand || brand || 'Maison',
+      concentrazione: dbVerifiedRecord?.concentration || parsed.concentrazione || 'Extrait de Parfum',
       famiglia_olfattiva: pureFamily,
-      note_testa: parsed.note_testa || '',
-      note_cuore: parsed.note_cuore || '',
-      note_fondo: parsed.note_fondo || '',
+      note_testa: normTesta,
+      note_cuore: normCuore,
+      note_fondo: normFondo,
       note_olfattive: unifiedNotes,
-      descrizione_ai: parsed.descrizione_ai || '',
-      prezzo_stimato_euro: parsed.prezzo_stimato_euro || '€150',
-      formato_ml: Number(parsed.formato_ml) || 100,
-      stagione_ideale: parsed.stagione_ideale || '',
-      occasione_ideale: parsed.occasione_ideale || 'Serata',
+      descrizione_ai: '',
       naso: finalNaso,
-      voto_longevita: Number(parsed.voto_longevita) || 8,
-      voto_scia: Number(parsed.voto_scia) || 8,
-      voto_proiezione: Number(parsed.voto_proiezione) || 8,
-      voto_complessita: Number(parsed.voto_complessita) || 8,
       url_foto_vetrina: finalImageUrl,
       _modelUsed: dbVerifiedRecord ? `supabase_db+${modelUsed}` : `web_niche+${modelUsed}`,
     };
 
-    // AUTO-APPRENDIMENTO DEL DATABASE
-    if (supabase && !imageBase64) {
-      if (dbVerifiedRecord?.id) {
-        supabase
-          .from('perfumes')
-          .update({ cached_ai_data: finalPayload })
-          .eq('id', dbVerifiedRecord.id)
-          .then();
-      } else if (finalPayload.nome && finalPayload.brand && finalPayload.note_olfattive) {
-        supabase
-          .from('perfumes')
-          .insert({
-            name: finalPayload.nome,
-            brand: finalPayload.brand,
-            concentration: finalPayload.concentrazione,
-            main_accords: finalPayload.famiglia_olfattiva,
-            top_notes: finalPayload.note_testa,
-            middle_notes: finalPayload.note_cuore,
-            base_notes: finalPayload.note_fondo,
-            perfumers: finalPayload.naso,
-            cached_ai_data: finalPayload,
-          })
-          .then();
-      }
+    if (supabase && !imageBase64 && dbVerifiedRecord?.id) {
+      supabase
+        .from('perfumes')
+        .update({ cached_ai_data: finalPayload })
+        .eq('id', dbVerifiedRecord.id)
+        .then();
     }
 
     return NextResponse.json(finalPayload);
