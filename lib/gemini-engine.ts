@@ -22,17 +22,11 @@ const FALLBACK_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-2.5-pro',
-  'gemini-3-flash-preview',
-  'gemini-3.1-flash-lite-preview',
   'gemini-flash-latest',
-  'gemini-pro-latest',
 ];
 
-let cachedDiscoveredModels: string[] | null = null;
-let lastDiscoveryTimestamp = 0;
 let lastWorkingModel: string | null = null;
 const deadModelsForKey = new Set<string>();
-const CACHE_TTL_MS = 3600000;
 
 function normalizeParts(parts: GeminiPart[]): any[] {
   return parts.map((p) => {
@@ -54,101 +48,6 @@ function normalizeParts(parts: GeminiPart[]): any[] {
   });
 }
 
-function isModelNameAllowed(rawName: string): boolean {
-  const name = rawName.toLowerCase().replace(/^models\//, '');
-  if (deadModelsForKey.has(name)) return false;
-
-  const excludedKeywords = [
-    'embedding',
-    'aqa',
-    'imagen',
-    'image',
-    'veo',
-    'tts',
-    'audio',
-    'live',
-    'robotics',
-    'computer-use',
-    'learnlm',
-    'gemma',
-    '1.0',
-    '1.5-flash-8b',
-    'thinking',
-    'customtools',
-  ];
-
-  return !excludedKeywords.some((kw) => name.includes(kw));
-}
-
-function scoreModelPriority(modelName: string): number {
-  if (lastWorkingModel && modelName === lastWorkingModel) return 0;
-  if (modelName === 'gemini-2.5-flash') return 1;
-  if (modelName === 'gemini-2.0-flash') return 2;
-  if (modelName === 'gemini-2.5-pro') return 3;
-  if (modelName === 'gemini-3-flash-preview') return 4;
-  if (modelName === 'gemini-3.1-flash-lite-preview') return 5;
-  if (modelName === 'gemini-flash-latest') return 6;
-  if (modelName.includes('2.5')) return 7;
-  if (modelName.includes('flash')) return 8;
-  if (modelName.includes('pro')) return 9;
-  return 15;
-}
-
-async function getActiveModelsForKey(apiKey: string, errors: string[]): Promise<string[]> {
-  const now = Date.now();
-  if (
-    cachedDiscoveredModels &&
-    cachedDiscoveredModels.length > 0 &&
-    now - lastDiscoveryTimestamp < CACHE_TTL_MS
-  ) {
-    return cachedDiscoveredModels.filter((m) => !deadModelsForKey.has(m));
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
-
-  try {
-    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-    const listRes = await fetch(listUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    clearTimeout(timeout);
-
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      const allModels: any[] = listData?.models || [];
-
-      const validFromGoogle = allModels
-        .filter((m) => {
-          const methods: string[] = m?.supportedGenerationMethods || [];
-          if (!methods.includes('generateContent')) return false;
-          return isModelNameAllowed(String(m?.name || ''));
-        })
-        .map((m) => String(m.name).replace(/^models\//, ''));
-
-      validFromGoogle.sort((a, b) => scoreModelPriority(a) - scoreModelPriority(b));
-
-      if (validFromGoogle.length > 0) {
-        cachedDiscoveredModels = validFromGoogle;
-        lastDiscoveryTimestamp = now;
-        return validFromGoogle;
-      }
-    } else {
-      const errTxt = await listRes.text();
-      errors.push(`ListModels (${listRes.status}): ${errTxt.slice(0, 80)}`);
-    }
-  } catch (e: any) {
-    clearTimeout(timeout);
-    errors.push(
-      `ListModels skip: ${e?.name === 'AbortError' ? 'Timeout 3s' : e?.message}`
-    );
-  }
-
-  return [];
-}
-
 export async function callOpenRouterFree(
   prompt: string,
   systemInstruction?: string
@@ -157,20 +56,20 @@ export async function callOpenRouterFree(
   const orKey = (process.env.OPENROUTER_API_KEY || '').trim();
 
   if (groqKey && groqKey !== 'undefined') {
-    const groqModels = [
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-    ];
+    const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
 
     for (const model of groqModels) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 9000);
+        const timer = setTimeout(() => controller.abort(), 7500);
         const messages: any[] = [];
         if (systemInstruction) {
           messages.push({ role: 'system', content: systemInstruction });
         }
-        messages.push({ role: 'user', content: `${prompt}\n\nRespond ONLY with a valid JSON object.` });
+        messages.push({
+          role: 'user',
+          content: `${prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido.`,
+        });
 
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -180,7 +79,7 @@ export async function callOpenRouterFree(
           },
           body: JSON.stringify({
             model,
-            temperature: 0.0,
+            temperature: 0.1,
             response_format: { type: 'json_object' },
             messages,
           }),
@@ -211,7 +110,7 @@ export async function callOpenRouterFree(
     for (const model of freeModels) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
+        const timer = setTimeout(() => controller.abort(), 8000);
         const messages: any[] = [];
         if (systemInstruction) {
           messages.push({ role: 'system', content: systemInstruction });
@@ -226,7 +125,7 @@ export async function callOpenRouterFree(
           },
           body: JSON.stringify({
             model,
-            temperature: 0.0,
+            temperature: 0.1,
             messages,
           }),
           signal: controller.signal,
@@ -260,26 +159,21 @@ export async function callGeminiWithFallback(
     ''
   ).trim();
 
-  const temperature = options?.temperature ?? 0.0;
+  const temperature = options?.temperature ?? 0.1;
   const jsonMode = options?.jsonMode ?? false;
-  const perAttemptTimeoutMs = options?.timeoutMs ?? 15000;
+  const perAttemptTimeoutMs = options?.timeoutMs ?? 7500;
   const errors: string[] = [];
 
   const normalizedParts = normalizeParts(parts);
   const hasInlineImage = normalizedParts.some((p) => p.inlineData);
 
   if (apiKey && apiKey !== 'undefined') {
-    const discoveredModels = await getActiveModelsForKey(apiKey, errors);
-
-    const rawQueue = Array.from(
+    const queue = Array.from(
       new Set([
         ...(lastWorkingModel ? [lastWorkingModel] : []),
         ...FALLBACK_MODELS,
-        ...discoveredModels,
       ])
     ).filter((m) => !deadModelsForKey.has(m));
-
-    rawQueue.sort((a, b) => scoreModelPriority(a) - scoreModelPriority(b));
 
     const safetySettings = [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -288,16 +182,18 @@ export async function callGeminiWithFallback(
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
     ];
 
-    for (const model of rawQueue) {
-      // Se useGoogleSearch è richiesto, prova PRIMA con googleSearch e SUBITO DOPO in JSON puro sullo stesso modello (non salta mai il modello!)
+    for (const model of queue) {
+      // Priorità assoluta a JSON nativo veloce (evita i blocchi e i timeout di googleSearch sui modelli incompatibili)
       const attemptModes: Array<{ search: boolean; strictJson: boolean }> = [];
-      if (options?.useGoogleSearch && !hasInlineImage) {
-        attemptModes.push({ search: true, strictJson: false });
-      }
       if (jsonMode) {
         attemptModes.push({ search: false, strictJson: true });
       }
-      attemptModes.push({ search: false, strictJson: false });
+      if (options?.useGoogleSearch && !hasInlineImage) {
+        attemptModes.push({ search: true, strictJson: false });
+      }
+      if (!jsonMode) {
+        attemptModes.push({ search: false, strictJson: false });
+      }
 
       for (const mode of attemptModes) {
         const controller = new AbortController();
@@ -349,73 +245,60 @@ export async function callGeminiWithFallback(
               .join('')
               .trim();
 
-            if (text.length > 0) {
+            if (text.length > 2) {
               lastWorkingModel = model;
-              return { text, modelUsed: mode.search ? `${model}+googleSearch` : model };
+              return { text, modelUsed: mode.search ? `${model}+search` : model };
             } else {
-              errors.push(`${model}: risposta vuota`);
+              errors.push(`${model}: vuoto`);
               continue;
             }
           } else {
             const errBody = await res.text();
-
-            if (res.status === 400 && errBody.includes('API_KEY_INVALID')) {
-              throw new Error(
-                'La tua GEMINI_API_KEY non è valida. Verifica di averla copiata correttamente su Vercel.'
-              );
-            }
-
             if (res.status === 404 || res.status === 403) {
               deadModelsForKey.add(model);
               if (lastWorkingModel === model) lastWorkingModel = null;
-              errors.push(`${model} (${res.status}): escluso`);
               break;
             }
-
-            // Se fallisce mode.search o strictJson (es. 400), passa automaticamente al tentativo successivo sullo STESSO modello!
             if (res.status === 400) {
               continue;
             }
-
-            errors.push(`${model} (${res.status}): ${errBody.slice(0, 70)}`);
+            errors.push(`${model} (${res.status}): ${errBody.slice(0, 60)}`);
             break;
           }
         } catch (err: any) {
           clearTimeout(timer);
-          if (err?.message?.includes('GEMINI_API_KEY non è valida')) {
-            throw err;
-          }
-          const msg =
-            err?.name === 'AbortError'
-              ? `Timeout (${perAttemptTimeoutMs}ms)`
-              : err?.message || 'Network error';
-          errors.push(`${model}: ${msg}`);
+          errors.push(
+            `${model}: ${err?.name === 'AbortError' ? 'Timeout' : err?.message}`
+          );
           break;
         }
       }
     }
   }
 
-  // Fallback immediato su Groq Llama 3.3 70B
+  // SECONDO MOTORE AI IMMEDIATO: Groq Llama 3.3 70B / OpenRouter
   if (!hasInlineImage) {
     const promptTextOnly = normalizedParts
       .map((p) => p.text || '')
       .filter(Boolean)
       .join('\n');
     if (promptTextOnly) {
-      const backupResult = await callOpenRouterFree(promptTextOnly, options?.systemInstruction);
+      const backupResult = await callOpenRouterFree(
+        promptTextOnly,
+        options?.systemInstruction
+      );
       if (backupResult) return backupResult;
     }
   }
 
   throw new Error(
-    `Nessun modello AI ha risposto. Dettagli: ${errors.slice(0, 5).join(' | ')}`
+    `Motori AI temporaneamente occupati. Riprova tra un istante. (${errors.slice(0, 3).join(' | ')})`
   );
 }
 
 export function extractJsonFromAiText<T = any>(rawText: string): T {
   if (!rawText || typeof rawText !== 'string') {
-    throw new Error('Testo AI vuoto o non valido per estrazione JSON.');
+    throw new Error('Risposta AI vuota.');
   }
 
   const cleaned = rawText
@@ -439,26 +322,9 @@ export function extractJsonFromAiText<T = any>(rawText: string): T {
   } catch {
     const firstObj = cleaned.indexOf('{');
     const lastObj = cleaned.lastIndexOf('}');
-    const firstArr = cleaned.indexOf('[');
-    const lastArr = cleaned.lastIndexOf(']');
-
-    const isArrayFirst =
-      firstArr !== -1 && (firstObj === -1 || firstArr < firstObj);
-
-    if (isArrayFirst && lastArr > firstArr) {
-      try {
-        return safeParse(cleaned.slice(firstArr, lastArr + 1));
-      } catch {
-        // Fallback
-      }
-    }
-
     if (firstObj !== -1 && lastObj > firstObj) {
       return safeParse(cleaned.slice(firstObj, lastObj + 1));
     }
-
-    throw new Error(
-      `Risposta AI non in formato JSON valido: "${cleaned.slice(0, 80)}..."`
-    );
+    throw new Error('Formato JSON non riconosciuto.');
   }
 }
