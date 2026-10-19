@@ -23,6 +23,9 @@ import {
   Sparkles,
   RefreshCw,
   Tag,
+  LayoutGrid,
+  SquareStack,
+  ChevronRight,
 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
@@ -70,6 +73,7 @@ export default function CollezionePage() {
   const [activeTab, setActiveTab] = useState<'collezione' | 'radar'>(
     vistaParam === 'radar' ? 'radar' : 'collezione'
   );
+  const [viewMode, setViewMode] = useState<'grid' | 'vetrina'>('vetrina');
   const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -117,8 +121,8 @@ export default function CollezionePage() {
     setLoadingPrices(true);
     try {
       const prompt = `Sei un esperto di listini ufficiali di alta profumeria di nicchia e artistica.
-Indica i formati di vendita ufficiali (ESCLUSIVAMENTE da 30 ml in su: es. 30ml, 50ml, 70ml, 75ml, 100ml) e i relativi prezzi di listino ufficiali in Euro (sito ufficiale della Maison o concessionari autorizzati, escluso eBay o usato) per il profumo "${p.brand} - ${p.nome}".
-REGOLA TASSATIVA: Ignora ed escludi qualsiasi formato inferiore a 30ml (vietato inserire 2ml, 5ml, 10ml o campioncini).
+Indica i formati di vendita ufficiali (ESCLUSIVAMENTE da 30 ml in su: es. 30ml, 50ml, 70ml, 75ml, 100ml) e i relativi prezzi di listino ufficiali in Euro per il profumo "${p.brand} - ${p.nome}".
+REGOLA TASSATIVA: Ignora ed escludi qualsiasi formato inferiore a 30ml.
 Rispondi SOLO con una stringa sintetica in questo formato esatto:
 "50ml: €190 • 100ml: €265"`;
 
@@ -143,9 +147,9 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
       const updated = { ...p, prezzo_stimato_euro: cleanPrices };
       setSelectedProfumo(updated);
       setProfumi((prev) => prev.map((item) => (item.id === p.id ? updated : item)));
-      showToast('Listino formati (≥ 30ml) aggiornato.');
+      showToast('Listino formati aggiornato.');
     } catch (err: any) {
-      showToast(err?.message || 'Errore recupero prezzi per formato.', 'error');
+      showToast(err?.message || 'Errore recupero prezzi.', 'error');
     } finally {
       setLoadingPrices(false);
     }
@@ -224,8 +228,8 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
-      {/* HEADER UNIFORMATO A SINISTRA CON LOGO MONOCROMATICO GRANDE E IN RISALTO */}
-      <header className="flex items-center justify-between gap-4 pb-6 border-b border-white/10">
+      {/* HEADER */}
+      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
         <div className="flex items-center gap-4">
           <Link
             href="/"
@@ -237,7 +241,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
           <Logo variant="mono" className="h-12" />
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
           <div className="flex rounded-full bg-[#0E0A16] p-1 border border-white/10">
             <button
               onClick={() => {
@@ -281,14 +285,42 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
             </button>
           </div>
 
-          <Link
-            href="/scanner"
-            style={{ backgroundColor: aura.primary }}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90"
-            title="Acquisisci"
-          >
-            <Plus className="h-4 w-4 stroke-[2.5]" />
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* SWITCH VETRINA / GRIGLIA */}
+            <div className="flex items-center rounded-full bg-[#0E0A16] border border-white/10 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('vetrina')}
+                title="Vista Vetrina"
+                style={viewMode === 'vetrina' ? { backgroundColor: aura.primary, color: '#08060C' } : undefined}
+                className={`p-2 rounded-full transition ${
+                  viewMode === 'vetrina' ? 'font-bold' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+                }`}
+              >
+                <SquareStack className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                title="Vista Griglia"
+                style={viewMode === 'grid' ? { backgroundColor: aura.primary, color: '#08060C' } : undefined}
+                className={`p-2 rounded-full transition ${
+                  viewMode === 'grid' ? 'font-bold' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <Link
+              href="/scanner"
+              style={{ backgroundColor: aura.primary }}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90"
+              title="Acquisisci"
+            >
+              <Plus className="h-4 w-4 stroke-[2.5]" />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -413,12 +445,12 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
         </section>
       )}
 
-      {/* GRIGLIA FLACONI */}
+      {/* LISTA O GRIGLIA FLACONI */}
       <section className="mt-8">
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-80 rounded-[30px] aura-skeleton" />
+              <div key={n} className="h-72 rounded-[30px] aura-skeleton" />
             ))}
           </div>
         ) : filteredProfumi.length === 0 ? (
@@ -431,7 +463,86 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
               Nessuna creazione trovata
             </h2>
           </div>
+        ) : viewMode === 'vetrina' ? (
+          /* VISTA VETRINA IMMERSIVA (CARD AMPIE) */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredProfumi.map((p) => {
+              const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+              const imgUrl = p.url_foto_vetrina || p.immagine_url;
+
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => {
+                    setSelectedProfumo(p);
+                    setAuraFromProfumo(p);
+                    setEditForm(p);
+                    setIsEditing(false);
+                  }}
+                  style={{ borderColor: `${pAura.primary}40` }}
+                  className="group relative flex flex-col justify-between rounded-[32px] border bg-[#161024]/95 p-6 transition-all duration-300 hover:scale-[1.01] cursor-pointer shadow-xl"
+                >
+                  <div className="flex gap-5 items-center">
+                    <div className="relative shrink-0">
+                      <div
+                        className="absolute inset-0 rounded-[24px] blur-2xl opacity-40 transition-opacity group-hover:opacity-80"
+                        style={{ backgroundColor: pAura.primary }}
+                      />
+                      <BottlePedestal
+                        src={imgUrl}
+                        alt={p.nome}
+                        size="lg"
+                        className="relative z-10 !h-44 !w-32"
+                        showSigil={false}
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span
+                          style={{ color: pAura.primary }}
+                          className="font-mono text-[10px] uppercase tracking-widest truncate"
+                        >
+                          {p.brand}
+                        </span>
+                        {p.famiglia_olfattiva && (
+                          <span className="font-mono text-[10px] text-[#B8A9C9]">
+                            {p.famiglia_olfattiva}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="font-serif text-xl text-[#F6EFE4] leading-snug line-clamp-2">
+                        {p.nome}
+                      </h3>
+
+                      <p className="text-xs text-[#B8A9C9] line-clamp-2">
+                        {p.note_testa || p.note_olfattive || p.descrizione_ai || 'Nessuna nota registrata.'}
+                      </p>
+
+                      {activeTab === 'radar' && p.prezzo_stimato_euro && (
+                        <div className="pt-1">
+                          <span className="inline-block rounded-full bg-[#0E0A16] border border-purple-400/40 px-2.5 py-0.5 font-mono text-[10px] text-purple-200 line-clamp-1">
+                            {p.prezzo_stimato_euro}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3.5 border-t border-white/10 flex items-center justify-between font-mono text-xs text-[#B8A9C9]">
+                    <span>{p.concentrazione || 'Extrait de Parfum'}</span>
+                    <span style={{ color: pAura.primary }} className="flex items-center gap-1 group-hover:translate-x-1 transition">
+                      <span>Apri Scheda</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          /* VISTA A GRIGLIA COMPATTA */
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
             {filteredProfumi.map((p) => {
               const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
@@ -839,7 +950,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                           <p className="font-mono text-xs text-[#F6EFE4] text-left">
                             {selectedProfumo.prezzo_stimato_euro
                               ? selectedProfumo.prezzo_stimato_euro
-                              : 'Premi "Calcola Prezzi Formati AI" per estrarre i prezzi ufficiali da 30ml, 50ml, 100ml (esclusi campioncini).'}
+                              : 'Premi "Calcola Prezzi Formati AI" per estrarre i prezzi ufficiali da 30ml, 50ml, 100ml.'}
                           </p>
                         </div>
                       )}
