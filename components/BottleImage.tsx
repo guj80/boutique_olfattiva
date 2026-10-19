@@ -7,6 +7,7 @@ interface BottlePedestalProps {
   src?: string | null;
   alt: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  iconSize?: string;
   className?: string;
   showSigil?: boolean;
 }
@@ -38,6 +39,7 @@ export function BottlePedestal({
   src,
   alt,
   size = 'md',
+  iconSize,
   className = '',
   showSigil = true,
 }: BottlePedestalProps) {
@@ -69,12 +71,12 @@ export function BottlePedestal({
         </>
       ) : (
         <div className="flex flex-col items-center justify-center">
-          <Logo variant="original" className={cfg.fallbackLogo} />
+          <Logo variant="original" className={iconSize ? `h-[${iconSize}] w-[${iconSize}]` : cfg.fallbackLogo} />
         </div>
       )}
     </div>
   );
 }
 
-// Alias esportato per retrocompatibilità con eventuali import del Diario
+// Alias esportati per retrocompatibilità totale con qualsiasi pagina esistente
 export const SmartBottleImage = BottlePedestal;
