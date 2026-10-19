@@ -1,81 +1,94 @@
 import { NextResponse } from 'next/server';
-import { callGeminiWithFallback, extractJsonFromAiText } from '@/lib/gemini-engine';
+import {
+  callGeminiWithFallback,
+  extractJsonFromAiText,
+} from '@/lib/gemini-engine';
+import { isCollezioneProfumo, getUnifiedNotes } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 25;
 
 export async function POST(req: Request) {
   try {
-    const { query, profumi } = await req.json();
+    const body = await req.json();
+    const { query, profumi = [], recentWornIds = [] } = body;
 
     if (!query || !Array.isArray(profumi) || profumi.length === 0) {
       return NextResponse.json(
-        { error: 'Inserisci una richiesta per CHIEDI ALL\'IA e assicurati che la collezione sia caricata.' },
+        { error: 'Collezione vuota o richiesta mancante.' },
         { status: 400 }
       );
     }
 
-    const catalogoCompatto = profumi.map((p: any) => ({
+    // Filtra prioritariamente i flaconi in Collezione (se presenti), altrimenti usa tutti
+    const ownedBottles = profumi.filter(isCollezioneProfumo);
+    const pool = ownedBottles.length > 0 ? ownedBottles : profumi;
+
+    // Payload compatto per velocità estrema e risparmio token
+    const compactCatalog = pool.slice(0, 85).map((p: any) => ({
       id: p.id,
-      brand: p.brand,
-      nome: p.nome,
-      concentrazione: p.concentrazione || '',
+      brand: p.brand || 'Maison',
+      nome: p.nome || 'Fragranza',
       famiglia: p.famiglia_olfattiva || '',
-      note_testa: p.note_testa || '',
-      note_cuore: p.note_cuore || '',
-      note_fondo: p.note_fondo || '',
-      note_complete: p.note_olfattive || '',
+      note: getUnifiedNotes(p).slice(0, 140),
       stagione: p.stagione_ideale || '',
       occasione: p.occasione_ideale || '',
-      descrizione: p.descrizione_ai || '',
-      mouche: p.note_mouche || '',
-      pelle: p.note_pelle || '',
+      indossatoDiRecente: Array.isArray(recentWornIds) && recentWornIds.includes(p.id),
     }));
 
-    const prompt = `Sei il motore di analisi tecnica olfattiva ("CHIEDI ALL'IA") della collezione di Luca.
-REGOLE TASSATIVE:
-1. NON usare toni poetici, teatrali o da "sommelier". Sii diretto, analitico, preciso e oggettivo.
-2. Basati ESCLUSIVAMENTE sulle note olfattive e sui dati reali presenti nel JSON della collezione qui sotto. È severamente vietato attribuire a un profumo note che non sono scritte nella sua scheda.
-
-Richiesta di Luca:
+    const prompt = `Sei un Maître Parfumeur e Sommelier Olfattivo personale.
+L'utente chiede un consiglio per oggi con queste indicazioni:
 "${query}"
 
-Collezione certificata di Luca (JSON):
-${JSON.stringify(catalogoCompatto)}
+Ecco i flaconi disponibili nella sua Collezione (in JSON compatto):
+${JSON.stringify(compactCatalog)}
 
-Seleziona da questa lista solo i profumi (da 1 a 5) che rispondono tecnicamente alla richiesta.
-Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta:
+REGOLE DI SELEZIONE:
+1. Scegli 1 profumo principale perfetto + fino a 2 alternative valide (totale massimo 3 ID reali presenti nella lista sopra).
+2. Se possibile, penalizza i profumi con "indossatoDiRecente": true per favorire una rotazione elegante della collezione.
+3. Spiega il perché tecnico (accordi, scia, aderenza a clima/outfit/occasione) in italiano impeccabile, incisivo e mai banale.
+
+Restituisci ESCLUSIVAMENTE questo oggetto JSON:
 {
-  "recommendedIds": ["id_1", "id_2"],
-  "sommelierAdvice": "Analisi tecnica diretta e chiara (3-4 frasi) rivolta a Luca che spiega perché queste fragranze rispondono alla richiesta, citando solo le vere note presenti nelle loro schede.",
+  "sommelierAdvice": "Il tuo consiglio diretto (2-3 frasi ricche di dettagli sulle note dei profumi scelti e perché funzionano oggi)",
+  "recommendedIds": ["id_scelta_1", "id_alternativa_2", "id_alternativa_3"],
   "motivazioniPerProfumo": {
-    "id_1": "Spiegazione tecnica precisa (1 frase) basata sulle note reali di questo profumo.",
-    "id_2": "Spiegazione tecnica precisa (1 frase) per il secondo profumo."
+    "id_scelta_1": "Scelta Principale: motivazione specifica in 1 frase",
+    "id_alternativa_2": "Alternativa: motivazione specifica in 1 frase",
+    "id_alternativa_3": "Alternativa: motivazione specifica in 1 frase"
   }
 }`;
 
     const { text, modelUsed } = await callGeminiWithFallback([{ text: prompt }], {
-      temperature: 0.0,
+      temperature: 0.25,
       jsonMode: true,
+      useGoogleSearch: false,
     });
 
     const parsed = extractJsonFromAiText<{
-      recommendedIds?: string[];
       sommelierAdvice?: string;
+      recommendedIds?: string[];
       motivazioniPerProfumo?: Record<string, string>;
     }>(text);
 
+    // Validazione ferrea: accetta solo ID realmente esistenti nella collezione dell'utente
+    const validIdSet = new Set(pool.map((p: any) => String(p.id)));
+    const validatedIds = (parsed.recommendedIds || [])
+      .map((id) => String(id))
+      .filter((id) => validIdSet.has(id))
+      .slice(0, 3);
+
     return NextResponse.json({
-      recommendedIds: Array.isArray(parsed.recommendedIds) ? parsed.recommendedIds : [],
       sommelierAdvice:
         parsed.sommelierAdvice ||
-        'Ecco la selezione tecnica calcolata dall\'IA in base alle piramidi olfattive della tua collezione.',
+        'Ecco la selezione ideale dalla tua collezione per questa occasione.',
+      recommendedIds: validatedIds,
       motivazioniPerProfumo: parsed.motivazioniPerProfumo || {},
       _modelUsed: modelUsed,
     });
-  } catch (error: any) {
-    console.error('[API /api/search Error]:', error);
+  } catch (err: any) {
     return NextResponse.json(
-      { error: error?.message || 'Errore nella consultazione dell\'IA.' },
+      { error: err?.message || 'Errore durante la consulenza olfattiva.' },
       { status: 500 }
     );
   }
