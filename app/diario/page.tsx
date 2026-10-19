@@ -1,287 +1,182 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useState } from 'react';
 import {
-  ArrowLeft,
-  Trash2,
-  Plus,
-  FlaskConical,
-  Crown,
+  BookOpen,
+  Calendar,
   Sparkles,
-  Droplets,
-  Feather,
   Sun,
+  Sunrise,
   Sunset,
   Moon,
-  Stars,
+  Flame,
+  Check,
+  Plus,
+  Trash2,
 } from 'lucide-react';
-import { supabase, Profumo, Momento, isCollezioneProfumo } from '@/lib/supabase';
+import { supabase, getLocalDateISO, isCollezioneProfumo } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
-import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
-import { SmartBottleImage } from '@/components/BottleImage';
+import { BottlePedestal } from '@/components/BottleImage';
+import { GlassCard } from '@/components/GlassCard';
+import { useAura, resolveAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
+import { useSpruzzo } from '@/components/Spruzzo';
 
-const MOMENTI: Array<{ key: Momento; label: string; icon: any }> = [
-  { key: 'Mattina', label: 'Mattina', icon: Sun },
-  { key: 'Pomeriggio', label: 'Pomeriggio', icon: Sunset },
-  { key: 'Sera', label: 'Sera', icon: Moon },
-  { key: 'Notte', label: 'Notte', icon: Stars },
+const MOMENTI = [
+  { label: 'Mattina', icon: Sunrise },
+  { label: 'Pomeriggio', icon: Sun },
+  { label: 'Sera', icon: Sunset },
+  { label: 'Notte', icon: Moon },
 ];
 
 export default function DiarioPage() {
-  const [indossi, setIndossi] = useState<any[]>([]);
-  const [profumi, setProfumi] = useState<Profumo[]>([]);
+  const [indossi, setIndossi] = useState([]);
+  const [profumi, setProfumi] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const [selectedProfumoId, setSelectedProfumoId] = useState<string>('');
-  const [selectedMomento, setSelectedMomento] = useState<Momento>('Mattina');
-  const [contestoOutfit, setContestoOutfit] = useState<string>('');
-  const [noteGiorno, setNoteGiorno] = useState<string>('');
-  const [submitting, setSubmitting] = useState(false);
+  const [selectedProfumoId, setSelectedProfumoId] = useState('');
+  const [selectedMomento, setSelectedMomento] = useState('Pomeriggio');
+  const [noteIndosso, setNoteIndosso] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const { aura, setCustomAura } = useAura();
+  const { setCustomAura } = useAura();
   const { showToast } = useToast();
+  const { triggerSpruzzo } = useSpruzzo();
 
   useEffect(() => {
     setCustomAura(SECTION_THEMES.diario);
-    fetchDiario();
+    fetchDiarioData();
   }, [setCustomAura]);
 
-  async function fetchDiario() {
-    setLoading(true);
+  async function fetchDiarioData() {
     try {
-      const [{ data: indossiData, error: errIndossi }, { data: profumiData, error: errProfumi }] =
-        await Promise.all([
-          supabase.from('indossi').select('*').order('created_at', { ascending: false }),
-          supabase.from('profumi').select('*').order('nome', { ascending: true }),
-        ]);
+      const [indRes, profRes] = await Promise.all([
+        supabase
+          .from('indossi')
+          .select('*, profumi(*)')
+          .order('created_at', { ascending: false }),
+        supabase.from('profumi').select('*').order('nome', { ascending: true }),
+      ]);
 
-      if (errIndossi) throw errIndossi;
-      if (errProfumi) throw errProfumi;
-
-      const listProfumi = profumiData || [];
-      setProfumi(listProfumi);
-      if (listProfumi.length > 0 && !selectedProfumoId) {
-        setSelectedProfumoId(listProfumi[0].id);
+      setIndossi(indRes.data || []);
+      setProfumi(profRes.data || []);
+      if (profRes.data?.[0]) {
+        setSelectedProfumoId(profRes.data[0].id);
       }
-
-      const profumiMap = new Map(listProfumi.map((p: any) => [p.id, p]));
-      const enriched = (indossiData || []).map((item: any) => ({
-        ...item,
-        profumi: profumiMap.get(item.profumo_id) || null,
-      }));
-
-      setIndossi(enriched);
-    } catch {
-      showToast('Impossibile caricare il diario.', 'error');
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleAddIndosso(e: React.FormEvent) {
+  async function handleAddIndosso(e) {
     e.preventDefault();
-    if (!selectedProfumoId) {
-      showToast('Seleziona una creazione.', 'error');
-      return;
-    }
+    if (!selectedProfumoId || saving) return;
+    setSaving(true);
 
-    setSubmitting(true);
     try {
-      const { error } = await supabase.from('indossi').insert([
-        {
-          profumo_id: selectedProfumoId,
-          momento_giornata: selectedMomento,
-          contesto_outfit: contestoOutfit.trim() || null,
-          note_giorno: noteGiorno.trim() || null,
-        },
-      ]);
+      const payload = {
+        profumo_id: selectedProfumoId,
+        data_indosso: getLocalDateISO(),
+        momento_giornata: selectedMomento,
+        note_indosso: noteIndosso.trim() || null,
+      };
 
+      const { error } = await supabase.from('indossi').insert([payload]);
       if (error) throw error;
 
-      setContestoOutfit('');
-      setNoteGiorno('');
-      showToast(`Indosso (${selectedMomento}) registrato.`);
-      fetchDiario();
-    } catch (err: any) {
-      showToast(err?.message || 'Errore nella registrazione.', 'error');
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([20, 40, 20]);
+      }
+      triggerSpruzzo();
+      setNoteIndosso('');
+      showToast('Indosso registrato nel Diario', 'success');
+      fetchDiarioData();
+    } catch (err) {
+      showToast('Errore durante la registrazione.', 'error');
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
-  async function handleDeleteIndosso(id: string) {
+  async function handleDeleteIndosso(id) {
     try {
       const { error } = await supabase.from('indossi').delete().eq('id', id);
       if (error) throw error;
-      setIndossi((prev) => prev.filter((item) => item.id !== id));
-      setDeleteId(null);
-      showToast('Registrazione rimossa.');
-    } catch (err: any) {
-      showToast(err?.message || "Errore durante l'eliminazione.", 'error');
+      showToast('Voce rimossa dal Diario', 'success');
+      setIndossi((prev) => prev.filter((i) => i.id !== id));
+    } catch (err) {
+      showToast('Impossibile rimuovere la voce.', 'error');
     }
   }
 
-  const boutiqueStats = useMemo(() => {
-    const flaconiCollezione = profumi.filter(isCollezioneProfumo);
-    const maisonsSet = new Set(profumi.map((p) => p.brand).filter(Boolean));
-    const nasiSet = new Set(profumi.map((p) => p.naso).filter(Boolean));
-
-    const famCount: Record<string, number> = {};
-    profumi.forEach((p) => {
-      if (p.famiglia_olfattiva) {
-        famCount[p.famiglia_olfattiva] = (famCount[p.famiglia_olfattiva] || 0) + 1;
-      }
-    });
-    const famigliaDominante =
-      Object.entries(famCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-
-    const profumiIndossatiCount: Record<string, number> = {};
-    indossi.forEach((item) => {
-      const pName = item.profumi?.nome;
-      if (pName) {
-        profumiIndossatiCount[pName] = (profumiIndossatiCount[pName] || 0) + 1;
-      }
-    });
-    const signatureScent =
-      Object.entries(profumiIndossatiCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-
-    return {
-      totaleFlaconi: flaconiCollezione.length,
-      totaleMaisons: maisonsSet.size,
-      totaleNasi: nasiSet.size,
-      famigliaDominante,
-      signatureScent,
-      totaleIndossi: indossi.length,
-    };
-  }, [profumi, indossi]);
+  const ownedProfumi = profumi.filter(isCollezioneProfumo);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-36 space-y-8">
-      {/* HEADER UNIFORMATO A SINISTRA CON LOGO GRANDE E AD ALTO CONTRASTO */}
-      <header className="flex items-center justify-between gap-4 pb-6 border-b border-white/10">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#161024] text-[#F6EFE4] transition hover:border-white/40"
-          >
-            <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
-          </Link>
-          <Logo variant="mono" className="h-12" />
+    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-5 pb-36 space-y-8">
+      {/* HEADER DIARIO CON LOGO BLACK */}
+      <header className="flex items-center gap-3 pt-2 pb-2">
+        <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-black/60 border border-white/10 p-2 shadow-lg">
+          <Logo variant="black" className="h-full w-full" />
         </div>
-        <span
-          style={{ color: aura.primary }}
-          className="font-mono text-xs uppercase tracking-widest"
-        >
-          Diario &amp; Statistiche
-        </span>
+        <div>
+          <h1 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-tight">
+            Diario Olfattivo
+          </h1>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[#8E7C9E]">
+            Registrazione indossi • Rotazione &amp; Statistiche
+          </p>
+        </div>
       </header>
 
-      {/* STATISTICHE CON SIMBOLI D'ALTA PROFUMERIA */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-              Signature Scent
-            </span>
-            <Crown style={{ color: aura.primary }} className="h-4 w-4" />
+      {/* FORM REGISTRAZIONE INDOSSO */}
+      <GlassCard accentColor="#FB7185" className="p-5 sm:p-7 space-y-5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/15 border border-rose-400/30 text-rose-400">
+            <BookOpen className="h-4 w-4" />
           </div>
-          <p className="font-serif text-xl text-[#F6EFE4] truncate">
-            {boutiqueStats.signatureScent}
-          </p>
-        </div>
-
-        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-              Accordo Dominante
-            </span>
-            <Droplets style={{ color: aura.primary }} className="h-4 w-4" />
-          </div>
-          <p className="font-serif text-xl text-[#F6EFE4] truncate">
-            {boutiqueStats.famigliaDominante}
-          </p>
-        </div>
-
-        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-              Maisons &amp; Nasi
-            </span>
-            <Feather style={{ color: aura.primary }} className="h-4 w-4" />
-          </div>
-          <p className="font-serif text-xl text-[#F6EFE4]">
-            {boutiqueStats.totaleMaisons} Maisons • {boutiqueStats.totaleNasi} Nasi
-          </p>
-        </div>
-
-        <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-              Indossi Totali
-            </span>
-            <FlaskConical style={{ color: aura.primary }} className="h-4 w-4" />
-          </div>
-          <p className="font-serif text-xl text-[#F6EFE4]">
-            {boutiqueStats.totaleIndossi} Rituali
-          </p>
-        </div>
-      </section>
-
-      {/* REGISTRAZIONE DIARIO MULTIPLO */}
-      <section
-        style={{ borderColor: `${aura.primary}40` }}
-        className="rounded-[28px] border bg-[#161024]/95 p-6 space-y-5 shadow-xl"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
-            <h2 className="font-serif text-xl text-[#F6EFE4]">
-              Registra Indosso Giornaliero
-            </h2>
-          </div>
+          <h2 className="font-serif text-xl text-[#F6EFE4]">Registra Indosso di Oggi</h2>
         </div>
 
         <form onSubmit={handleAddIndosso} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9] mb-1.5">
-                Creazione Scelta
+            {/* Selezione Profumo */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[10px] uppercase tracking-wider text-[#8E7C9E]">
+                Fragranza
               </label>
               <select
                 value={selectedProfumoId}
                 onChange={(e) => setSelectedProfumoId(e.target.value)}
-                className="w-full rounded-[16px] border border-white/10 bg-[#0E0A16] px-4 py-3 text-xs text-[#F6EFE4] focus:outline-none"
+                className="w-full rounded-[16px] border border-white/10 bg-[#050308] px-4 py-3 text-xs sm:text-sm text-[#F6EFE4] focus:border-rose-400/50 focus:outline-none"
               >
-                {profumi.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-[#0E0A16]">
+                {ownedProfumi.map((p) => (
+                  <option key={p.id} value={p.id}>
                     {p.brand} — {p.nome}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className="block font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9] mb-1.5">
+            {/* Selezione Momento */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[10px] uppercase tracking-wider text-[#8E7C9E]">
                 Momento della Giornata
               </label>
               <div className="grid grid-cols-4 gap-1.5">
                 {MOMENTI.map((m) => {
                   const Icon = m.icon;
-                  const active = selectedMomento === m.key;
+                  const active = selectedMomento === m.label;
                   return (
                     <button
-                      key={m.key}
+                      key={m.label}
                       type="button"
-                      onClick={() => setSelectedMomento(m.key)}
-                      style={active ? { backgroundColor: aura.primary } : undefined}
-                      className={`flex flex-col items-center justify-center gap-1 rounded-[14px] py-2 text-[10px] font-mono transition ${
+                      onClick={() => setSelectedMomento(m.label)}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-xl py-2 font-mono text-[10px] border transition ${
                         active
-                          ? 'text-[#08060C] font-bold'
-                          : 'bg-[#0E0A16] text-[#B8A9C9] border border-white/10 hover:text-white'
+                          ? 'border-rose-400 bg-rose-500/20 text-rose-200'
+                          : 'border-white/10 bg-[#050308] text-[#8E7C9E] hover:border-white/20'
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -293,42 +188,33 @@ export default function DiarioPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="font-mono text-[10px] uppercase tracking-wider text-[#8E7C9E]">
+              Note sulla pelle o contesto (Opzionale)
+            </label>
             <input
               type="text"
-              value={contestoOutfit}
-              onChange={(e) => setContestoOutfit(e.target.value)}
-              placeholder="Occasione o tenuta..."
-              className="w-full rounded-[16px] border border-white/10 bg-[#0E0A16] px-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45"
-            />
-            <input
-              type="text"
-              value={noteGiorno}
-              onChange={(e) => setNoteGiorno(e.target.value)}
-              placeholder="Annotazioni olfattive sulla pelle..."
-              className="w-full rounded-[16px] border border-white/10 bg-[#0E0A16] px-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45"
+              value={noteIndosso}
+              onChange={(e) => setNoteIndosso(e.target.value)}
+              placeholder="Es. Sillage notevole, ottima persistenza con il calore..."
+              className="w-full rounded-[16px] border border-white/10 bg-[#050308] px-4 py-3 text-xs sm:text-sm text-[#F6EFE4] placeholder:text-[#8E7C9E]/50 focus:border-rose-400/50 focus:outline-none"
             />
           </div>
 
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={submitting || profumi.length === 0}
-              style={{ backgroundColor: aura.primary }}
-              className="flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-40"
-            >
-              <Plus className="h-4 w-4" />
-              <span>{submitting ? 'Registrazione...' : 'Aggiungi al Diario'}</span>
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={saving || ownedProfumi.length === 0}
+            className="w-full flex items-center justify-center gap-2 rounded-[16px] bg-rose-500 py-3.5 text-xs font-bold uppercase tracking-wider text-[#050308] transition hover:bg-rose-400 disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Registra Indosso</span>
+          </button>
         </form>
-      </section>
+      </GlassCard>
 
-      {/* ARCHIVIO DEGLI INDOSSI */}
-      <section className="space-y-3">
-        <h2 className="font-serif text-xl text-[#F6EFE4] px-1">
-          Archivio degli Indossi
-        </h2>
+      {/* CRONOLOGIA INDOSSI */}
+      <div className="space-y-4">
+        <h3 className="font-serif text-2xl text-[#F6EFE4]">Cronologia Indossi</h3>
 
         {loading ? (
           <div className="space-y-3">
@@ -337,49 +223,46 @@ export default function DiarioPage() {
             ))}
           </div>
         ) : indossi.length === 0 ? (
-          <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-12 text-center space-y-2">
-            <p className="font-serif text-xl text-[#F6EFE4]">
-              Nessun indosso registrato
-            </p>
-          </div>
+          <GlassCard className="p-8 text-center text-xs text-[#8E7C9E]">
+            Nessun indosso registrato nel Diario. Inizia a tracciare la tua rotazione quotidiana.
+          </GlassCard>
         ) : (
           <div className="space-y-3">
             {indossi.map((item) => {
               const p = item.profumi;
-              const pAura = p ? resolveAura(p.famiglia_olfattiva, p.nome) : aura;
-              const dateStr = new Date(item.created_at).toLocaleDateString('it-IT', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              });
+              const pAura = resolveAura(p?.famiglia_olfattiva, p?.nome);
 
               return (
                 <div
                   key={item.id}
-                  style={{ borderColor: `${pAura.primary}38` }}
-                  className="flex items-center justify-between gap-4 rounded-[22px] border bg-[#161024]/90 p-4 transition"
+                  style={{ borderColor: `${pAura.primary}35` }}
+                  className="flex items-center justify-between rounded-[22px] border bg-[#090612]/95 p-4 shadow-lg transition"
                 >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <SmartBottleImage
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <BottlePedestal
                       src={p?.url_foto_vetrina || p?.immagine_url}
-                      alt={p?.nome || 'Flacone'}
-                      iconSize="w-5 h-5"
-                      className="h-12 w-12 shrink-0"
+                      alt={p?.nome || 'Fragranza'}
+                      size="sm"
+                      className="!h-14 !w-14 shrink-0"
+                      showSigil={true}
                     />
-                    <div className="min-w-0">
-                      <p
-                        style={{ color: pAura.primary }}
-                        className="font-mono text-[10px] uppercase tracking-wider"
-                      >
-                        {dateStr} • {item.momento_giornata || 'Mattina'}{' '}
-                        {item.contesto_outfit ? `• ${item.contesto_outfit}` : ''}
-                      </p>
-                      <h3 className="font-serif text-xl text-[#F6EFE4] truncate mt-0.5">
-                        {p ? `${p.brand} — ${p.nome}` : 'Creazione rimossa'}
-                      </h3>
-                      {item.note_giorno && (
-                        <p className="text-xs text-[#B8A9C9] truncate mt-0.5">
-                          &ldquo;{item.note_giorno}&rdquo;
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-rose-300">
+                          {item.data_indosso || item.created_at?.slice(0, 10)}
+                        </span>
+                        {item.momento_giornata && (
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[9px] text-[#B8A9C9]">
+                            {item.momento_giornata}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-serif text-base text-[#F6EFE4] truncate">
+                        {p ? `${p.brand} — ${p.nome}` : 'Fragranza rimossa'}
+                      </h4>
+                      {item.note_indosso && (
+                        <p className="text-xs text-[#8E7C9E] truncate">
+                          {item.note_indosso}
                         </p>
                       )}
                     </div>
@@ -387,9 +270,9 @@ export default function DiarioPage() {
 
                   <button
                     type="button"
-                    onClick={() => setDeleteId(item.id)}
-                    title="Elimina indosso"
-                    className="p-2 text-[#B8A9C9] hover:text-red-400 transition"
+                    onClick={() => handleDeleteIndosso(item.id)}
+                    title="Elimina voce"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#8E7C9E] hover:border-rose-400 hover:text-rose-400 transition"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -398,33 +281,7 @@ export default function DiarioPage() {
             })}
           </div>
         )}
-      </section>
-
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/80 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#161024] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
-            <h3 className="font-serif text-xl text-[#F6EFE4]">
-              Rimuovere questo indosso?
-            </h3>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteId(null)}
-                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
-              >
-                Annulla
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteIndosso(deleteId)}
-                className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-red-500"
-              >
-                Conferma
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </main>
   );
 }
