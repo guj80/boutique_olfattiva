@@ -1,102 +1,77 @@
 'use client';
 
-import React from 'react';
-import { FlaskConical } from 'lucide-react';
-import { useAura } from './AuraProvider';
+import React, { useState } from 'react';
 import { Logo } from './Logo';
 
 interface BottlePedestalProps {
   src?: string | null;
-  alt?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  alt: string;
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
+  /**
+   * Se true (default per i flaconi in Collezione), mostra in basso a destra il sigillo con il Logo nel colore originale
+   */
   showSigil?: boolean;
 }
 
+const SIZE_MAP = {
+  sm: {
+    wrapper: 'h-24 w-24 p-2',
+    sigil: 'h-6 w-6 bottom-1.5 right-1.5',
+    fallbackLogo: 'h-12',
+  },
+  md: {
+    wrapper: 'h-48 w-full p-4',
+    sigil: 'h-8 w-8 bottom-2.5 right-2.5',
+    fallbackLogo: 'h-20',
+  },
+  lg: {
+    wrapper: 'h-64 w-full p-6',
+    sigil: 'h-10 w-10 bottom-3 right-3',
+    fallbackLogo: 'h-28',
+  },
+};
+
 export function BottlePedestal({
   src,
-  alt = 'Flacone',
+  alt,
   size = 'md',
   className = '',
-  showSigil = false,
+  showSigil = true,
 }: BottlePedestalProps) {
-  const { aura } = useAura();
-
-  const sizeClasses = {
-    sm: 'h-16 w-16',
-    md: 'h-28 w-24',
-    lg: 'h-52 w-full',
-    xl: 'h-72 w-64',
-  }[size];
-
-  const iconSizes = {
-    sm: 'h-6 w-6',
-    md: 'h-8 w-8',
-    lg: 'h-12 w-12',
-    xl: 'h-16 w-16',
-  }[size];
+  const [imgError, setImgError] = useState(false);
+  const cfg = SIZE_MAP[size] || SIZE_MAP.md;
+  const hasValidImage = Boolean(src && src.trim().startsWith('http') && !imgError);
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden bg-transparent ${sizeClasses}${className}`}
+      className={`relative flex items-center justify-center overflow-hidden rounded-[22px] bg-[radial-gradient(circle_at_50%_40%,rgba(255,255,255,0.06)_0%,rgba(5,3,8,0.92)_80%)] border border-white/10 ${cfg.wrapper} ${className}`}
     >
-      <div
-        style={{
-          background: `radial-gradient(circle at center, ${aura.primary}24 0%, transparent 72%)`,
-        }}
-        className="absolute inset-0 pointer-events-none transition-all duration-700"
-      />
-
-      {src ? (
-        <div className="relative z-10 h-full w-full p-2 flex items-center justify-center">
+      {hasValidImage ? (
+        <>
           <img
-            src={src}
+            src={src!}
             alt={alt}
-            className="max-h-full max-w-full object-contain drop-shadow-[0_16px_28px_rgba(0,0,0,0.85)] transition-transform duration-500 hover:scale-105"
+            loading="lazy"
+            onError={() => setImgError(true)}
+            className="relative z-10 h-full w-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.85)] transition-transform duration-500 group-hover:scale-105"
           />
-        </div>
+
+          {/* SIGILLO SUL LATO DESTRO DEI FLACONI IN COLLEZIONE: SEMPRE COLORE ORIGINALE */}
+          {showSigil && (
+            <div
+              title="Pezzo in Collezione"
+              className={`pointer-events-none absolute z-20 flex items-center justify-center rounded-full bg-[#050308]/90 border border-white/15 p-1 shadow-[0_4px_14px_rgba(0,0,0,0.9)] backdrop-blur-md ${cfg.sigil}`}
+            >
+              <Logo variant="original" className="h-full w-full" />
+            </div>
+          )}
+        </>
       ) : (
-        <FlaskConical
-          style={{ color: aura.primary }}
-          className={`${iconSizes} opacity-60 transition-transform duration-500`}
-        />
-      )}
-
-      {/* Sigillo d'Autore vettoriale (Solo nella modale di dettaglio) */}
-      {showSigil && (
-        <div
-          style={{ borderColor: `${aura.primary}45` }}
-          className="absolute bottom-2 right-3 z-20 flex h-9 w-9 items-center justify-center rounded-full border bg-[#0E0A14]/90 p-1.5 shadow-xl backdrop-blur-md"
-        >
-          <Logo variant="mono" className="h-full w-full" />
+        /* Se il flacone non ha foto esterna, mostra il Logo nel suo colore originale al centro */
+        <div className="flex flex-col items-center justify-center">
+          <Logo variant="original" className={cfg.fallbackLogo} />
         </div>
-      )}
-    </div>
-  );
-}
-
-interface SmartBottleImageProps {
-  src?: string | null;
-  alt?: string;
-  className?: string;
-  iconSize?: string;
-}
-
-export function SmartBottleImage({
-  src,
-  alt = 'Flacone',
-  className = '',
-  iconSize = 'h-5 w-5',
-}: SmartBottleImageProps) {
-  const { aura } = useAura();
-  return (
-    <div
-      className={`relative flex items-center justify-center overflow-hidden rounded-[14px] bg-[#0E0A14]/90 p-1.5 border border-white/10 ${className}`}
-    >
-      {src ? (
-        <img src={src} alt={alt} className="h-full w-full object-contain drop-shadow-md" />
-      ) : (
-        <FlaskConical style={{ color: aura.primary }} className={`${iconSize} opacity-60`} />
       )}
     </div>
   );
