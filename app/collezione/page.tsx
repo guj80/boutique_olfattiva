@@ -65,7 +65,7 @@ export default function CollezionePage() {
 
   const availableFamilies = Array.from(
     new Set(currentList.map((p) => p.famiglia_olfattiva).filter(Boolean))
-  );
+  ) as string[];
 
   const filteredProfumi = currentList.filter((p) => {
     const matchesSearch =
