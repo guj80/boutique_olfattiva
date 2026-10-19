@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { Library, Compass, BookOpen, Sparkles, ChevronRight } from 'lucide-react';
+import { Library, Compass, BookOpen, ChevronRight } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { GlassCard } from '@/components/GlassCard';
 import { useAura, SECTION_THEMES } from '@/components/AuraProvider';
@@ -15,13 +15,13 @@ export default function HomePage() {
   }, [setCustomAura]);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-10 pb-36 space-y-12">
-      {/* HEADER CON LOGO PULITO SENZA SFUMATURE O INGABBIATURE */}
-      <header className="flex flex-col items-center text-center space-y-4 pt-4">
+    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-12 pb-36 space-y-10">
+      {/* HEADER CON LOGO NETTO, SENZA ALCUN RIFLESSO O SFUMATURA */}
+      <header className="flex flex-col items-center text-center space-y-3 pt-2">
         <div className="h-16 w-48 flex items-center justify-center">
           <Logo variant="mono" className="h-full w-full object-contain" />
         </div>
-        <div className="space-y-1.5 max-w-lg">
+        <div className="space-y-1">
           <h1 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-tight">
             Boutique Olfattiva
           </h1>
@@ -31,18 +31,8 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* CITAZIONE D'AUTORE */}
-      <section className="rounded-[28px] border border-white/10 bg-[#090612]/90 p-6 sm:p-8 text-center space-y-3 shadow-xl">
-        <p className="font-serif italic text-base sm:text-lg text-[#F6EFE4]/90 leading-relaxed">
-          &ldquo;Il profumo è l&apos;ombra invisibile che precede e segue ogni presenza.&rdquo;
-        </p>
-        <p className="font-mono text-[10px] uppercase tracking-widest text-[#8E7C9E]">
-          — Cabinet de Curiosités olfattive
-        </p>
-      </section>
-
       {/* SEZIONI PRINCIPALI (COLLEZIONE, RADAR, DIARIO) */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-4">
         {/* COLLEZIONE */}
         <Link href="/collezione" className="group block">
           <GlassCard accentColor="#38BDF8" className="h-full p-6 space-y-4 transition duration-300 group-hover:-translate-y-1">
