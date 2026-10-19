@@ -85,81 +85,110 @@ export default function CollezionePage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-6 pb-36 space-y-8">
-      {/* HEADER SENZA BOX FORZATI, LOGO NERO PURO */}
-      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 border-b border-white/10 pb-6">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 flex items-center justify-center p-1">
-            <Logo variant="black" className="h-full w-full" />
-          </div>
-          <div>
-            <h1 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-tight">
-              {activeTab === 'collezione' ? 'Collezione' : 'Radar & Scouting'}
-            </h1>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-[#8E7C9E] mt-1">
-              {activeTab === 'collezione'
-                ? `${collezioneList.length} flaconi registrati nel vault`
-                : `${radarList.length} campioni in valutazione`}
-            </p>
+      {/* HEADER PRINCIPALE CON LOGO NERO PURO */}
+      <header className="flex flex-col gap-5 border-b border-white/10 pb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 flex items-center justify-center p-1">
+              <Logo variant="black" className="h-full w-full" />
+            </div>
+            <div>
+              <h1 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-tight">
+                {activeTab === 'collezione' ? 'Collezione' : 'Radar & Scouting'}
+              </h1>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-[#8E7C9E] mt-1">
+                {activeTab === 'collezione'
+                  ? `${collezioneList.length} flaconi registrati`
+                  : `${radarList.length} campioni in valutazione`}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* CONTROLLI VISTA E TAB */}
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          {/* Switch Griglia / Vetrina */}
+        {/* BARRA CONTROLLI: VISTA (GRIGLIA/VETRINA) E TASTO FILTRI SEMPRE VISIBILI */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          {/* Switch Collezione / Radar Tabs */}
           <div className="flex items-center rounded-2xl bg-[#090612] border border-white/10 p-1">
             <button
               type="button"
-              onClick={() => setViewMode('vetrina')}
-              title="Visualizzazione Vetrina"
-              className={`p-2 rounded-xl transition ${
-                viewMode === 'vetrina'
-                  ? 'bg-white/10 text-[#F6EFE4]'
+              onClick={() => setActiveTab('collezione')}
+              className={`px-4 py-2 rounded-xl font-mono text-xs font-bold transition ${
+                activeTab === 'collezione'
+                  ? 'bg-white/15 text-[#F6EFE4] shadow'
                   : 'text-[#8E7C9E] hover:text-[#F6EFE4]'
               }`}
             >
-              <SquareStack className="h-4 w-4" />
+              Collezione ({collezioneList.length})
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('grid')}
-              title="Visualizzazione Griglia"
-              className={`p-2 rounded-xl transition ${
-                viewMode === 'grid'
-                  ? 'bg-white/10 text-[#F6EFE4]'
+              onClick={() => setActiveTab('radar')}
+              className={`px-4 py-2 rounded-xl font-mono text-xs font-bold transition ${
+                activeTab === 'radar'
+                  ? 'bg-white/15 text-[#F6EFE4] shadow'
                   : 'text-[#8E7C9E] hover:text-[#F6EFE4]'
               }`}
             >
-              <LayoutGrid className="h-4 w-4" />
+              Radar ({radarList.length})
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Switch Griglia / Vetrina */}
+            <div className="flex items-center rounded-2xl bg-[#090612] border border-white/10 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('vetrina')}
+                title="Vista Vetrina"
+                className={`p-2 rounded-xl transition ${
+                  viewMode === 'vetrina'
+                    ? 'bg-white/15 text-[#F6EFE4]'
+                    : 'text-[#8E7C9E] hover:text-[#F6EFE4]'
+                }`}
+              >
+                <SquareStack className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                title="Vista Griglia"
+                className={`p-2 rounded-xl transition ${
+                  viewMode === 'grid'
+                    ? 'bg-white/15 text-[#F6EFE4]'
+                    : 'text-[#8E7C9E] hover:text-[#F6EFE4]'
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Tasto Filtri */}
+            <button
+              type="button"
+              onClick={() => setShowFiltersModal(!showFiltersModal)}
+              className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 font-mono text-xs uppercase tracking-wider transition ${
+                selectedFamily !== 'tutte' || showFiltersModal
+                  ? 'border-white/40 bg-white/20 text-[#F6EFE4]'
+                  : 'border-white/10 bg-[#090612] text-[#8E7C9E] hover:border-white/20'
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Filtri {selectedFamily !== 'tutte' ? '(Attivi)' : ''}</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* BARRA DI RICERCA E TASTO FILTRI */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8E7C9E]" />
-          <input
-            type="text"
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Cerca per brand, nome o note..."
-            className="w-full rounded-[18px] border border-white/10 bg-[#090612] pl-11 pr-4 py-3.5 text-xs sm:text-sm text-[#F6EFE4] placeholder:text-[#8E7C9E]/60 focus:border-white/35 focus:outline-none"
-          />
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setShowFiltersModal(!showFiltersModal)}
-          className={`flex items-center gap-2.5 rounded-[18px] border px-5 py-3.5 font-mono text-xs uppercase tracking-wider transition ${
-            selectedFamily !== 'tutte' || showFiltersModal
-              ? 'border-white/40 bg-white/15 text-[#F6EFE4]'
-              : 'border-white/10 bg-[#090612] text-[#8E7C9E] hover:border-white/20'
-          }`}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          <span>Filtri {selectedFamily !== 'tutte' ? `(1)` : ''}</span>
-        </button>
+      {/* BARRA DI RICERCA */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8E7C9E]" />
+        <input
+          type="text"
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+          placeholder="Cerca per brand, nome o note..."
+          className="w-full rounded-[18px] border border-white/10 bg-[#090612] pl-11 pr-4 py-3.5 text-xs sm:text-sm text-[#F6EFE4] placeholder:text-[#8E7C9E]/60 focus:border-white/35 focus:outline-none"
+        />
       </div>
 
       {/* PANNELLO FILTRI RAPIDI ESPANDIBILE */}
@@ -222,7 +251,7 @@ export default function CollezionePage() {
           </p>
         </GlassCard>
       ) : viewMode === 'vetrina' ? (
-        /* VISTA VETRINA IMMERSIVA (CARD AMPIE) */
+        /* VISTA VETRINA IMMERSIVA */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredProfumi.map((p) => {
             const imgUrl = p.url_foto_vetrina || p.immagine_url;
