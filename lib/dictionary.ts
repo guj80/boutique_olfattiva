@@ -1,29 +1,29 @@
 const TECHNICAL_NOTES_DICTIONARY: Record<string, string> = {
-  'bergamot': 'Bergamotto',
   'calabrian bergamot': 'Bergamotto di Calabria',
-  'lemon': 'Limone',
+  'bergamot': 'Bergamotto',
   'sicilian lemon': 'Limone di Sicilia',
-  'mandarin': 'Mandarino',
+  'lemon': 'Limone',
   'mandarin orange': 'Mandarino',
+  'mandarin': 'Mandarino',
   'blood orange': 'Arancia Rossa',
   'bitter orange': 'Arancia Amara',
+  'orange blossom': "Fiore d'Arancio",
   'orange': 'Arancia',
   'grapefruit': 'Pompelmo',
   'lime': 'Lime',
   'yuzu': 'Yuzu',
   'neroli': 'Neroli',
   'petitgrain': 'Petitgrain',
-  'orange blossom': 'Fiore d\'Arancio',
-  'rose': 'Rosa',
   'damask rose': 'Rosa Damascena',
   'bulgarian rose': 'Rosa Bulgara',
   'taif rose': 'Rosa di Taif',
-  'jasmine': 'Gelsomino',
+  'rose': 'Rosa',
   'jasmine sambac': 'Gelsomino Sambac',
+  'jasmine': 'Gelsomino',
   'tuberose': 'Tuberosa',
+  'orris root': "Radice di Iris",
+  'orris': "Burro d'Iris (Orris)",
   'iris': 'Iris',
-  'orris': 'Burro d\'Iris (Orris)',
-  'orris root': 'Radice di Iris',
   'violet': 'Violetta',
   'ylang-ylang': 'Ylang-Ylang',
   'osmanthus': 'Osmanto',
@@ -36,27 +36,28 @@ const TECHNICAL_NOTES_DICTIONARY: Record<string, string> = {
   'cashmeran': 'Cashmeran',
   'akigalawood': 'Akigalawood',
   'georgywood': 'Georgywood',
-  'vanilla': 'Vaniglia',
   'bourbon vanilla': 'Vaniglia Bourbon',
   'madagascar vanilla': 'Vaniglia del Madagascar',
+  'vanilla': 'Vaniglia',
   'tonka bean': 'Fava Tonka',
-  'sandalwood': 'Sandalo',
   'australian sandalwood': 'Sandalo Australiano',
-  'cedar': 'Legno di Cedro',
-  'atlas cedar': 'Cedro dell\'Atlante',
+  'sandalwood': 'Sandalo',
+  'atlas cedar': "Cedro dell'Atlante",
   'virginia cedar': 'Cedro della Virginia',
+  'cedar': 'Legno di Cedro',
   'guaiac wood': 'Legno di Guaiaco',
+  'agarwood (oud)': 'Oud (Legno di Agar)',
   'agarwood': 'Oud (Legno di Agar)',
   'oud': 'Oud (Legno di Agar)',
-  'amber': 'Ambra',
   'ambergris': 'Ambra Grigia',
-  'amberwood': 'Legno d\'Ambra',
+  'amberwood': "Legno d'Ambra",
+  'amber': 'Ambra',
   'patchouli': 'Patchouli',
-  'vetiver': 'Vetiver',
   'haitian vetiver': 'Vetiver di Haiti',
+  'vetiver': 'Vetiver',
   'oakmoss': 'Muschio di Quercia',
+  'suede': 'Pelle Scamosciata',
   'leather': 'Cuoio',
-  'suede': 'Pelle Scamosciata (Suede)',
   'saffron': 'Zafferano',
   'incense': 'Incenso (Olibano)',
   'olibanum': 'Olibano (Incenso)',
@@ -64,25 +65,28 @@ const TECHNICAL_NOTES_DICTIONARY: Record<string, string> = {
   'labdanum': 'Labdano',
   'benzoin': 'Benzoino',
   'elemi': 'Resina di Elemi',
-  'black pepper': 'Pepe Nero',
   'pink pepper': 'Pepe Rosa',
+  'black pepper': 'Pepe Nero',
   'sichuan pepper': 'Pepe di Sichuan',
   'pepper': 'Pepe',
   'cardamom': 'Cardamomo',
   'cinnamon': 'Cannella',
   'nutmeg': 'Noce Moscata',
+  'cloves': 'Chiodi di Garofano',
   'clove': 'Chiodi di Garofano',
   'ginger': 'Zenzero',
   'coriander': 'Coriandolo',
   'cumin': 'Cumino',
   'juniper berries': 'Bacche di Ginepro',
-  'tobacco': 'Foglie di Tabacco',
+  'tobacco leaf': 'Foglie di Tabacco',
+  'tobacco': 'Tabacco',
   'honey': 'Miele',
   'coffee': 'Caffè',
   'cacao': 'Cacao Assoluto',
   'praline': 'Pralina',
   'caramel': 'Caramello',
-  'almond': 'Mandorla Amara',
+  'bitter almond': 'Mandorla Amara',
+  'almond': 'Mandorla',
   'fig': 'Fico',
   'pear': 'Pera',
   'peach': 'Pesca',
@@ -95,7 +99,8 @@ const TECHNICAL_NOTES_DICTIONARY: Record<string, string> = {
   'salt': 'Sale Marino',
   'cypress': 'Cipresso',
   'pine': 'Pino',
-  'sage': 'Salvia Sclarea',
+  'clary sage': 'Salvia Sclarea',
+  'sage': 'Salvia',
   'rosemary': 'Rosmarino',
   'mint': 'Menta',
   'green tea': 'Tè Verde',
@@ -106,21 +111,21 @@ const TECHNICAL_NOTES_DICTIONARY: Record<string, string> = {
   'whiskey': 'Whisky',
 };
 
-export function formatPerfumeNote(text?: string | null): string {
-  if (!text || !text.trim()) return 'Non dichiarate';
+const SORTED_ENTRIES = Object.entries(TECHNICAL_NOTES_DICTIONARY).sort(
+  (a, b) => b[0].length - a[0].length
+);
 
-  // Ordina le chiavi dalla più lunga alla più corta per non spezzare parole composte (es. "pink pepper" prima di "pepper")
-  const sortedEntries = Object.entries(TECHNICAL_NOTES_DICTIONARY).sort(
-    (a, b) => b[0].length - a[0].length
-  );
+export function formatPerfumeNote(text?: string | null): string {
+  if (!text || !text.trim()) return '';
 
   return text
     .split(',')
     .map((rawNote) => {
       let note = rawNote.trim();
       if (!note) return '';
-      for (const [en, it] of sortedEntries) {
-        const regex = new RegExp(`^${en}$|\\b${en}\\b`, 'gi');
+      for (const [en, it] of SORTED_ENTRIES) {
+        const escaped = en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
         note = note.replace(regex, it);
       }
       return note.charAt(0).toUpperCase() + note.slice(1);
