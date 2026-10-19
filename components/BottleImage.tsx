@@ -8,9 +8,6 @@ interface BottlePedestalProps {
   alt: string;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
-  /**
-   * Se true (default per i flaconi in Collezione), mostra in basso a destra il sigillo con il Logo nel colore originale
-   */
   showSigil?: boolean;
 }
 
@@ -56,8 +53,6 @@ export function BottlePedestal({
             onError={() => setImgError(true)}
             className="relative z-10 h-full w-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.85)] transition-transform duration-500 group-hover:scale-105"
           />
-
-          {/* SIGILLO SUL LATO DESTRO DEI FLACONI IN COLLEZIONE: SEMPRE COLORE ORIGINALE */}
           {showSigil && (
             <div
               title="Pezzo in Collezione"
@@ -68,7 +63,6 @@ export function BottlePedestal({
           )}
         </>
       ) : (
-        /* Se il flacone non ha foto esterna, mostra il Logo nel suo colore originale al centro */
         <div className="flex flex-col items-center justify-center">
           <Logo variant="original" className={cfg.fallbackLogo} />
         </div>
@@ -76,3 +70,6 @@ export function BottlePedestal({
     </div>
   );
 }
+
+// Alias esportato per retrocompatibilità totale con app/diario/page.tsx
+export const SmartBottleImage = BottlePedestal;
