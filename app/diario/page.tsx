@@ -14,7 +14,13 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { supabase, getLocalDateISO, isCollezioneProfumo } from '@/lib/supabase';
+import {
+  supabase,
+  getLocalDateISO,
+  isCollezioneProfumo,
+  Indosso,
+  Profumo,
+} from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { GlassCard } from '@/components/GlassCard';
@@ -30,8 +36,8 @@ const MOMENTI = [
 ];
 
 export default function DiarioPage() {
-  const [indossi, setIndossi] = useState([]);
-  const [profumi, setProfumi] = useState([]);
+  const [indossi, setIndossi] = useState<Indosso[]>([]);
+  const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedProfumoId, setSelectedProfumoId] = useState('');
@@ -58,8 +64,8 @@ export default function DiarioPage() {
         supabase.from('profumi').select('*').order('nome', { ascending: true }),
       ]);
 
-      setIndossi(indRes.data || []);
-      setProfumi(profRes.data || []);
+      setIndossi((indRes.data || []) as Indosso[]);
+      setProfumi((profRes.data || []) as Profumo[]);
       if (profRes.data?.[0]) {
         setSelectedProfumoId(profRes.data[0].id);
       }
@@ -70,7 +76,7 @@ export default function DiarioPage() {
     }
   }
 
-  async function handleAddIndosso(e) {
+  async function handleAddIndosso(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedProfumoId || saving) return;
     setSaving(true);
@@ -100,7 +106,7 @@ export default function DiarioPage() {
     }
   }
 
-  async function handleDeleteIndosso(id) {
+  async function handleDeleteIndosso(id: string) {
     try {
       const { error } = await supabase.from('indossi').delete().eq('id', id);
       if (error) throw error;
@@ -115,7 +121,6 @@ export default function DiarioPage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-5 pb-36 space-y-8">
-      {/* HEADER DIARIO CON LOGO BLACK */}
       <header className="flex items-center gap-3 pt-2 pb-2">
         <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-black/60 border border-white/10 p-2 shadow-lg">
           <Logo variant="black" className="h-full w-full" />
@@ -130,7 +135,6 @@ export default function DiarioPage() {
         </div>
       </header>
 
-      {/* FORM REGISTRAZIONE INDOSSO */}
       <GlassCard accentColor="#FB7185" className="p-5 sm:p-7 space-y-5">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/15 border border-rose-400/30 text-rose-400">
@@ -141,7 +145,6 @@ export default function DiarioPage() {
 
         <form onSubmit={handleAddIndosso} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Selezione Profumo */}
             <div className="space-y-1.5">
               <label className="font-mono text-[10px] uppercase tracking-wider text-[#8E7C9E]">
                 Fragranza
@@ -159,7 +162,6 @@ export default function DiarioPage() {
               </select>
             </div>
 
-            {/* Selezione Momento */}
             <div className="space-y-1.5">
               <label className="font-mono text-[10px] uppercase tracking-wider text-[#8E7C9E]">
                 Momento della Giornata
@@ -212,7 +214,6 @@ export default function DiarioPage() {
         </form>
       </GlassCard>
 
-      {/* CRONOLOGIA INDOSSI */}
       <div className="space-y-4">
         <h3 className="font-serif text-2xl text-[#F6EFE4]">Cronologia Indossi</h3>
 
