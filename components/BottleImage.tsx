@@ -6,7 +6,7 @@ import { Logo } from './Logo';
 interface BottlePedestalProps {
   src?: string | null;
   alt: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   showSigil?: boolean;
 }
@@ -26,6 +26,11 @@ const SIZE_MAP = {
     wrapper: 'h-64 w-full p-6',
     sigil: 'h-10 w-10 bottom-3 right-3',
     fallbackLogo: 'h-28',
+  },
+  xl: {
+    wrapper: 'h-80 w-full p-8',
+    sigil: 'h-12 w-12 bottom-4 right-4',
+    fallbackLogo: 'h-36',
   },
 };
 
@@ -71,5 +76,5 @@ export function BottlePedestal({
   );
 }
 
-// Alias esportato per retrocompatibilità totale con app/diario/page.tsx
+// Alias esportato per retrocompatibilità con eventuali import del Diario
 export const SmartBottleImage = BottlePedestal;
