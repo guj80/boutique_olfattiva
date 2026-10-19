@@ -19,6 +19,7 @@ import {
   isCollezioneProfumo,
   isRadarProfumo,
   parsePrezzoEuro,
+  Profumo,
 } from '@/lib/supabase';
 import { Logo } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
@@ -30,7 +31,7 @@ export default function CollezionePage() {
   const initialTab = searchParams.get('vista') === 'radar' ? 'radar' : 'collezione';
 
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [profumi, setProfumi] = useState([]);
+  const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedFamily, setSelectedFamily] = useState('tutte');
@@ -38,7 +39,6 @@ export default function CollezionePage() {
   const { setCustomAura } = useAura();
 
   useEffect(() => {
-    // Aura dinamica: Blu profondo per Collezione, Ametista per Radar
     setCustomAura(activeTab === 'collezione' ? SECTION_THEMES.collezione : SECTION_THEMES.radar);
 
     async function fetchItems() {
@@ -63,7 +63,6 @@ export default function CollezionePage() {
   const radarList = profumi.filter(isRadarProfumo);
   const currentList = activeTab === 'collezione' ? collezioneList : radarList;
 
-  // Estrae le famiglie presenti per il filtro rapido
   const availableFamilies = Array.from(
     new Set(currentList.map((p) => p.famiglia_olfattiva).filter(Boolean))
   );
@@ -84,7 +83,6 @@ export default function CollezionePage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-5 pb-36 space-y-7">
-      {/* HEADER DI SEZIONE CON LOGO BLACK SU ALONE DEL TEMA */}
       <header className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 pb-2">
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-black/60 border border-white/10 p-2 shadow-lg">
@@ -102,7 +100,6 @@ export default function CollezionePage() {
           </div>
         </div>
 
-        {/* TAB SWITCHER */}
         <div className="flex items-center rounded-2xl bg-[#090612] border border-white/10 p-1.5 shadow-lg">
           <button
             type="button"
@@ -138,7 +135,6 @@ export default function CollezionePage() {
         </div>
       </header>
 
-      {/* BARRA FILTRI E RICERCA */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8E7C9E]" />
@@ -151,7 +147,6 @@ export default function CollezionePage() {
           />
         </div>
 
-        {/* Filtro Famiglia Rapido */}
         {availableFamilies.length > 0 && (
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
             <button
@@ -183,7 +178,6 @@ export default function CollezionePage() {
         )}
       </div>
 
-      {/* GRIGLIA FLACONI */}
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4, 5, 6].map((n) => (
@@ -215,7 +209,6 @@ export default function CollezionePage() {
                 className="group flex flex-col justify-between p-4 transition duration-300 hover:-translate-y-1"
               >
                 <div>
-                  {/* Immagine con Sigillo originale se in Collezione */}
                   <BottlePedestal
                     src={imgUrl}
                     alt={p.nome}
@@ -251,7 +244,6 @@ export default function CollezionePage() {
                   </div>
                 </div>
 
-                {/* Footer Card con Prezzo o Anno */}
                 <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
                   <span className="font-mono text-[11px] text-[#F6EFE4]">
                     {p.prezzo_stimato_euro ? `€${parsePrezzoEuro(p)}` : '—'}
