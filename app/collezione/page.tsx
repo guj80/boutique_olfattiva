@@ -4,7 +4,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Search,
   SlidersHorizontal,
   Plus,
@@ -23,10 +22,11 @@ import {
   Sparkles,
   RefreshCw,
   Tag,
+  Activity,
 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
-import { Logo } from '@/components/Logo';
+import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
@@ -224,73 +224,65 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
-      {/* HEADER UNIFORMATO A SINISTRA CON LOGO MONOCROMATICO GRANDE E IN RISALTO */}
-      <header className="flex items-center justify-between gap-4 pb-6 border-b border-white/10">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#161024] text-[#F6EFE4] transition hover:border-white/40"
-          >
-            <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
-          </Link>
-          <Logo variant="mono" className="h-12" />
-        </div>
+      <PageHeader
+        title={activeTab === 'radar' ? 'Testing Radar' : 'Collezione Privata'}
+        subtitle="Atelier Scultoreo"
+        rightSlot={
+          <div className="flex items-center gap-2.5">
+            <div className="flex rounded-full bg-[#0E0A16] p-1 border border-white/10">
+              <button
+                onClick={() => {
+                  setActiveTab('collezione');
+                  setCustomAura(SECTION_THEMES.collezione);
+                  router.push('/collezione');
+                }}
+                style={
+                  activeTab === 'collezione'
+                    ? { backgroundColor: SECTION_THEMES.collezione.primary }
+                    : undefined
+                }
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  activeTab === 'collezione'
+                    ? 'text-[#08060C]'
+                    : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+                }`}
+              >
+                <Library className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Collezione</span> ({profumi.filter(isCollezioneProfumo).length})
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('radar');
+                  setCustomAura(SECTION_THEMES.radar);
+                  router.push('/collezione?vista=radar');
+                }}
+                style={
+                  activeTab === 'radar'
+                    ? { backgroundColor: SECTION_THEMES.radar.primary }
+                    : undefined
+                }
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  activeTab === 'radar'
+                    ? 'text-[#08060C]'
+                    : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+                }`}
+              >
+                <Compass className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Radar</span> ({profumi.filter(isRadarProfumo).length})
+              </button>
+            </div>
 
-        <div className="flex items-center gap-2.5">
-          <div className="flex rounded-full bg-[#0E0A16] p-1 border border-white/10">
-            <button
-              onClick={() => {
-                setActiveTab('collezione');
-                setCustomAura(SECTION_THEMES.collezione);
-                router.push('/collezione');
-              }}
-              style={
-                activeTab === 'collezione'
-                  ? { backgroundColor: SECTION_THEMES.collezione.primary }
-                  : undefined
-              }
-              className={`flex items-center gap-2 rounded-full px-3.5 sm:px-4 py-2 text-xs font-semibold transition ${
-                activeTab === 'collezione'
-                  ? 'text-[#08060C]'
-                  : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
-              }`}
+            <Link
+              href="/scanner"
+              style={{ backgroundColor: aura.primary }}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg"
+              title="Acquisisci"
             >
-              <Library className="h-3.5 w-3.5" />
-              <span>Collezione ({profumi.filter(isCollezioneProfumo).length})</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('radar');
-                setCustomAura(SECTION_THEMES.radar);
-                router.push('/collezione?vista=radar');
-              }}
-              style={
-                activeTab === 'radar'
-                  ? { backgroundColor: SECTION_THEMES.radar.primary }
-                  : undefined
-              }
-              className={`flex items-center gap-2 rounded-full px-3.5 sm:px-4 py-2 text-xs font-semibold transition ${
-                activeTab === 'radar'
-                  ? 'text-[#08060C]'
-                  : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
-              }`}
-            >
-              <Compass className="h-3.5 w-3.5" />
-              <span>Radar ({profumi.filter(isRadarProfumo).length})</span>
-            </button>
+              <Plus className="h-4 w-4 stroke-[2.5]" />
+            </Link>
           </div>
-
-          <Link
-            href="/scanner"
-            style={{ backgroundColor: aura.primary }}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90"
-            title="Acquisisci"
-          >
-            <Plus className="h-4 w-4 stroke-[2.5]" />
-          </Link>
-        </div>
-      </header>
+        }
+      />
 
       {/* RICERCA E FILTRI */}
       <section className="mt-6 flex flex-col sm:flex-row items-center gap-3">
@@ -494,7 +486,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
         )}
       </section>
 
-      {/* SCHEDA DI DETTAGLIO MODALE */}
+      {/* SCHEDA DI DETTAGLIO MODALE (CON GRAFICO TECNICO STILE GINEMBASSY) */}
       {selectedProfumo &&
         (() => {
           const modalAura = resolveAura(
@@ -505,11 +497,16 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
           const pAny = selectedProfumo as any;
           const isRadarItem = isRadarProfumo(selectedProfumo);
 
+          const longevita = Number(pAny.voto_longevita || 8);
+          const scia = Number(pAny.voto_scia || 8);
+          const proiezione = Number(pAny.voto_proiezione || 8);
+          const compl = Number(pAny.voto_complessita || 8);
+
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/85 backdrop-blur-md animate-in fade-in duration-200">
               <div
                 style={{ borderColor: `${modalAura.primary}55` }}
-                className="relative w-full max-w-lg max-h-[86dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16"
+                className="relative w-full max-w-lg max-h-[88dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16"
               >
                 <div className="absolute right-5 top-5 flex items-center gap-2 z-20">
                   <button
@@ -694,66 +691,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                   </div>
                 ) : (
                   <>
-                    {/* 1. PIRAMIDE OLFATTIVA SUBITO IN CIMA */}
-                    <div className="space-y-2.5 pt-2">
-                      <h3
-                        style={{ color: modalAura.primary }}
-                        className="font-mono text-[10px] uppercase tracking-[0.2em]"
-                      >
-                        Piramide Olfattiva
-                      </h3>
-                      <div className="space-y-2 text-xs">
-                        {selectedProfumo.note_testa && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
-                            <span
-                              style={{ color: modalAura.primary }}
-                              className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
-                            >
-                              Testa
-                            </span>
-                            <span className="text-left sm:text-right text-[#F6EFE4]">
-                              {formatPerfumeNote(selectedProfumo.note_testa)}
-                            </span>
-                          </div>
-                        )}
-                        {selectedProfumo.note_cuore && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
-                            <span
-                              style={{ color: modalAura.primary }}
-                              className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
-                            >
-                              Cuore
-                            </span>
-                            <span className="text-left sm:text-right text-[#F6EFE4]">
-                              {formatPerfumeNote(selectedProfumo.note_cuore)}
-                            </span>
-                          </div>
-                        )}
-                        {selectedProfumo.note_fondo && (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
-                            <span
-                              style={{ color: modalAura.primary }}
-                              className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
-                            >
-                              Fondo
-                            </span>
-                            <span className="text-left sm:text-right text-[#F6EFE4]">
-                              {formatPerfumeNote(selectedProfumo.note_fondo)}
-                            </span>
-                          </div>
-                        )}
-                        {!selectedProfumo.note_testa &&
-                          !selectedProfumo.note_cuore &&
-                          !selectedProfumo.note_fondo &&
-                          selectedProfumo.note_olfattive && (
-                            <div className="rounded-[16px] bg-[#0E0A16] p-3.5 border border-white/10 text-center text-[#F6EFE4]">
-                              {formatPerfumeNote(selectedProfumo.note_olfattive)}
-                            </div>
-                          )}
-                      </div>
-                    </div>
-
-                    {/* 2. PODIO CON SIGILLO D'AUTORE + DATI ANAGRAFICI */}
+                    {/* PODIO FLACONE + ANAGRAFICA */}
                     <div className="flex flex-col items-center text-center pt-2">
                       <div className="relative mb-4">
                         <div
@@ -810,6 +748,85 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                         )}
                       </div>
 
+                      {/* GRAFICO TECNICO DI DEGUSTAZIONE / OLFATTIVO STILE GINEMBASSY */}
+                      <div className="mt-5 w-full rounded-2xl bg-[#0E0A16] p-4 border border-white/10 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5" style={{ color: modalAura.primary }}>
+                            <Activity className="h-4 w-4" />
+                            <span className="font-mono text-[11px] uppercase tracking-wider font-bold">
+                              Profilo Organolettico & Prestazioni
+                            </span>
+                          </div>
+                          <span className="font-mono text-[10px] text-[#B8A9C9]">Scala 1-10</span>
+                        </div>
+
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
+                              <span>Longevità (Durata)</span>
+                              <span style={{ color: modalAura.primary }}>{longevita}/10</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${(longevita / 10) * 100}%`,
+                                  backgroundColor: modalAura.primary,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
+                              <span>Scia (Sillage)</span>
+                              <span style={{ color: modalAura.primary }}>{scia}/10</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${(scia / 10) * 100}%`,
+                                  backgroundColor: modalAura.primary,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
+                              <span>Proiezione</span>
+                              <span style={{ color: modalAura.primary }}>{proiezione}/10</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${(proiezione / 10) * 100}%`,
+                                  backgroundColor: modalAura.primary,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
+                              <span>Complessità Olfattiva</span>
+                              <span style={{ color: modalAura.primary }}>{compl}/10</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${(compl / 10) * 100}%`,
+                                  backgroundColor: modalAura.primary,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* SEZIONE RADAR: PREZZI DISTINTI PER FORMATO >= 30ML */}
                       {isRadarItem && (
                         <div className="mt-4 w-full rounded-2xl bg-[#0E0A16] p-4 border border-purple-400/35 space-y-2.5">
@@ -844,7 +861,58 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                         </div>
                       )}
 
-                      {/* 3. LE 4 STAGIONI */}
+                      {/* PIRAMIDE OLFATTIVA */}
+                      <div className="mt-5 w-full space-y-2.5 text-left">
+                        <h3
+                          style={{ color: modalAura.primary }}
+                          className="font-mono text-[10px] uppercase tracking-[0.2em]"
+                        >
+                          Piramide Olfattiva
+                        </h3>
+                        <div className="space-y-2 text-xs">
+                          {selectedProfumo.note_testa && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
+                              <span
+                                style={{ color: modalAura.primary }}
+                                className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
+                              >
+                                Testa
+                              </span>
+                              <span className="text-left sm:text-right text-[#F6EFE4]">
+                                {formatPerfumeNote(selectedProfumo.note_testa)}
+                              </span>
+                            </div>
+                          )}
+                          {selectedProfumo.note_cuore && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
+                              <span
+                                style={{ color: modalAura.primary }}
+                                className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
+                              >
+                                Cuore
+                              </span>
+                              <span className="text-left sm:text-right text-[#F6EFE4]">
+                                {formatPerfumeNote(selectedProfumo.note_cuore)}
+                              </span>
+                            </div>
+                          )}
+                          {selectedProfumo.note_fondo && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
+                              <span
+                                style={{ color: modalAura.primary }}
+                                className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
+                              >
+                                Fondo
+                              </span>
+                              <span className="text-left sm:text-right text-[#F6EFE4]">
+                                {formatPerfumeNote(selectedProfumo.note_fondo)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* STAGIONI IDEALI */}
                       <div className="mt-4 w-full grid grid-cols-4 gap-2 rounded-2xl bg-[#0E0A16]/90 p-2.5 border border-white/10">
                         <div
                           className={`flex flex-col items-center gap-1 rounded-xl py-2 transition ${
