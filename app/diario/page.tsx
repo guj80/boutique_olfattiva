@@ -90,7 +90,7 @@ export default function DiarioPage() {
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
       <PageHeader
         title="Diario Olfattivo"
-        subtitle=""
+        subtitle="Registro"
         rightSlot={
           <div
            style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
