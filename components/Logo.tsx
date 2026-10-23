@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useId } from 'react';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { useAura } from './AuraProvider';
 
 interface LogoProps {
   className?: string;
-  /**
-   * 'original' | 'default' | 'bicolor' = Colori originali bicolore (Smeraldo + Magenta/Viola) per Splash, Home e Sigillo
-   * 'black' | 'mono' = Scultura scura ad alto contrasto con bordo luminoso del colore tema per le schermate interne
-   */
   variant?: 'original' | 'bicolor' | 'black' | 'mono' | 'default';
 }
 
@@ -28,7 +26,6 @@ export function Logo({ className = 'h-16', variant = 'original' }: LogoProps) {
     <div
       className={`relative inline-flex items-center justify-center select-none ${className}`}
     >
-      {/* Alone luminoso calibrato per staccare sempre il logo dallo sfondo */}
       <div
         className="pointer-events-none absolute -inset-4 rounded-full blur-2xl transition-all duration-700"
         style={{
@@ -106,7 +103,6 @@ export function Logo({ className = 'h-16', variant = 'original' }: LogoProps) {
 
         {isOriginal ? (
           <>
-            {/* Livello secondario Magenta/Viola */}
             <g transform="translate(4, 2.5)" opacity="0.92">
               <path
                 d="M66 42 L168 24 L142 62 L148 40 L84 44 L102 58 L124 62 L82 62 Z"
@@ -131,7 +127,6 @@ export function Logo({ className = 'h-16', variant = 'original' }: LogoProps) {
               />
             </g>
 
-            {/* Livello principale Smeraldo con micro-filo di luce */}
             <g
               fill={`url(#${mainGradId})`}
               stroke="rgba(246, 239, 228, 0.35)"
@@ -147,7 +142,6 @@ export function Logo({ className = 'h-16', variant = 'original' }: LogoProps) {
             </g>
           </>
         ) : (
-          /* Versione per la Banda Superiore dei Tab: corpo scuro vellutato + filo neon nitido del colore sezione */
           <>
             <g transform="translate(2.5, 2)" opacity="0.45" fill={themeColor}>
               <path d="M66 42 L168 24 L142 62 L148 40 L84 44 L102 58 L124 62 L82 62 Z" />
@@ -174,5 +168,56 @@ export function Logo({ className = 'h-16', variant = 'original' }: LogoProps) {
         )}
       </svg>
     </div>
+  );
+}
+
+interface PageHeaderProps {
+  title: string;
+  subtitle?: string;
+  backHref?: string;
+  rightSlot?: React.ReactNode;
+}
+
+export function PageHeader({
+  title,
+  subtitle,
+  backHref = '/',
+  rightSlot,
+}: PageHeaderProps) {
+  const { aura } = useAura();
+
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-white/10">
+      <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+        <Link
+          href={backHref}
+          aria-label="Torna alla home"
+          style={{ borderColor: `${aura.primary}40` }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-[#140D1C] text-[#F6EFE4] shadow-md transition hover:scale-105 hover:border-white/50"
+        >
+          <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
+        </Link>
+
+        <Logo variant="mono" className="h-12 shrink-0" />
+
+        <div className="min-w-0 pl-3 border-l border-white/10">
+          {subtitle && (
+            <p
+              style={{ color: aura.primary }}
+              className="font-mono text-[10px] uppercase tracking-[0.2em] truncate"
+            >
+              {subtitle}
+            </p>
+          )}
+          <h1 className="font-serif text-xl sm:text-2xl text-[#F6EFE4] leading-tight truncate">
+            {title}
+          </h1>
+        </div>
+      </div>
+
+      {rightSlot && (
+        <div className="flex items-center gap-2.5 shrink-0">{rightSlot}</div>
+      )}
+    </header>
   );
 }
