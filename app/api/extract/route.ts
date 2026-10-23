@@ -271,6 +271,46 @@ function clampVote(val: any, fallback: number = 8): number {
   if (isNaN(n) || n < 1 || n > 10) return fallback;
   return Math.round(n);
 }
+async function searchWebByPerfumeName(query: string): Promise<{
+  webSnippet: string;
+  foundImage: string | null;
+}> {
+  let webSnippet = '';
+  let foundImage: string | null = null;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3200);
+    const searchUrl = `https://s.jina.ai/${encodeURIComponent(
+      `${query} perfume notes perfumer fragrantica parfumo`
+    )}`;
+    const res = await fetch(searchUrl, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'text/plain',
+        'X-Retain-Images': 'none',
+      },
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const text = await res.text();
+      webSnippet = text.slice(0, 4200);
+
+      const urlMatch = text.match(
+        /https?:\/\/(?:www\.)?(?:fragrantica\.[a-z.]+|parfumo\.com)\/[^\s)\]"']+/i
+      );
+      if (urlMatch?.[0]) {
+        const meta = await fetchWebMetadataWithBypass(urlMatch[0]);
+        if (meta.ogImage) foundImage = meta.ogImage;
+      }
+    }
+  } catch {
+    // Prosegue con Google Search Grounding di Gemini + Groq
+  }
+
+  return { webSnippet, foundImage };
+}
 
 export async function POST(req: Request) {
   try {
@@ -292,7 +332,7 @@ export async function POST(req: Request) {
 
     const searchTarget = (queryName || `${brand || ''} ${nome || ''}`).trim();
 
-    // LIVELLO 1: Cerca nel catalogo Supabase (59.325+ profumi) come base, ma arricchisce SEMPRE i campi mancanti tramite AI
+    // LIVELLO 1: Cerca nel catalogo Supabase (59.325+ profumi)
     if (supabase && searchTarget.length >= 2 && !imageBase64 && !url) {
       try {
         const { data: matches } = await supabase.rpc('search_perfume_exact', {
@@ -315,7 +355,6 @@ export async function POST(req: Request) {
           if (isTrueMatch) {
             dbVerifiedRecord = topMatch;
 
-            // Ritorna la cache solo se è davvero completa (ha note E prezzo formati >=30ml)
             if (
               dbVerifiedRecord.cached_ai_data &&
               dbVerifiedRecord.cached_ai_data.note_testa &&
@@ -329,11 +368,13 @@ export async function POST(req: Request) {
           }
         }
       } catch {
-        // Continua su AI
+        // Continua su Ricerca Web + AI
       }
     }
 
-    // LIVELLO 2: Costruzione Contesto per la Doppia AI (Gemini + Groq)
+    // LIVELLO 2: Costruzione Contesto (Link, DB o Ricerca Web Live per profumi fuori catalogo)
+    const needsLiveWebSearch = Boolean(searchTarget && !dbVerifiedRecord && !url && !imageBase64);
+
     if (url && typeof url === 'string' && url.trim().startsWith('http')) {
       const cleanUrl = sanitizeProductUrl(url);
       const slugInfo = parseUrlSlugInfo(cleanUrl);
@@ -342,7 +383,7 @@ export async function POST(req: Request) {
       contextSource = `MODALITA: Estrazione da Link Ufficiale/Web.\nURL: ${cleanUrl}\n${slugInfo}\n${webData.textSnippet}`;
     } else if (dbVerifiedRecord) {
       contextSource = `MODALITA: INTEGRAZIONE SCHEDA DATABASE + CONOSCENZA AI.
-Dati di base presenti nel database per questo profumo:
+Dati verificati nel database per questo profumo:
 - Brand: ${dbVerifiedRecord.brand || brand || ''}
 - Nome: ${dbVerifiedRecord.name || nome || ''}
 - Concentrazione: ${dbVerifiedRecord.concentration || ''}
@@ -353,11 +394,14 @@ Dati di base presenti nel database per questo profumo:
 - Note di Cuore: ${dbVerifiedRecord.middle_notes || ''}
 - Note di Fondo: ${dbVerifiedRecord.base_notes || ''}
 
-COMPITO: Traduci fedelmente in italiano le note presenti e COMPLETA OBBLIGATORIAMENTE tutti i dati mancanti nel DB (come il Naso se mancante, l'anno di lancio, i voti tecnici, la descrizione tecnica e i prezzi di listino per formato >= 30ml) usando la tua conoscenza enciclopedica della profumeria.`;
+COMPITO: Traduci fedelmente in italiano le note presenti e completa i dati mancanti (Naso se assente, voti tecnici e prezzi ufficiali per formato >= 30ml).`;
     } else if (searchTarget) {
-      contextSource = `MODALITA: RICERCA ENCICLOPEDICA PROFUMERIA DI NICCHIA E ARTISTICA ("${searchTarget}").
-Il profumo "${searchTarget}" non è ancora nel database locale o richiede l'estrazione completa.
-Usa la tua conoscenza enciclopedica del catalogo ufficiale del brand per compilare TUTTI i campi della scheda tecnica (Brand esatto, Nome esatto, Concentrazione, Anno di lancio, Naso profumiere, Piramide olfattiva completa Testa/Cuore/Fondo, Prezzi ufficiali per formato da 30ml in su, e Voti tecnici).`;
+      const liveWeb = await searchWebByPerfumeName(searchTarget);
+      if (liveWeb.foundImage) discoveredImage = liveWeb.foundImage;
+
+      contextSource = `MODALITA: RICERCA WEB LIVE PROFUMERIA DI NICCHIA E ARTISTICA ("${searchTarget}").
+${liveWeb.webSnippet ? `RISULTATI WEB IN TEMPO REALE:\n${liveWeb.webSnippet}\n` : ''}
+Usa i risultati web qui sopra e la tua conoscenza enciclopedica ufficiale della Maison per compilare con precisione assoluta Brand, Nome, Concentrazione, Anno di lancio, vero Naso creatore, Piramide olfattiva (Testa, Cuore, Fondo) e Prezzi ufficiali per formato >= 30ml.`;
     } else if (imageBase64) {
       contextSource = `MODALITA: Analisi Visiva Flacone / Campioncino. Riconosci brand e nome del profumo dall'immagine allegata e restituisci la scheda tecnica e la piramide olfattiva ufficiale completa.`;
     } else {
@@ -375,7 +419,7 @@ ${contextSource}
 REGOLE TASSATIVE:
 1. "famiglia_olfattiva": Scegli ESCLUSIVAMENTE UNA SOLA PAROLA tra queste 12:
    "Agrumata", "Aromatica", "Marina", "Floreale", "Fruttata", "Verde", "Speziata", "Legnosa", "Ambrata", "Gourmand", "Cuoiata", "Muschiata".
-2. "prezzo_stimato_euro": Indica SEMPRE i prezzi di listino ufficiali (Maison o concessionari autorizzati) DISTINTI PER FORMATO a partire da 30ml in su (es. "50ml: €195 • 100ml: €280" oppure "100ml: €220"). VIETATO inserire prezzi di campioncini da 2ml/5ml/10ml.
+2. "prezzo_stimato_euro": Indica SEMPRE i prezzi di listino ufficiali DISTINTI PER FORMATO a partire da 30ml in su (es. "50ml: €195 • 100ml: €280" oppure "100ml: €220"). VIETATO inserire campioncini da 2ml/5ml/10ml.
 3. Compila SEMPRE note_testa, note_cuore, note_fondo in italiano tecnico.
 
 Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
@@ -413,31 +457,27 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       });
     }
 
-    // CHIAMATA VELOCE DUAL-AI (Gemini JSON nativo -> fallback immediato Groq Llama 3.3 70B)
+    // CHIAMATA DUAL-AI CON GOOGLE SEARCH ATTIVO PER PROFUMI FUORI DB
     let { text, modelUsed } = await callGeminiWithFallback(parts, {
       temperature: 0.1,
       jsonMode: true,
-      useGoogleSearch: false,
+      useGoogleSearch: needsLiveWebSearch,
+      timeoutMs: 5200,
     });
 
     let parsed = extractJsonFromAiText<Record<string, any>>(text);
 
-    // SECONDA AI (Groq Llama 3.3 70B): se Gemini ha lasciato vuoto il Naso, le Note o i Prezzi per formato >=30ml, Groq completa e verifica la scheda!
-    const isMissingCriticalInfo =
-      !parsed.note_testa || !parsed.prezzo_stimato_euro || !parsed.naso;
+    // SECONDA AI VELOCE (Groq Llama 3.3 70B) SOLO SE MANCANO NOTE O PREZZI
+    const isMissingCriticalInfo = !parsed.note_testa || !parsed.prezzo_stimato_euro;
 
-    if (
-      isMissingCriticalInfo &&
-      (process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY)
-    ) {
-      const enrichPrompt = `Completa e verifica questa scheda tecnica per il profumo "${
+    if (isMissingCriticalInfo && process.env.GROQ_API_KEY) {
+      const enrichPrompt = `Completa questa scheda tecnica per il profumo "${
         parsed.brand || brand || ''
       } ${parsed.nome || nome || searchTarget}".
-Assicurati che:
-1. "note_testa", "note_cuore", "note_fondo" siano compilate in italiano.
-2. "naso" contenga il vero profumiere creatore (se noto).
-3. "prezzo_stimato_euro" contenga i prezzi di listino ufficiali per formato da 30ml in su (es. "50ml: €190 • 100ml: €260", esclusi campioncini).
-Restituisci SOLO il JSON completo con le stesse chiavi:
+1. Compila "note_testa", "note_cuore", "note_fondo" in italiano.
+2. Compila "naso" col vero profumiere creatore.
+3. Compila "prezzo_stimato_euro" coi prezzi ufficiali >= 30ml (es. "50ml: €190 • 100ml: €260").
+Restituisci SOLO il JSON completo:
 ${JSON.stringify(parsed)}`;
 
       const groqRes = await callOpenRouterFree(enrichPrompt);
@@ -455,10 +495,10 @@ ${JSON.stringify(parsed)}`;
               prezzo_stimato_euro:
                 enriched.prezzo_stimato_euro || parsed.prezzo_stimato_euro,
             };
-            modelUsed = `${modelUsed}+groq_enriched`;
+            modelUsed = `${modelUsed}+groq`;
           }
         } catch {
-          // Mantiene il risultato di Gemini
+          // Mantiene il risultato primario
         }
       }
     }
@@ -524,16 +564,34 @@ ${JSON.stringify(parsed)}`;
       voto_proiezione: clampVote(parsed.voto_proiezione, 8),
       voto_complessita: clampVote(parsed.voto_complessita, 8),
       url_foto_vetrina: finalImageUrl,
-      _modelUsed: dbVerifiedRecord ? `db+${modelUsed}` : `dual_ai+${modelUsed}`,
+      _modelUsed: dbVerifiedRecord ? `db+${modelUsed}` : `web_ai+${modelUsed}`,
     };
 
-    // AUTO-APPRENDIMENTO: se il profumo era nel DB, aggiorna la cache; se NON c'era nel DB, lo salva per le prossime ricerche!
+    // AUTO-APPRENDIMENTO CATALOGO: aggiorna la cache se esiste, oppure inserisce il nuovo profumo nel catalogo generale
     if (supabase && !imageBase64 && finalPayload.note_olfattive) {
       if (dbVerifiedRecord?.id) {
         supabase
           .from('perfumes')
           .update({ cached_ai_data: finalPayload })
           .eq('id', dbVerifiedRecord.id)
+          .then();
+      } else {
+        supabase
+          .from('perfumes')
+          .insert([
+            {
+              brand: finalPayload.brand,
+              name: finalPayload.nome,
+              concentration: finalPayload.concentrazione,
+              release_year: finalPayload.anno_lancio,
+              perfumers: finalPayload.naso,
+              top_notes: finalPayload.note_testa,
+              middle_notes: finalPayload.note_cuore,
+              base_notes: finalPayload.note_fondo,
+              main_accords: finalPayload.famiglia_olfattiva,
+              cached_ai_data: finalPayload,
+            },
+          ])
           .then();
       }
     }
@@ -546,3 +604,4 @@ ${JSON.stringify(parsed)}`;
     );
   }
 }
+
