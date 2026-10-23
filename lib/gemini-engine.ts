@@ -19,8 +19,8 @@ export interface GeminiCallOptions {
 }
 
 const FALLBACK_MODELS = [
-  'gemini-2.5-flash',
   'gemini-2.0-flash',
+  'gemini-1.5-flash',
 ];
 
 let lastWorkingModel: string | null = null;
@@ -59,7 +59,7 @@ export async function callOpenRouterFree(
     for (const model of groqModels) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 5500);
+        const timer = setTimeout(() => controller.abort(), 12000);
         const messages: any[] = [];
         if (systemInstruction) {
           messages.push({ role: 'system', content: systemInstruction });
@@ -103,7 +103,7 @@ export async function callOpenRouterFree(
     for (const model of freeModels) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 5500);
+        const timer = setTimeout(() => controller.abort(), 12000);
         const messages: any[] = [];
         if (systemInstruction) {
           messages.push({ role: 'system', content: systemInstruction });
@@ -150,7 +150,8 @@ export async function callGeminiWithFallback(
 
   const temperature = options?.temperature ?? 0.1;
   const jsonMode = options?.jsonMode ?? false;
-  const perAttemptTimeoutMs = options?.timeoutMs ?? 5200;
+  // Timeout aumentato a 22 secondi per consentire il completamento di ricerche web e risposte complesse
+  const perAttemptTimeoutMs = options?.timeoutMs ?? 22000;
   const errors: string[] = [];
 
   const normalizedParts = normalizeParts(parts);
