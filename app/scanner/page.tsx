@@ -4,7 +4,6 @@ import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Link2,
   Camera,
   Sparkles,
@@ -13,9 +12,10 @@ import {
   Search,
   FlaskConical,
   UserCheck,
+  Library,
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
-import { Logo } from '@/components/Logo';
+import { PageHeader } from '@/components/PageHeader';
 import { useAura, resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 
@@ -186,7 +186,6 @@ export default function ScannerPage() {
           .filter(Boolean)
           .join(', ');
 
-      // Mappatura rigorosa sulla colonna "naso" della tabella "profumi"
       const fullPayload: Record<string, any> = {
         nome: draft.nome.trim(),
         brand: draft.brand.trim(),
@@ -228,7 +227,7 @@ export default function ScannerPage() {
         if (fallbackErr) throw fallbackErr;
       }
 
-      showToast('Creazione registrata nell\'Atelier.');
+      showToast("Creazione registrata nell'Atelier.");
       router.push(
         targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione'
       );
@@ -240,26 +239,21 @@ export default function ScannerPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 sm:px-8 py-8 pb-36">
-      <header className="flex items-center justify-between gap-4 pb-6 border-b border-white/10">
-        <div className="flex items-center gap-4">
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
+      <PageHeader
+        title="Acquisizione"
+        subtitle="Scanner Olfattivo"
+        rightSlot={
           <Link
-            href="/"
-            aria-label="Torna alla home"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#1E1428]/80 text-[#F6EFE4] transition hover:border-white/40"
+            href="/collezione"
+            style={{ borderColor: `${aura.primary}45` }}
+            className="flex items-center gap-2 rounded-full border bg-[#140D1C] px-4 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:border-white/50"
           >
-            <ArrowLeft style={{ color: aura.primary }} className="h-5 w-5" />
+            <Library style={{ color: aura.primary }} className="h-3.5 w-3.5" />
+            <span>Collezione</span>
           </Link>
-          <Logo className="h-12" />
-        </div>
-        <Link
-          href="/collezione"
-          style={{ borderColor: `${aura.primary}40` }}
-          className="rounded-full border bg-[#1E1428] px-4 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:border-white/40"
-        >
-          La Collezione
-        </Link>
-      </header>
+        }
+      />
 
       <section
         style={{ borderColor: `${aura.primary}30` }}
