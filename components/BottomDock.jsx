@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Sparkles, Library, ScanLine, Compass, CalendarHeart } from 'lucide-react';
+import { Library, ScanLine, Compass } from 'lucide-react';
 import { useAura, SECTION_THEMES } from './AuraProvider';
 
 function BottomDockInner() {
@@ -16,24 +16,18 @@ function BottomDockInner() {
 
   const vista = searchParams.get('vista');
   const activeKey =
-    pathname === '/'
-      ? 'atelier'
-      : pathname.startsWith('/collezione') && vista === 'radar'
+    pathname.startsWith('/collezione') && vista === 'radar'
       ? 'radar'
       : pathname.startsWith('/collezione')
       ? 'collezione'
       : pathname.startsWith('/scanner')
       ? 'scanner'
-      : pathname.startsWith('/diario')
-      ? 'diario'
-      : 'atelier';
+      : 'collezione';
 
   const items = [
-    { key: 'atelier', label: 'Atelier', href: '/', icon: Sparkles, theme: SECTION_THEMES.atelier },
     { key: 'collezione', label: 'Collezione', href: '/collezione', icon: Library, theme: SECTION_THEMES.collezione },
     { key: 'scanner', label: '', href: '/scanner', icon: ScanLine, center: true, theme: SECTION_THEMES.scanner },
     { key: 'radar', label: 'Radar', href: '/collezione?vista=radar', icon: Compass, theme: SECTION_THEMES.radar },
-    { key: 'diario', label: 'Diario', href: '/diario', icon: CalendarHeart, theme: SECTION_THEMES.diario },
   ];
 
   return (
@@ -44,7 +38,7 @@ function BottomDockInner() {
     >
       <div
         style={{ borderColor: `${aura.primary}35` }}
-        className="pointer-events-auto flex items-center gap-1.5 rounded-full border bg-[#140D1C]/95 px-2.5 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-colors duration-700"
+        className="pointer-events-auto flex items-center gap-2 rounded-full border bg-[#140D1C]/95 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-colors duration-700"
       >
         {items.map((item) => {
           const Icon = item.icon;
@@ -58,7 +52,7 @@ function BottomDockInner() {
                 onClick={() => setCustomAura(item.theme)}
                 aria-label="Scanner"
                 style={{ backgroundColor: aura.primary }}
-                className="relative mx-1.5 flex h-12 w-12 items-center justify-center rounded-full text-[#140D1C] shadow-lg transition hover:scale-105"
+                className="relative mx-2 flex h-12 w-12 items-center justify-center rounded-full text-[#140D1C] shadow-lg transition hover:scale-105"
               >
                 <Icon className="relative z-10 h-5 w-5 stroke-[2.2]" />
               </Link>
@@ -75,7 +69,7 @@ function BottomDockInner() {
                   ? { borderColor: `${aura.primary}50`, color: '#F6EFE4' }
                   : undefined
               }
-              className={`relative flex min-h-[42px] min-w-[42px] items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${
+              className={`relative flex min-h-[42px] min-w-[42px] items-center justify-center gap-2 rounded-full px-5 py-2 text-xs font-medium transition-colors ${
                 isActive
                   ? 'bg-[#1E1428] border'
                   : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
