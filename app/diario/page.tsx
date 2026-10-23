@@ -90,10 +90,10 @@ export default function DiarioPage() {
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
       <PageHeader
         title="Diario Olfattivo"
-        subtitle="Rotazione & Memoria"
+        subtitle=""
         rightSlot={
           <div
-            style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
+           style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
             className="flex items-center gap-2 rounded-full border bg-[#140D1C] px-4 py-2 font-mono text-xs"
           >
             <CalendarHeart className="h-4 w-4" />
