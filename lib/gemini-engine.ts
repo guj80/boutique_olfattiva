@@ -16,47 +16,6 @@ export async function callOpenRouterFree(
   prompt: string,
   systemInstruction?: string
 ): Promise<{ text: string; modelUsed: string } | null> {
-  const groqKey = (process.env.GROQ_API_KEY || '').trim();
-  if (!groqKey || groqKey === 'undefined') return null;
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    const messages: any[] = [];
-    if (systemInstruction) {
-      messages.push({ role: 'system', content: systemInstruction });
-    }
-    messages.push({
-      role: 'user',
-      content: `${prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido.`,
-    });
-
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${groqKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-        messages,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (res.ok) {
-      const data = await res.json();
-      const content = data?.choices?.[0]?.message?.content?.trim();
-      if (content && content.length > 5) {
-        return { text: content, modelUsed: 'groq:llama-3.3-70b-versatile' };
-      }
-    }
-  } catch (err) {
-    console.error('Groq direct error:', err);
-  }
   return null;
 }
 
@@ -64,20 +23,85 @@ export async function callGeminiWithFallback(
   parts: GeminiPart[],
   options?: GeminiCallOptions
 ): Promise<{ text: string; modelUsed: string }> {
-  // Estrae tutto il testo dai pezzi
-  const promptText = parts
-    .map((p) => p.text || '')
-    .filter(Boolean)
-    .join('\n');
+  const apiKey = (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+    ''
+  ).trim();
 
-  // Tenta prima con Groq se disponibile
-  const groqResult = await callOpenRouterFree(promptText, options?.systemInstruction);
-  if (groqResult) {
-    return groqResult;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY non configurata.');
   }
 
-  // Fallback estremo se Groq non risponde
-  throw new Error('Motori AI non raggiungibili. Verifica la chiave GROQ_API_KEY su Vercel.');
+  // Normalizza le parti per l'API di Gemini
+  const contents = parts.map((p) => {
+    if (p.text) return { role: 'user', parts: [{ text: p.text }] };
+    const imgData = p.inlineData?.data || p.inline_data?.data;
+    const imgMime = p.inlineData?.mimeType || p.inline_data?.mime_type;
+    if (imgData && imgMime) {
+      return {
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType: imgMime,
+              data: imgData.includes(',') ? imgData.split(',')[1] : imgData,
+            },
+          },
+        ],
+      };
+    }
+    return { role: 'user', parts: [{ text: '' }] };
+  });
+
+  // Usiamo gemini-2.0-flash che supporta perfettamente le nuove chiavi AQ.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+  const payload: Record<string, any> = {
+    contents,
+    generationConfig: {
+      temperature: options?.temperature ?? 0.1,
+      ...(options?.jsonMode ? { responseMimeType: 'application/json' } : {}),
+    },
+  };
+
+  if (options?.systemInstruction) {
+    payload.systemInstruction = {
+      parts: [{ text: options.systemInstruction }],
+    };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options?.timeoutMs ?? 25000);
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini API Error (${res.status}): ${errText.slice(0, 150)}`);
+    }
+
+    const data = await res.json();
+    const candidate = data?.candidates?.[0];
+    const text = candidate?.content?.parts?.[0]?.text?.trim();
+
+    if (!text) {
+      throw new Error('Risposta vuota da Gemini.');
+    }
+
+    return { text, modelUsed: 'gemini-2.0-flash' };
+  } catch (err: any) {
+    clearTimeout(timer);
+    throw new Error(`Errore motore Gemini: ${err?.message || 'Timeout'}`);
+  }
 }
 
 export function extractJsonFromAiText<T = any>(rawText: string): T {
@@ -85,7 +109,10 @@ export function extractJsonFromAiText<T = any>(rawText: string): T {
     throw new Error('Risposta AI vuota.');
   }
 
-  const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const cleaned = rawText
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
 
   try {
     return JSON.parse(cleaned) as T;
