@@ -271,6 +271,11 @@ export async function callGeminiWithFallback(
   );
 }
 
+export function extractJsonFromAiText<T = any>(rawText: string): T {
+  if (!rawText || typeof rawText !== 'string') {
+    throw new Error('Risposta AI vuota.');
+  }
+
   const cleaned = rawText
     .replace(/```json/gi, '')
     .replace(/```/g, '')
