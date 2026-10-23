@@ -238,7 +238,7 @@ async function fetchWebMetadataWithBypass(rawUrl: string): Promise<{
       if (!foundOgImage) {
         const mdImages = Array.from(
           readerText.matchAll(
-            /!\[[^\]]*\]\((https?:\/\/[^\s)]+\.(?:jpg\vert{}jpeg\vert{}png\vert{}webp)[^\s)]*)\)/gi
+            /!\[[^\]]*\]\((https?:\/\/[^\s)]+\.(?:jpg|jpeg|png|webp)[^\s)]*)\)/gi
           )
         );
         const goodImg = mdImages
@@ -271,6 +271,7 @@ function clampVote(val: any, fallback: number = 8): number {
   if (isNaN(n) || n < 1 || n > 10) return fallback;
   return Math.round(n);
 }
+
 async function searchWebByPerfumeName(query: string): Promise<{
   webSnippet: string;
   foundImage: string | null;
@@ -280,7 +281,7 @@ async function searchWebByPerfumeName(query: string): Promise<{
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3200);
+    const timer = setTimeout(() => controller.abort(), 4000);
     const searchUrl = `https://s.jina.ai/${encodeURIComponent(
       `${query} perfume notes perfumer fragrantica parfumo`
     )}`;
@@ -306,7 +307,7 @@ async function searchWebByPerfumeName(query: string): Promise<{
       }
     }
   } catch {
-    // Prosegue con Google Search Grounding di Gemini + Groq
+    // Prosegue con Google Search Grounding di Gemini
   }
 
   return { webSnippet, foundImage };
@@ -332,7 +333,7 @@ export async function POST(req: Request) {
 
     const searchTarget = (queryName || `${brand || ''} ${nome || ''}`).trim();
 
-    // LIVELLO 1: Cerca nel catalogo Supabase (59.325+ profumi)
+    // LIVELLO 1: Cerca nel catalogo Supabase (protetto da try/catch per evitare crash)
     if (supabase && searchTarget.length >= 2 && !imageBase64 && !url) {
       try {
         const { data: matches } = await supabase.rpc('search_perfume_exact', {
@@ -341,38 +342,23 @@ export async function POST(req: Request) {
 
         if (matches && matches.length > 0) {
           const topMatch = matches[0];
-          const fullDbName = `${topMatch.brand || ''} ${topMatch.name || ''}`.toLowerCase();
-          const targetWords = searchTarget
-            .toLowerCase()
-            .split(/\s+/)
-            .filter((w: string) => w.length > 2);
-
-          const isTrueMatch =
-            targetWords.length === 0 ||
-            targetWords.every((w: string) => fullDbName.includes(w)) ||
-            fullDbName.includes((nome || searchTarget).toLowerCase().trim());
-
-          if (isTrueMatch) {
-            dbVerifiedRecord = topMatch;
-
-            if (
-              dbVerifiedRecord.cached_ai_data &&
-              dbVerifiedRecord.cached_ai_data.note_testa &&
-              dbVerifiedRecord.cached_ai_data.prezzo_stimato_euro
-            ) {
-              return NextResponse.json({
-                ...dbVerifiedRecord.cached_ai_data,
-                _modelUsed: 'supabase-verified-cache',
-              });
-            }
+          dbVerifiedRecord = topMatch;
+          if (
+            dbVerifiedRecord.cached_ai_data &&
+            dbVerifiedRecord.cached_ai_data.note_testa &&
+            dbVerifiedRecord.cached_ai_data.prezzo_stimato_euro
+          ) {
+            return NextResponse.json({
+              ...dbVerifiedRecord.cached_ai_data,
+              _modelUsed: 'supabase-verified-cache',
+            });
           }
         }
       } catch {
-        // Continua su Ricerca Web + AI
+        // Ignora eventuali errori della RPC e procede con la ricerca web AI
       }
     }
 
-    // LIVELLO 2: Costruzione Contesto (Link, DB o Ricerca Web Live per profumi fuori catalogo)
     const needsLiveWebSearch = Boolean(searchTarget && !dbVerifiedRecord && !url && !imageBase64);
 
     if (url && typeof url === 'string' && url.trim().startsWith('http')) {
@@ -394,16 +380,16 @@ Dati verificati nel database per questo profumo:
 - Note di Cuore: ${dbVerifiedRecord.middle_notes || ''}
 - Note di Fondo: ${dbVerifiedRecord.base_notes || ''}
 
-COMPITO: Traduci fedelmente in italiano le note presenti e completa i dati mancanti (Naso se assente, voti tecnici e prezzi ufficiali per formato >= 30ml).`;
+COMPITO: Traduci fedelmente in italiano le note presenti e completa i dati mancanti.`;
     } else if (searchTarget) {
       const liveWeb = await searchWebByPerfumeName(searchTarget);
       if (liveWeb.foundImage) discoveredImage = liveWeb.foundImage;
 
       contextSource = `MODALITA: RICERCA WEB LIVE PROFUMERIA DI NICCHIA E ARTISTICA ("${searchTarget}").
 ${liveWeb.webSnippet ? `RISULTATI WEB IN TEMPO REALE:\n${liveWeb.webSnippet}\n` : ''}
-Usa i risultati web qui sopra e la tua conoscenza enciclopedica ufficiale della Maison per compilare con precisione assoluta Brand, Nome, Concentrazione, Anno di lancio, vero Naso creatore, Piramide olfattiva (Testa, Cuore, Fondo) e Prezzi ufficiali per formato >= 30ml.`;
+Usa i risultati web qui sopra e la tua conoscenza enciclopedica ufficiale della Maison per compilare con precisione Brand, Nome, Concentrazione, Anno, Naso, Piramide olfattiva e Prezzi ufficiali >= 30ml.`;
     } else if (imageBase64) {
-      contextSource = `MODALITA: Analisi Visiva Flacone / Campioncino. Riconosci brand e nome del profumo dall'immagine allegata e restituisci la scheda tecnica e la piramide olfattiva ufficiale completa.`;
+      contextSource = `MODALITA: Analisi Visiva Flacone / Campioncino. Riconosci brand e nome del profumo dall'immagine allegata e restituisci la scheda tecnica completa.`;
     } else {
       return NextResponse.json(
         { error: 'Fornisci un URL, una foto o il nome del profumo.' },
@@ -411,7 +397,7 @@ Usa i risultati web qui sopra e la tua conoscenza enciclopedica ufficiale della 
       );
     }
 
-    const systemPrompt = `Sei l'enciclopedia tecnica definitiva dell'alta profumeria artistica, di nicchia e di lusso.
+    const systemPrompt = `Sei l'enciclopedia tecnica definitiva dell'alta profumeria artistica e di nicchia.
 Il tuo compito è restituire una scheda tecnica COMPLETA e PRECISA per il profumo richiesto.
 
 ${contextSource}
@@ -419,26 +405,26 @@ ${contextSource}
 REGOLE TASSATIVE:
 1. "famiglia_olfattiva": Scegli ESCLUSIVAMENTE UNA SOLA PAROLA tra queste 12:
    "Agrumata", "Aromatica", "Marina", "Floreale", "Fruttata", "Verde", "Speziata", "Legnosa", "Ambrata", "Gourmand", "Cuoiata", "Muschiata".
-2. "prezzo_stimato_euro": Indica SEMPRE i prezzi di listino ufficiali DISTINTI PER FORMATO a partire da 30ml in su (es. "50ml: €195 • 100ml: €280" oppure "100ml: €220"). VIETATO inserire campioncini da 2ml/5ml/10ml.
+2. "prezzo_stimato_euro": Indica SEMPRE i prezzi di listino ufficiali DISTINTI PER FORMATO a partire da 30ml in su (es. "50ml: €195 • 100ml: €280"). VIETATO inserire campioncini.
 3. Compila SEMPRE note_testa, note_cuore, note_fondo in italiano tecnico.
 
 Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
 {
   "nome": "Nome ufficiale esatto del profumo (senza brand)",
   "brand": "Nome ufficiale della Maison",
-  "concentrazione": "Es. Extrait de Parfum, Eau de Parfum, Eau de Toilette",
+  "concentrazione": "Es. Extrait de Parfum, Eau de Parfum",
   "anno_lancio": 2023,
   "famiglia_olfattiva": "Una sola delle 12 famiglie pure",
-  "note_testa": "Note di testa in italiano separate da virgola",
-  "note_cuore": "Note di cuore in italiano separate da virgola",
-  "note_fondo": "Note di fondo in italiano separate da virgola",
-  "note_olfattive": "Elenco completo delle note in italiano separate da virgola",
-  "descrizione_ai": "Analisi tecnica oggettiva in 2 frasi del profilo olfattivo e dell'evoluzione",
+  "note_testa": "Note di testa separate da virgola",
+  "note_cuore": "Note di cuore separate da virgola",
+  "note_fondo": "Note di fondo separate da virgola",
+  "note_olfattive": "Elenco completo note separate da virgola",
+  "descrizione_ai": "Analisi tecnica oggettiva in 2 frasi",
   "prezzo_stimato_euro": "Es. 50ml: €195 • 100ml: €280",
   "formato_ml": 100,
-  "stagione_ideale": "Es. Primavera / Estate, oppure Autunno / Inverno",
-  "occasione_ideale": "Es. Giorno, Serata, Evento Formale",
-  "naso": "Nome del Maître Parfumeur (Naso) ufficiale",
+  "stagione_ideale": "Es. Primavera / Estate",
+  "occasione_ideale": "Es. Serata, Evento Formale",
+  "naso": "Nome del Maître Parfumeur ufficiale",
   "voto_longevita": 8,
   "voto_scia": 8,
   "voto_proiezione": 8,
@@ -457,51 +443,15 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       });
     }
 
-    // CHIAMATA DUAL-AI CON GOOGLE SEARCH ATTIVO PER PROFUMI FUORI DB
+    // Timeout aumentato a 18 secondi per evitare troncamenti o errori 500
     let { text, modelUsed } = await callGeminiWithFallback(parts, {
       temperature: 0.1,
       jsonMode: true,
       useGoogleSearch: needsLiveWebSearch,
-      timeoutMs: 5200,
+      timeoutMs: 18000,
     });
 
     let parsed = extractJsonFromAiText<Record<string, any>>(text);
-
-    // SECONDA AI VELOCE (Groq Llama 3.3 70B) SOLO SE MANCANO NOTE O PREZZI
-    const isMissingCriticalInfo = !parsed.note_testa || !parsed.prezzo_stimato_euro;
-
-    if (isMissingCriticalInfo && process.env.GROQ_API_KEY) {
-      const enrichPrompt = `Completa questa scheda tecnica per il profumo "${
-        parsed.brand || brand || ''
-      } ${parsed.nome || nome || searchTarget}".
-1. Compila "note_testa", "note_cuore", "note_fondo" in italiano.
-2. Compila "naso" col vero profumiere creatore.
-3. Compila "prezzo_stimato_euro" coi prezzi ufficiali >= 30ml (es. "50ml: €190 • 100ml: €260").
-Restituisci SOLO il JSON completo:
-${JSON.stringify(parsed)}`;
-
-      const groqRes = await callOpenRouterFree(enrichPrompt);
-      if (groqRes) {
-        try {
-          const enriched = extractJsonFromAiText<Record<string, any>>(groqRes.text);
-          if (enriched.nome && (enriched.note_testa || enriched.note_olfattive)) {
-            parsed = {
-              ...parsed,
-              ...enriched,
-              note_testa: enriched.note_testa || parsed.note_testa,
-              note_cuore: enriched.note_cuore || parsed.note_cuore,
-              note_fondo: enriched.note_fondo || parsed.note_fondo,
-              naso: enriched.naso || parsed.naso,
-              prezzo_stimato_euro:
-                enriched.prezzo_stimato_euro || parsed.prezzo_stimato_euro,
-            };
-            modelUsed = `${modelUsed}+groq`;
-          }
-        } catch {
-          // Mantiene il risultato primario
-        }
-      }
-    }
 
     const pureFamily = (PURE_FAMILIES as readonly string[]).includes(parsed.famiglia_olfattiva)
       ? parsed.famiglia_olfattiva
@@ -521,32 +471,18 @@ ${JSON.stringify(parsed)}`;
         ? String(parsed.url_foto_vetrina).trim()
         : null);
 
-    const rawNaso =
-      parsed.naso ||
-      (dbVerifiedRecord?.perfumers && dbVerifiedRecord.perfumers !== 'Non specificato'
-        ? dbVerifiedRecord.perfumers
-        : '');
-    const finalNaso =
-      rawNaso && String(rawNaso).trim() && String(rawNaso).toLowerCase() !== 'non specificato'
-        ? String(rawNaso).trim()
-        : null;
+    const rawNaso = parsed.naso || (dbVerifiedRecord?.perfumers !== 'Non specificato' ? dbVerifiedRecord?.perfumers : '');
+    const finalNaso = rawNaso && String(rawNaso).trim() && String(rawNaso).toLowerCase() !== 'non specificato' ? String(rawNaso).trim() : null;
 
     const rawYear = dbVerifiedRecord?.release_year || parsed.anno_lancio;
-    const finalYear =
-      rawYear && !isNaN(Number(rawYear)) && Number(rawYear) > 1700 && Number(rawYear) <= 2030
-        ? Number(rawYear)
-        : null;
+    const finalYear = rawYear && !isNaN(Number(rawYear)) && Number(rawYear) > 1700 && Number(rawYear) <= 2030 ? Number(rawYear) : null;
 
-    const finalFormato =
-      parsed.formato_ml && !isNaN(Number(parsed.formato_ml)) && Number(parsed.formato_ml) >= 30
-        ? Number(parsed.formato_ml)
-        : 100;
+    const finalFormato = parsed.formato_ml && !isNaN(Number(parsed.formato_ml)) && Number(parsed.formato_ml) >= 30 ? Number(parsed.formato_ml) : 100;
 
     const finalPayload = {
       nome: (dbVerifiedRecord?.name || parsed.nome || nome || searchTarget || 'Creazione').trim(),
       brand: (dbVerifiedRecord?.brand || parsed.brand || brand || 'Maison').trim(),
-      concentrazione:
-        (dbVerifiedRecord?.concentration || parsed.concentrazione || 'Eau de Parfum').trim(),
+      concentrazione: (dbVerifiedRecord?.concentration || parsed.concentrazione || 'Eau de Parfum').trim(),
       anno_lancio: finalYear,
       famiglia_olfattiva: pureFamily,
       note_testa: normTesta,
@@ -567,41 +503,12 @@ ${JSON.stringify(parsed)}`;
       _modelUsed: dbVerifiedRecord ? `db+${modelUsed}` : `web_ai+${modelUsed}`,
     };
 
-    // AUTO-APPRENDIMENTO CATALOGO: aggiorna la cache se esiste, oppure inserisce il nuovo profumo nel catalogo generale
-    if (supabase && !imageBase64 && finalPayload.note_olfattive) {
-      if (dbVerifiedRecord?.id) {
-        supabase
-          .from('perfumes')
-          .update({ cached_ai_data: finalPayload })
-          .eq('id', dbVerifiedRecord.id)
-          .then();
-      } else {
-        supabase
-          .from('perfumes')
-          .insert([
-            {
-              brand: finalPayload.brand,
-              name: finalPayload.nome,
-              concentration: finalPayload.concentrazione,
-              release_year: finalPayload.anno_lancio,
-              perfumers: finalPayload.naso,
-              top_notes: finalPayload.note_testa,
-              middle_notes: finalPayload.note_cuore,
-              base_notes: finalPayload.note_fondo,
-              main_accords: finalPayload.famiglia_olfattiva,
-              cached_ai_data: finalPayload,
-            },
-          ])
-          .then();
-      }
-    }
-
     return NextResponse.json(finalPayload);
   } catch (error: any) {
+    console.error('Extraction API Error:', error);
     return NextResponse.json(
       { error: error?.message || 'Errore durante estrazione.' },
       { status: 500 }
     );
   }
 }
-
