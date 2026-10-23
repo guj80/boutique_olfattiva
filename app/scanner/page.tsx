@@ -15,7 +15,7 @@ import {
   Library,
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
-import { PageHeader } from '@/components/PageHeader';
+import { PageHeader } from '@/components/Logo';
 import { useAura, resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 
@@ -475,7 +475,9 @@ export default function ScannerPage() {
                 type="button"
                 onClick={() => setTargetStato('radar')}
                 style={
-                  targetStato === 'radar' ? { backgroundColor: aura.primary } : undefined
+                  targetStato === 'radar'
+                    ? { backgroundColor: aura.primary }
+                    : undefined
                 }
                 className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                   targetStato === 'radar' ? 'text-[#140D1C]' : 'text-[#B8A9C9]'
