@@ -224,8 +224,8 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
       <PageHeader
-        title={activeTab === 'radar' ? 'Testing Radar' : 'I MIEI PROFUMI'}
-        subtitle=""
+        title={activeTab === 'radar' ? 'Testing Radar' : 'La mia Collezione'}
+        subtitle="VETRINA"
         rightSlot={
           <div className="flex items-center gap-2.5">
             <div className="flex rounded-full bg-[#0E0A16] p-1 border border-white/10">
