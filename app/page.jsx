@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { Library, Compass, BookOpen, ChevronRight, Sparkles } from 'lucide-react';
+import { Library, Compass, BookOpen, ChevronRight, Sparkles, ScanLine } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { GlassCard } from '@/components/GlassCard';
 import { useAura, SECTION_THEMES } from '@/components/AuraProvider';
@@ -11,20 +11,60 @@ export default function HomePage() {
   const { setCustomAura } = useAura();
 
   useEffect(() => {
-    setCustomAura(SECTION_THEMES.home);
+    setCustomAura(SECTION_THEMES.atelier);
   }, [setCustomAura]);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-12 pb-36 space-y-12">
-      {/* HEADER CON IL LOGO ORIGINALE SMERALDO / MAGENTA E ZERO TESTI RIDONDANTI */}
-      <header className="flex flex-col items-center text-center space-y-4 pt-4">
-        <div className="h-20 w-56 flex items-center justify-center p-2">
-          <Logo variant="default" className="h-full w-full object-contain" />
+    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-10 pb-36 space-y-10">
+      {/* HEADER ATELIER */}
+      <header className="flex flex-col items-center text-center space-y-4 pt-2">
+        <div className="h-24 w-64 flex items-center justify-center p-2">
+          <Logo variant="original" className="h-full w-full object-contain" />
         </div>
+        <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#B8A9C9]">
+          Haute Parfumerie & Olfactive Vault
+        </p>
       </header>
 
-      {/* I TRE BOX DELLA HOME: IMMERSIVI, RAFFINATI E CON IDENTITÀ DISTINTA */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+      {/* HERO BANNER INTERATTIVO */}
+      <section className="relative overflow-hidden rounded-[36px] border border-[#10B981]/30 bg-gradient-to-b from-[#1E1428]/90 to-[#0C0814] p-8 sm:p-12 text-center shadow-2xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(16,185,129,0.18)_0%,transparent_70%)] pointer-events-none" />
+        
+        <div className="relative z-10 max-w-xl mx-auto space-y-4">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#10B981]/15 border border-[#10B981]/35 px-4 py-1.5 font-mono text-[11px] uppercase tracking-wider text-[#34F5A6]">
+            <Sparkles className="h-3.5 w-3.5" />
+            Atelier Privato Attivo
+          </span>
+          <h2 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] leading-tight">
+            Esplora, sperimenta e custodisci l'essenza.
+          </h2>
+          <p className="text-sm text-[#B8A9C9] leading-relaxed">
+            Seleziona una sezione sottostante o avvia lo scanner olfattivo per catalogare una nuova creazione artistica.
+          </p>
+
+          <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/scanner"
+              onClick={() => setCustomAura(SECTION_THEMES.scanner)}
+              className="flex items-center gap-2 rounded-full bg-[#34F5A6] px-6 py-3 font-mono text-xs font-bold text-[#08060C] transition hover:scale-105 shadow-lg"
+            >
+              <ScanLine className="h-4 w-4 stroke-[2.5]" />
+              <span>Scannerizza Flacone</span>
+            </Link>
+            <Link
+              href="/collezione"
+              onClick={() => setCustomAura(SECTION_THEMES.collezione)}
+              className="flex items-center gap-2 rounded-full border border-white/20 bg-[#161024] px-6 py-3 font-mono text-xs font-semibold text-[#F6EFE4] transition hover:border-white/40"
+            >
+              <Library className="h-4 w-4 text-sky-400" />
+              <span>Apri Collezione</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* TRE ACCESSI PRINCIPALI */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* COLLEZIONE */}
         <Link href="/collezione" className="group block">
           <GlassCard accentColor="#38BDF8" className="h-full flex flex-col justify-between p-6 sm:p-7 transition duration-500 group-hover:-translate-y-1.5 shadow-2xl">
@@ -36,9 +76,9 @@ export default function HomePage() {
                 <span className="font-mono text-[10px] uppercase tracking-widest text-sky-400">
                   Lo Scaffale
                 </span>
-                <h2 className="font-serif text-2xl text-[#F6EFE4]">Collezione</h2>
+                <h3 className="font-serif text-2xl text-[#F6EFE4]">Collezione</h3>
                 <p className="text-xs text-[#8E7C9E] leading-relaxed pt-1">
-                  Esplora i flaconi firmati, le piramidi olfattive e la libreria artistica della tua collezione privata.
+                  Flaconi firmati, piramidi olfattive e libreria artistica della tua collezione privata.
                 </p>
               </div>
             </div>
@@ -64,9 +104,9 @@ export default function HomePage() {
                 <span className="font-mono text-[10px] uppercase tracking-widest text-purple-400">
                   Il Radar
                 </span>
-                <h2 className="font-serif text-2xl text-[#F6EFE4]">Testing</h2>
+                <h3 className="font-serif text-2xl text-[#F6EFE4]">Testing</h3>
                 <p className="text-xs text-[#8E7C9E] leading-relaxed pt-1">
-                  Gestisci i campioni, i decant e le scoperte in corso d'analisi con listini formati dedicati.
+                  Campioni, decant e scoperte in corso d'analisi con listini formati dedicati.
                 </p>
               </div>
             </div>
@@ -92,9 +132,9 @@ export default function HomePage() {
                 <span className="font-mono text-[10px] uppercase tracking-widest text-rose-400">
                   Rotazione
                 </span>
-                <h2 className="font-serif text-2xl text-[#F6EFE4]">Diario</h2>
+                <h3 className="font-serif text-2xl text-[#F6EFE4]">Diario</h3>
                 <p className="text-xs text-[#8E7C9E] leading-relaxed pt-1">
-                  Traccia gli indossi quotidiani, l'evoluzione sulla pelle e le impressioni olfattive nel tempo.
+                  Indossi quotidiani, evoluzione sulla pelle e impressioni olfattive nel tempo.
                 </p>
               </div>
             </div>
