@@ -22,7 +22,6 @@ import {
   Sparkles,
   RefreshCw,
   Tag,
-  Activity,
 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
@@ -486,7 +485,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
         )}
       </section>
 
-      {/* SCHEDA DI DETTAGLIO MODALE (CON GRAFICO TECNICO STILE GINEMBASSY) */}
+      {/* SCHEDA DI DETTAGLIO MODALE (SENZA ALCUN GRAFICO INVENTATO) */}
       {selectedProfumo &&
         (() => {
           const modalAura = resolveAura(
@@ -496,11 +495,6 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
           const seasons = getSeasonsForFamily(selectedProfumo.famiglia_olfattiva);
           const pAny = selectedProfumo as any;
           const isRadarItem = isRadarProfumo(selectedProfumo);
-
-          const longevita = Number(pAny.voto_longevita || 8);
-          const scia = Number(pAny.voto_scia || 8);
-          const proiezione = Number(pAny.voto_proiezione || 8);
-          const compl = Number(pAny.voto_complessita || 8);
 
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/85 backdrop-blur-md animate-in fade-in duration-200">
@@ -746,85 +740,6 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                             <span>Anno: {pAny.anno_lancio}</span>
                           </div>
                         )}
-                      </div>
-
-                      {/* GRAFICO TECNICO DI DEGUSTAZIONE / OLFATTIVO STILE GINEMBASSY */}
-                      <div className="mt-5 w-full rounded-2xl bg-[#0E0A16] p-4 border border-white/10 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5" style={{ color: modalAura.primary }}>
-                            <Activity className="h-4 w-4" />
-                            <span className="font-mono text-[11px] uppercase tracking-wider font-bold">
-                              Profilo Organolettico & Prestazioni
-                            </span>
-                          </div>
-                          <span className="font-mono text-[10px] text-[#B8A9C9]">Scala 1-10</span>
-                        </div>
-
-                        <div className="space-y-2 text-xs">
-                          <div>
-                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
-                              <span>Longevità (Durata)</span>
-                              <span style={{ color: modalAura.primary }}>{longevita}/10</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${(longevita / 10) * 100}%`,
-                                  backgroundColor: modalAura.primary,
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
-                              <span>Scia (Sillage)</span>
-                              <span style={{ color: modalAura.primary }}>{scia}/10</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${(scia / 10) * 100}%`,
-                                  backgroundColor: modalAura.primary,
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
-                              <span>Proiezione</span>
-                              <span style={{ color: modalAura.primary }}>{proiezione}/10</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${(proiezione / 10) * 100}%`,
-                                  backgroundColor: modalAura.primary,
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between font-mono text-[10px] text-[#B8A9C9] mb-1">
-                              <span>Complessità Olfattiva</span>
-                              <span style={{ color: modalAura.primary }}>{compl}/10</span>
-                            </div>
-                            <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${(compl / 10) * 100}%`,
-                                  backgroundColor: modalAura.primary,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
                       </div>
 
                       {/* SEZIONE RADAR: PREZZI DISTINTI PER FORMATO >= 30ML */}
