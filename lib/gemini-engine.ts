@@ -21,8 +21,6 @@ export interface GeminiCallOptions {
 const FALLBACK_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
-  'gemini-2.5-pro',
-  'gemini-flash-latest',
 ];
 
 let lastWorkingModel: string | null = null;
@@ -61,7 +59,7 @@ export async function callOpenRouterFree(
     for (const model of groqModels) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 7500);
+        const timer = setTimeout(() => controller.abort(), 5500);
         const messages: any[] = [];
         if (systemInstruction) {
           messages.push({ role: 'system', content: systemInstruction });
@@ -101,16 +99,11 @@ export async function callOpenRouterFree(
   }
 
   if (orKey && orKey !== 'undefined') {
-    const freeModels = [
-      'openrouter/free',
-      'deepseek/deepseek-chat:free',
-      'qwen/qwen-2.5-72b-instruct:free',
-    ];
-
+    const freeModels = ['openrouter/free', 'deepseek/deepseek-chat:free'];
     for (const model of freeModels) {
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
+        const timer = setTimeout(() => controller.abort(), 5500);
         const messages: any[] = [];
         if (systemInstruction) {
           messages.push({ role: 'system', content: systemInstruction });
@@ -123,11 +116,7 @@ export async function callOpenRouterFree(
             Authorization: `Bearer ${orKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            model,
-            temperature: 0.1,
-            messages,
-          }),
+          body: JSON.stringify({ model, temperature: 0.1, messages }),
           signal: controller.signal,
         });
         clearTimeout(timer);
@@ -161,7 +150,7 @@ export async function callGeminiWithFallback(
 
   const temperature = options?.temperature ?? 0.1;
   const jsonMode = options?.jsonMode ?? false;
-  const perAttemptTimeoutMs = options?.timeoutMs ?? 7500;
+  const perAttemptTimeoutMs = options?.timeoutMs ?? 5200;
   const errors: string[] = [];
 
   const normalizedParts = normalizeParts(parts);
@@ -183,15 +172,13 @@ export async function callGeminiWithFallback(
     ];
 
     for (const model of queue) {
-      // Priorità assoluta a JSON nativo veloce (evita i blocchi e i timeout di googleSearch sui modelli incompatibili)
       const attemptModes: Array<{ search: boolean; strictJson: boolean }> = [];
-      if (jsonMode) {
-        attemptModes.push({ search: false, strictJson: true });
-      }
       if (options?.useGoogleSearch && !hasInlineImage) {
         attemptModes.push({ search: true, strictJson: false });
       }
-      if (!jsonMode) {
+      if (jsonMode) {
+        attemptModes.push({ search: false, strictJson: true });
+      } else {
         attemptModes.push({ search: false, strictJson: false });
       }
 
@@ -236,7 +223,6 @@ export async function callGeminiWithFallback(
             const data = await res.json();
             const candidate = data?.candidates?.[0];
             const rawParts: any[] = candidate?.content?.parts || [];
-
             const nonThoughtParts = rawParts.filter((p) => !p?.thought);
             const partsToRead = nonThoughtParts.length > 0 ? nonThoughtParts : rawParts;
 
@@ -247,10 +233,7 @@ export async function callGeminiWithFallback(
 
             if (text.length > 2) {
               lastWorkingModel = model;
-              return { text, modelUsed: mode.search ? `${model}+search` : model };
-            } else {
-              errors.push(`${model}: vuoto`);
-              continue;
+              return { text, modelUsed: mode.search ? `${model}+google_search` : model };
             }
           } else {
             const errBody = await res.text();
@@ -259,47 +242,34 @@ export async function callGeminiWithFallback(
               if (lastWorkingModel === model) lastWorkingModel = null;
               break;
             }
-            if (res.status === 400) {
-              continue;
-            }
-            errors.push(`${model} (${res.status}): ${errBody.slice(0, 60)}`);
+            if (res.status === 400) continue;
+            errors.push(`${model} (${res.status}): ${errBody.slice(0, 40)}`);
             break;
           }
         } catch (err: any) {
           clearTimeout(timer);
-          errors.push(
-            `${model}: ${err?.name === 'AbortError' ? 'Timeout' : err?.message}`
-          );
+          errors.push(`${model}: ${err?.name === 'AbortError' ? 'Timeout' : err?.message}`);
           break;
         }
       }
     }
   }
 
-  // SECONDO MOTORE AI IMMEDIATO: Groq Llama 3.3 70B / OpenRouter
   if (!hasInlineImage) {
     const promptTextOnly = normalizedParts
       .map((p) => p.text || '')
       .filter(Boolean)
       .join('\n');
     if (promptTextOnly) {
-      const backupResult = await callOpenRouterFree(
-        promptTextOnly,
-        options?.systemInstruction
-      );
+      const backupResult = await callOpenRouterFree(promptTextOnly, options?.systemInstruction);
       if (backupResult) return backupResult;
     }
   }
 
   throw new Error(
-    `Motori AI temporaneamente occupati. Riprova tra un istante. (${errors.slice(0, 3).join(' | ')})`
+    `Motori AI occupati (${errors.slice(0, 2).join(' | ')}).`
   );
 }
-
-export function extractJsonFromAiText<T = any>(rawText: string): T {
-  if (!rawText || typeof rawText !== 'string') {
-    throw new Error('Risposta AI vuota.');
-  }
 
   const cleaned = rawText
     .replace(/```json/gi, '')
