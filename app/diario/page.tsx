@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { CalendarHeart, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { PageHeader } from '@/components/PageHeader';
+import { PageHeader } from '@/components/Logo';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { SmartBottleImage } from '@/components/BottleImage';
 import { useToast } from '@/components/Toast';
