@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   callGeminiWithFallback,
-  callOpenRouterFree,
   extractJsonFromAiText,
   GeminiPart,
 } from '@/lib/gemini-engine';
@@ -31,10 +30,14 @@ function normalizeFamilyServer(raw?: string | null): string {
 }
 
 function getSupabaseServer() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false } });
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key, { auth: { persistSession: false } });
+  } catch {
+    return null;
+  }
 }
 
 function isSafePublicUrl(rawUrl: string): boolean {
@@ -315,7 +318,7 @@ async function searchWebByPerfumeName(query: string): Promise<{
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const { url, imageBase64, mimeType, queryName, brand, nome } = body;
 
     if (url && typeof url === 'string' && !isSafePublicUrl(url)) {
@@ -333,7 +336,7 @@ export async function POST(req: Request) {
 
     const searchTarget = (queryName || `${brand || ''} ${nome || ''}`).trim();
 
-    // LIVELLO 1: Cerca nel catalogo Supabase (protetto da try/catch per evitare crash)
+    // LIVELLO 1: Cerca nel catalogo Supabase (protetto da try/catch)
     if (supabase && searchTarget.length >= 2 && !imageBase64 && !url) {
       try {
         const { data: matches } = await supabase.rpc('search_perfume_exact', {
@@ -443,13 +446,20 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       });
     }
 
-    // Timeout aumentato a 18 secondi per evitare troncamenti o errori 500
-    let { text, modelUsed } = await callGeminiWithFallback(parts, {
-      temperature: 0.1,
-      jsonMode: true,
-      useGoogleSearch: needsLiveWebSearch,
-      timeoutMs: 18000,
-    });
+    let text = '';
+    let modelUsed = 'gemini-fallback';
+    try {
+      const resAi = await callGeminiWithFallback(parts, {
+        temperature: 0.1,
+        jsonMode: true,
+        useGoogleSearch: needsLiveWebSearch,
+        timeoutMs: 24000,
+      });
+      text = resAi.text;
+      modelUsed = resAi.modelUsed;
+    } catch (aiErr) {
+      console.error('AI Engine error:', aiErr);
+    }
 
     let parsed = extractJsonFromAiText<Record<string, any>>(text);
 
