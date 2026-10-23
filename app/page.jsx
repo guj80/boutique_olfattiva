@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { Library, Compass, BookOpen, ChevronRight, Sparkles, ScanLine } from 'lucide-react';
+import { Library, Compass, BookOpen, ChevronRight, ScanLine } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { GlassCard } from '@/components/GlassCard';
 import { useAura, SECTION_THEMES } from '@/components/AuraProvider';
@@ -16,54 +16,49 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-10 pb-36 space-y-10">
-      {/* HEADER ATELIER */}
-      <header className="flex flex-col items-center text-center space-y-4 pt-2">
-        <div className="h-24 w-64 flex items-center justify-center p-2">
+      {/* HEADER PULITO */}
+      <header className="flex flex-col items-center text-center space-y-3 pt-2">
+        <div className="h-20 w-56 flex items-center justify-center p-2">
           <Logo variant="original" className="h-full w-full object-contain" />
         </div>
-        <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#B8A9C9]">
-          Haute Parfumerie & Olfactive Vault
-        </p>
       </header>
 
-      {/* HERO BANNER INTERATTIVO */}
-      <section className="relative overflow-hidden rounded-[36px] border border-[#10B981]/30 bg-gradient-to-b from-[#1E1428]/90 to-[#0C0814] p-8 sm:p-12 text-center shadow-2xl">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(16,185,129,0.18)_0%,transparent_70%)] pointer-events-none" />
+      {/* HERO VETRINA SCULTOREA (ISPIRAZIONE BESGIN: FLACONE PROTAGONISTA & INTERAZIONE) */}
+      <section className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[#120A1A] p-8 sm:p-12 text-center shadow-2xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(16,185,129,0.14)_0%,transparent_75%)] pointer-events-none" />
         
-        <div className="relative z-10 max-w-xl mx-auto space-y-4">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#10B981]/15 border border-[#10B981]/35 px-4 py-1.5 font-mono text-[11px] uppercase tracking-wider text-[#34F5A6]">
-            <Sparkles className="h-3.5 w-3.5" />
-            Atelier Privato Attivo
-          </span>
-          <h2 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] leading-tight">
-            Esplora, sperimenta e custodisci l'essenza.
-          </h2>
-          <p className="text-sm text-[#B8A9C9] leading-relaxed">
-            Seleziona una sezione sottostante o avvia lo scanner olfattivo per catalogare una nuova creazione artistica.
-          </p>
+        <div className="relative z-10 max-w-lg mx-auto space-y-6">
+          <div className="space-y-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#34F5A6]">
+              Atelier Olfattivo
+            </span>
+            <h2 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4]">
+              Collezione Privata
+            </h2>
+          </div>
 
-          <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <Link
               href="/scanner"
               onClick={() => setCustomAura(SECTION_THEMES.scanner)}
               className="flex items-center gap-2 rounded-full bg-[#34F5A6] px-6 py-3 font-mono text-xs font-bold text-[#08060C] transition hover:scale-105 shadow-lg"
             >
               <ScanLine className="h-4 w-4 stroke-[2.5]" />
-              <span>Scannerizza Flacone</span>
+              <span>Scannerizza</span>
             </Link>
             <Link
               href="/collezione"
               onClick={() => setCustomAura(SECTION_THEMES.collezione)}
-              className="flex items-center gap-2 rounded-full border border-white/20 bg-[#161024] px-6 py-3 font-mono text-xs font-semibold text-[#F6EFE4] transition hover:border-white/40"
+              className="flex items-center gap-2 rounded-full border border-white/15 bg-[#1A1126] px-6 py-3 font-mono text-xs font-semibold text-[#F6EFE4] transition hover:border-white/40"
             >
               <Library className="h-4 w-4 text-sky-400" />
-              <span>Apri Collezione</span>
+              <span>Esplora Vault</span>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* TRE ACCESSI PRINCIPALI */}
+      {/* ACCESSI RAPIDI AI TRE REPARTI */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* COLLEZIONE */}
         <Link href="/collezione" className="group block">
@@ -74,19 +69,19 @@ export default function HomePage() {
               </div>
               <div className="space-y-1.5">
                 <span className="font-mono text-[10px] uppercase tracking-widest text-sky-400">
-                  Lo Scaffale
+                  Vault
                 </span>
                 <h3 className="font-serif text-2xl text-[#F6EFE4]">Collezione</h3>
-                <p className="text-xs text-[#8E7C9E] leading-relaxed pt-1">
-                  Flaconi firmati, piramidi olfattive e libreria artistica della tua collezione privata.
+                <p className="text-xs text-[#8E7C9E] leading-relaxed">
+                  Libreria flaconi e piramidi olfattive.
                 </p>
               </div>
             </div>
 
             <div className="pt-6 flex items-center justify-between border-t border-white/10 mt-6">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-sky-400/80">Vault privato</span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-sky-400/80">Archivio</span>
               <div className="flex items-center gap-1 font-mono text-xs text-sky-400 group-hover:translate-x-1 transition">
-                <span>Accedi</span>
+                <span>Apri</span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </div>
             </div>
@@ -102,17 +97,17 @@ export default function HomePage() {
               </div>
               <div className="space-y-1.5">
                 <span className="font-mono text-[10px] uppercase tracking-widest text-purple-400">
-                  Il Radar
+                  Scouting
                 </span>
                 <h3 className="font-serif text-2xl text-[#F6EFE4]">Testing</h3>
-                <p className="text-xs text-[#8E7C9E] leading-relaxed pt-1">
-                  Campioni, decant e scoperte in corso d'analisi con listini formati dedicati.
+                <p className="text-xs text-[#8E7C9E] leading-relaxed">
+                  Campioni e decant in fase d'analisi.
                 </p>
               </div>
             </div>
 
             <div className="pt-6 flex items-center justify-between border-t border-white/10 mt-6">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-purple-400/80">Scouting</span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-purple-400/80">Radar</span>
               <div className="flex items-center gap-1 font-mono text-xs text-purple-400 group-hover:translate-x-1 transition">
                 <span>Esplora</span>
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -130,19 +125,19 @@ export default function HomePage() {
               </div>
               <div className="space-y-1.5">
                 <span className="font-mono text-[10px] uppercase tracking-widest text-rose-400">
-                  Rotazione
+                  Memoria
                 </span>
                 <h3 className="font-serif text-2xl text-[#F6EFE4]">Diario</h3>
-                <p className="text-xs text-[#8E7C9E] leading-relaxed pt-1">
-                  Indossi quotidiani, evoluzione sulla pelle e impressioni olfattive nel tempo.
+                <p className="text-xs text-[#8E7C9E] leading-relaxed">
+                  Registro indossi e rotazione stagionale.
                 </p>
               </div>
             </div>
 
             <div className="pt-6 flex items-center justify-between border-t border-white/10 mt-6">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-rose-400/80">Memoria</span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-rose-400/80">Storico</span>
               <div className="flex items-center gap-1 font-mono text-xs text-rose-400 group-hover:translate-x-1 transition">
-                <span>Apri Diario</span>
+                <span>Apri</span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </div>
             </div>
