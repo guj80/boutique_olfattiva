@@ -124,7 +124,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
       const res = await fetch('/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, search: true, format: 'prezzi' }),
       });
       const data = await res.json();
       if (!res.ok || !data.text) throw new Error('Impossibile recuperare i listini.');
