@@ -12,10 +12,76 @@ export interface GeminiCallOptions {
   useGoogleSearch?: boolean;
 }
 
-export async function callOpenRouterFree(
+// Lista di modelli aggiornata con fallback automatico anti-404
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-pro-latest',
+  'gemini-1.5-flash',
+];
+
+function normalizeParts(parts: GeminiPart[]): any[] {
+  return parts.map((p) => {
+    if (p.text !== undefined) return { text: p.text };
+    const imgData = p.inlineData?.data || p.inline_data?.data;
+    const imgMime = p.inlineData?.mimeType || p.inline_data?.mime_type;
+    if (imgData && imgMime) {
+      const cleanBase64 = imgData.includes(',') ? imgData.split(',')[1] : imgData;
+      return { inlineData: { mimeType: imgMime, data: cleanBase64 } };
+    }
+    return p;
+  });
+}
+
+export async function callGroqFallback(
   prompt: string,
   systemInstruction?: string
 ): Promise<{ text: string; modelUsed: string } | null> {
+  const groqKey = (process.env.GROQ_API_KEY || '').trim();
+  if (!groqKey || groqKey === 'undefined') return null;
+
+  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+  for (const model of models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 14000);
+    try {
+      const messages: any[] = [];
+      if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+      }
+      messages.push({
+        role: 'user',
+        content: `${prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido.`,
+      });
+
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+          messages,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content?.trim();
+        if (content && content.length > 10) {
+          return { text: content, modelUsed: `groq:${model}` };
+        }
+      }
+    } catch {
+      clearTimeout(timer);
+      continue;
+    }
+  }
   return null;
 }
 
@@ -30,78 +96,100 @@ export async function callGeminiWithFallback(
     ''
   ).trim();
 
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY non configurata.');
+  const normalizedParts = normalizeParts(parts);
+  const hasInlineImage = normalizedParts.some((p) => p.inlineData);
+  const timeoutMs = options?.timeoutMs ?? 18000;
+  const errors: string[] = [];
+
+  if (apiKey && apiKey !== 'undefined') {
+    for (const model of GEMINI_MODELS) {
+      // Se richiesto useGoogleSearch, fa un primo tentativo con Google Search Grounding attivo
+      const modes =
+        options?.useGoogleSearch && !hasInlineImage
+          ? [
+              { search: true, strictJson: false },
+              { search: false, strictJson: options?.jsonMode ?? true },
+            ]
+          : [{ search: false, strictJson: options?.jsonMode ?? true }];
+
+      for (const mode of modes) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const generationConfig: Record<string, any> = {
+            temperature: options?.temperature ?? 0.1,
+          };
+          if (mode.strictJson) {
+            generationConfig.responseMimeType = 'application/json';
+          }
+
+          const payload: Record<string, any> = {
+            contents: [{ role: 'user', parts: normalizedParts }],
+            generationConfig,
+          };
+
+          if (options?.systemInstruction) {
+            payload.systemInstruction = {
+              parts: [{ text: options.systemInstruction }],
+            };
+          }
+
+          if (mode.search) {
+            payload.tools = [{ googleSearch: {} }];
+          }
+
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+            cache: 'no-store',
+          });
+          clearTimeout(timer);
+
+          if (res.ok) {
+            const data = await res.json();
+            const rawParts: any[] = data?.candidates?.[0]?.content?.parts || [];
+            const text = rawParts
+              .filter((p) => !p?.thought)
+              .map((p) => p?.text || '')
+              .join('')
+              .trim();
+
+            if (text.length > 5) {
+              return {
+                text,
+                modelUsed: mode.search ? `${model}+google_search` : model,
+              };
+            }
+          } else {
+            const errBody = await res.text();
+            errors.push(`${model}(${res.status})`);
+            // Se 404 (modello deprecato/non trovato), passa subito al modello successivo
+            if (res.status === 404 || res.status === 403) break;
+          }
+        } catch (err: any) {
+          clearTimeout(timer);
+          errors.push(`${model}:${err?.name === 'AbortError' ? 'Timeout' : 'NetworkErr'}`);
+          break;
+        }
+      }
+    }
   }
 
-  // Normalizza le parti per l'API di Gemini
-  const contents = parts.map((p) => {
-    if (p.text) return { role: 'user', parts: [{ text: p.text }] };
-    const imgData = p.inlineData?.data || p.inline_data?.data;
-    const imgMime = p.inlineData?.mimeType || p.inline_data?.mime_type;
-    if (imgData && imgMime) {
-      return {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType: imgMime,
-              data: imgData.includes(',') ? imgData.split(',')[1] : imgData,
-            },
-          },
-        ],
-      };
-    }
-    return { role: 'user', parts: [{ text: '' }] };
-  });
-
-  // Usiamo gemini-2.0-flash che supporta perfettamente le nuove chiavi AQ.
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-  const payload: Record<string, any> = {
-    contents,
-    generationConfig: {
-      temperature: options?.temperature ?? 0.1,
-      ...(options?.jsonMode ? { responseMimeType: 'application/json' } : {}),
-    },
-  };
-
-  if (options?.systemInstruction) {
-    payload.systemInstruction = {
-      parts: [{ text: options.systemInstruction }],
-    };
+  // Fallback su Groq (Llama 3.3 70B) se Gemini fallisce o se la chiave ha problemi
+  if (!hasInlineImage) {
+    const promptText = normalizedParts
+      .map((p) => p.text || '')
+      .filter(Boolean)
+      .join('\n');
+    const groqRes = await callGroqFallback(promptText, options?.systemInstruction);
+    if (groqRes) return groqRes;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options?.timeoutMs ?? 25000);
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Gemini API Error (${res.status}): ${errText.slice(0, 150)}`);
-    }
-
-    const data = await res.json();
-    const candidate = data?.candidates?.[0];
-    const text = candidate?.content?.parts?.[0]?.text?.trim();
-
-    if (!text) {
-      throw new Error('Risposta vuota da Gemini.');
-    }
-
-    return { text, modelUsed: 'gemini-2.0-flash' };
-  } catch (err: any) {
-    clearTimeout(timer);
-    throw new Error(`Errore motore Gemini: ${err?.message || 'Timeout'}`);
-  }
+  throw new Error(`Nessun motore AI ha risposto (${errors.join(', ')}).`);
 }
 
 export function extractJsonFromAiText<T = any>(rawText: string): T {
