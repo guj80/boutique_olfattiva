@@ -28,10 +28,10 @@ export const metadata: Metadata = {
   description: 'Haute Parfumerie Collection',
   themeColor: '#050308',
   viewport: { width: 'device-width', initialScale: 1, viewportFit: 'cover' },
-  icons: {
-    icon: '/logo_LG.jpg',
-    shortcut: '/logo_LG.jpg',
-    apple: '/logo_LG.jpg',
+icons: {
+    icon: '/LOGO_LG.jpg',
+    shortcut: '/LOGO_LG.jpg',
+    apple: '/LOGO_LG.jpg',
   },
   appleWebApp: {
     capable: true,
