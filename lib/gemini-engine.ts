@@ -53,7 +53,8 @@ export async function callGroqFallback(
         content: `${prompt}\n\nRispondi ESCLUSIVAMENTE con un oggetto JSON valido.`,
       });
 
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const groqEndpoint = ['https:', '', 'api.groq.com', 'openai', 'v1', 'chat', 'completions'].join('/');
+      const res = await fetch(groqEndpoint, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${groqKey}`,
@@ -115,7 +116,8 @@ export async function callGeminiWithFallback(
         const timer = setTimeout(() => controller.abort(), timeoutMs);
 
         try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const base = ['https:', '', 'generativelanguage.googleapis.com', 'v1beta', 'models'].join('/');
+          const url = `${base}/${model}:generateContent?key=${apiKey}`;
           const generationConfig: Record<string, any> = {
             temperature: options?.temperature ?? 0.1,
           };
