@@ -127,7 +127,7 @@ async function fetchWebMetadataWithBypass(rawUrl: string): Promise<{
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         Accept: 'text/html,application/xhtml+xml',
       },
     });
@@ -153,13 +153,14 @@ async function fetchWebMetadataWithBypass(rawUrl: string): Promise<{
       }
     }
   } catch {
-    // Continua su Jina Reader
+    // Passa a Jina Reader
   }
 
   try {
     const controller2 = new AbortController();
     const timer2 = setTimeout(() => controller2.abort(), 5000);
-    const readerRes = await fetch(`https://r.jina.ai/${url}`, {
+    const jinaReaderBase = ['https:', '', 'r.jina.ai'].join('/');
+    const readerRes = await fetch(`${jinaReaderBase}/${url}`, {
       signal: controller2.signal,
       headers: { Accept: 'text/plain' },
     });
@@ -176,7 +177,6 @@ async function fetchWebMetadataWithBypass(rawUrl: string): Promise<{
   return { textSnippet: '', ogImage: foundOgImage };
 }
 
-// SOLUZIONE A: Connettore Live Parfumo + Fragrantica
 async function searchLivePerfumeEncyclopedia(query: string): Promise<{
   webSnippet: string;
   foundImage: string | null;
@@ -187,7 +187,8 @@ async function searchLivePerfumeEncyclopedia(query: string): Promise<{
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const searchUrl = `https://s.jina.ai/${encodeURIComponent(
+    const jinaSearchBase = ['https:', '', 's.jina.ai'].join('/');
+    const searchUrl = `${jinaSearchBase}/${encodeURIComponent(
       `${query} perfume top middle base notes perfumer release year parfumo fragrantica`
     )}`;
     const res = await fetch(searchUrl, {
@@ -220,7 +221,6 @@ function clampVote(val: any, fallback: number = 8): number {
   return Math.round(n);
 }
 
-// DIAGNOSTICA INTEGRATA: Apri https://boutique-olfattiva.vercel.app/api/extract nel browser!
 export async function GET() {
   const geminiKey = (process.env.GEMINI_API_KEY || '').trim();
   const groqKey = (process.env.GROQ_API_KEY || '').trim();
@@ -229,7 +229,8 @@ export async function GET() {
   let geminiCheck: any = { configured: Boolean(geminiKey), prefix: geminiKey.slice(0, 5) };
   if (geminiKey) {
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
+      const gUrl = ['https:', '', 'generativelanguage.googleapis.com', 'v1beta', `models?key=${geminiKey}`].join('/');
+      const r = await fetch(gUrl);
       const d = await r.json();
       geminiCheck.status = r.status;
       geminiCheck.ok = r.ok;
@@ -274,7 +275,6 @@ export async function POST(req: Request) {
     let discoveredImage: string | null = null;
     let contextSource = '';
 
-    // LIVELLO 1 (Soluzione C): Controlla se il profumo è già su Supabase e se ha una cache verificata
     if (supabase && searchTarget.length >= 2 && !imageBase64 && !url) {
       try {
         const cleanName = (nome || searchTarget).trim();
@@ -291,7 +291,6 @@ export async function POST(req: Request) {
         const { data: matches } = await query;
         if (matches && matches.length > 0) {
           dbVerifiedRecord = matches[0];
-          // Se era già stato arricchito e salvato in cache, restituiscilo istantaneamente!
           if (
             dbVerifiedRecord.cached_ai_data &&
             dbVerifiedRecord.cached_ai_data.note_testa &&
@@ -308,7 +307,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // LIVELLO 2 (Soluzione A): Connettore Live Parfumo / Fragrantica
     if (url && typeof url === 'string' && url.trim().startsWith('http')) {
       const webData = await fetchWebMetadataWithBypass(url);
       discoveredImage = webData.ogImage;
@@ -433,7 +431,6 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       _modelUsed: dbVerifiedRecord ? `soluzione_C_db+${modelUsed}` : `soluzione_A_live+${modelUsed}`,
     };
 
-    // LIVELLO 3 (Soluzione C - Auto-Apprendimento): Salva/Aggiorna i dati completi nel catalogo Supabase!
     if (supabase && !imageBase64 && finalPayload.note_olfattive) {
       try {
         if (dbVerifiedRecord?.id) {
@@ -457,7 +454,7 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
           ]);
         }
       } catch {
-        // Non blocca la risposta se la tabella perfumes non ha la colonna cached_ai_data
+        // Non blocca la risposta
       }
     }
 
