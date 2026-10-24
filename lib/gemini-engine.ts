@@ -12,7 +12,6 @@ export interface GeminiCallOptions {
   useGoogleSearch?: boolean;
 }
 
-// Lista di modelli aggiornata con fallback automatico anti-404
 const GEMINI_MODELS = [
   'gemini-2.5-flash',
   'gemini-1.5-flash-latest',
@@ -103,7 +102,6 @@ export async function callGeminiWithFallback(
 
   if (apiKey && apiKey !== 'undefined') {
     for (const model of GEMINI_MODELS) {
-      // Se richiesto useGoogleSearch, fa un primo tentativo con Google Search Grounding attivo
       const modes =
         options?.useGoogleSearch && !hasInlineImage
           ? [
@@ -166,20 +164,18 @@ export async function callGeminiWithFallback(
             }
           } else {
             const errBody = await res.text();
-            errors.push(`${model}(${res.status})`);
-            // Se 404 (modello deprecato/non trovato), passa subito al modello successivo
-            if (res.status === 404 || res.status === 403) break;
+            errors.push(`${model}(${res.status}): ${errBody.slice(0, 60)}`);
+            if (res.status === 404 || res.status === 403 || res.status === 400) break;
           }
         } catch (err: any) {
           clearTimeout(timer);
-          errors.push(`${model}:${err?.name === 'AbortError' ? 'Timeout' : 'NetworkErr'}`);
+          errors.push(`${model}:${err?.name === 'AbortError' ? 'Timeout' : 'Err'}`);
           break;
         }
       }
     }
   }
 
-  // Fallback su Groq (Llama 3.3 70B) se Gemini fallisce o se la chiave ha problemi
   if (!hasInlineImage) {
     const promptText = normalizedParts
       .map((p) => p.text || '')
@@ -189,7 +185,7 @@ export async function callGeminiWithFallback(
     if (groqRes) return groqRes;
   }
 
-  throw new Error(`Nessun motore AI ha risposto (${errors.join(', ')}).`);
+  throw new Error(`Dettaglio errore AI: ${errors.join(' | ') || 'Chiavi mancanti'}`);
 }
 
 export function extractJsonFromAiText<T = any>(rawText: string): T {
