@@ -222,7 +222,7 @@ export function AuraProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setCustomAura = useCallback((pair: AuraPair) => {
-    setAura(pair);
+    if (pair) setAura(pair);
   }, []);
 
   const value = useMemo(
