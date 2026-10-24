@@ -40,13 +40,73 @@ function getSupabaseServer() {
   }
 }
 
-async function searchLivePerfumeEncyclopedia(query: string): Promise<string> {
+function isSafePublicUrl(rawUrl: string): boolean {
+  try {
+    const u = new URL(rawUrl.trim());
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    const host = u.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^169\.254\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveImageUrl(candidate: string | null | undefined, pageUrl: string): string | null {
+  if (!candidate) return null;
+  const cleaned = candidate.replace(/&amp;/g, '&').replace(/^['"]|['"]$/g, '').trim();
+  if (!cleaned || cleaned.startsWith('data:')) return null;
+  try {
+    if (cleaned.startsWith('//')) return `https:${cleaned}`;
+    const resolved = new URL(cleaned, pageUrl);
+    if (resolved.protocol === 'http:') resolved.protocol = 'https:';
+    return resolved.toString();
+  } catch {
+    return cleaned.startsWith('http') ? cleaned : null;
+  }
+}
+
+function extractProductImageFromHtml(html: string, pageUrl: string): string | null {
+  const metaPatterns = [
+    /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image:secure_url["']/i,
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+  ];
+  for (const regex of metaPatterns) {
+    const m = html.match(regex);
+    if (m?.[1]) {
+      const resolved = resolveImageUrl(m[1], pageUrl);
+      if (resolved) return resolved;
+    }
+  }
+  return null;
+}
+
+async function searchLivePerfumeData(query: string): Promise<{ webSnippet: string; foundImage: string | null }> {
+  let webSnippet = '';
+  let foundImage: string | null = null;
+
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 6000);
     const jinaSearchBase = ['https:', '', 's.jina.ai'].join('/');
     const searchUrl = `${jinaSearchBase}/${encodeURIComponent(
-      `${query} perfume top middle base notes perfumer release year parfumo fragrantica`
+      `${query} perfume top middle base notes perfumer release year concentration parfumo fragrantica`
     )}`;
     const res = await fetch(searchUrl, {
       signal: controller.signal,
@@ -56,12 +116,25 @@ async function searchLivePerfumeEncyclopedia(query: string): Promise<string> {
 
     if (res.ok) {
       const text = await res.text();
-      return text.slice(0, 4500);
+      webSnippet = text.slice(0, 5000);
+      const urlMatch = text.match(
+        /https?:\/\/(?:www\.)?(?:parfumo\.com|fragrantica\.[a-z.]+)\/[^\s)\]"']+/i
+      );
+      if (urlMatch?.[0] && isSafePublicUrl(urlMatch[0])) {
+        const pageRes = await fetch(urlMatch[0], {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        });
+        if (pageRes.ok) {
+          const html = await pageRes.text();
+          foundImage = extractProductImageFromHtml(html, urlMatch[0]);
+        }
+      }
     }
   } catch {
     // Fallback silenzioso
   }
-  return '';
+
+  return { webSnippet, foundImage };
 }
 
 function clampVote(val: any, fallback: number = 8): number {
@@ -85,98 +158,91 @@ export async function POST(req: Request) {
 
     const supabase = getSupabaseServer();
     let dbVerifiedRecord: any = null;
+    let officialRenderImage: string | null = null;
     let contextSource = '';
 
-    // SOLUZIONE C: Controlla se il profumo è già nel database da 59.324 elementi
-    if (supabase && searchTarget.length >= 2 && !imageBase64 && !url) {
-      try {
-        const cleanName = (nome || searchTarget).trim();
-        const { data: matches } = await supabase
-          .from('perfumes')
-          .select('*')
-          .ilike('name', `%${cleanName}%`)
-          .limit(3);
+    // Se viene passata una foto, la usiamo SOLO come input visivo per l'AI (Vision Recognition)
+    if (imageBase64) {
+      contextSource = "Analisi visiva del flacone tramite foto scattata/caricata per identificare con precisione la creazione olfattiva.";
+    } else {
+      // Ricerca su Supabase (Cache intelligente)
+      if (supabase && searchTarget.length >= 2) {
+        try {
+          const cleanQuery = searchTarget.toLowerCase();
+          let query = supabase.from('perfumes').select('*').limit(3);
 
-        if (matches && matches.length > 0) {
-          dbVerifiedRecord = matches[0];
-          if (
-            dbVerifiedRecord.cached_ai_data &&
-            dbVerifiedRecord.cached_ai_data.note_testa &&
-            dbVerifiedRecord.cached_ai_data.prezzo_stimato_euro
-          ) {
-            return NextResponse.json({
-              ...dbVerifiedRecord.cached_ai_data,
-              _modelUsed: 'supabase-verified-cache',
-            });
+          if (brand && nome) {
+            query = query.ilike('brand', `%${brand}%`).ilike('name', `%${nome}%`);
+          } else {
+            query = query.or(`name.ilike.%${cleanQuery}%,brand.ilike.%${cleanQuery}%`);
           }
+
+          const { data: matches } = await query;
+          if (matches && matches.length > 0) {
+            dbVerifiedRecord = matches[0];
+            if (dbVerifiedRecord.cached_ai_data && dbVerifiedRecord.cached_ai_data.note_testa) {
+              return NextResponse.json(dbVerifiedRecord.cached_ai_data);
+            }
+          }
+        } catch {
+          // Prosegue live
         }
-      } catch {
-        // Prosegue con la ricerca live
+      }
+
+      // Ricerca live della scheda tecnica e del render ufficiale del flacone
+      if (searchTarget) {
+        const liveData = await searchLivePerfumeData(searchTarget);
+        officialRenderImage = liveData.foundImage;
+        const dbFacts = dbVerifiedRecord
+          ? `DATI DATABASE: Nome="${dbVerifiedRecord.name}", Brand="${dbVerifiedRecord.brand}", Anno="${dbVerifiedRecord.release_year}".\n`
+          : '';
+        contextSource = `${dbFacts}${liveData.webSnippet ? `SCHEDA WEB LIVE:\n${liveData.webSnippet}` : ''}`;
       }
     }
 
-    // SOLUZIONE A: Connettore Live Parfumo / Fragrantica se non trovato in cache
-    if (searchTarget) {
-      const liveWebSnippet = await searchLivePerfumeEncyclopedia(searchTarget);
-      const dbFacts = dbVerifiedRecord
-        ? `DATI NEL DB: Nome="${dbVerifiedRecord.name || ''}", Brand="${dbVerifiedRecord.brand || ''}", Anno="${dbVerifiedRecord.release_year || ''}", Concentrazione="${dbVerifiedRecord.concentration || ''}".\n`
-        : '';
-
-      contextSource = `${dbFacts}${
-        liveWebSnippet ? `SCHEDA ENCICLOPEDICA LIVE (PARFUMO / FRAGRANTICA):\n${liveWebSnippet}` : ''
-      }`;
-    }
-
-    const systemPrompt = `Sei l'enciclopedia tecnica dell'alta profumeria artistica e di nicchia.
-Compila la scheda tecnica rigorosa per: "${searchTarget || 'Profumo'}".
+    const systemPrompt = `Sei l'enciclopedia tecnica definitiva dell'alta profumeria artistica e di nicchia per esperti.
+Compila la scheda tecnica professionale e rigorosa per il profumo identificato.
 
 ${contextSource}
 
-REGOLE TASSATIVE ANTI-ALLUCINAZIONE:
-1. Usa ESCLUSIVAMENTE le note olfattive reali, il vero Naso creatore e l'anno di lancio riportati nei dati sopra o nella scheda live. VIETATO inventare note.
-2. "famiglia_olfattiva": Scegli ESCLUSIVAMENTE UNA SOLA PAROLA tra queste 12:
-   "Agrumata", "Aromatica", "Marina", "Floreale", "Fruttata", "Verde", "Speziata", "Legnosa", "Ambrata", "Gourmand", "Cuoiata", "Muschiata".
-3. "prezzo_stimato_euro": Prezzi di listino ufficiali per formato >= 30ml (es. "50ml: €165 • 100ml: €230").
-
-Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
+REGOLE TASSATIVE (ZERO ALLUCINAZIONI):
+1. Usa ESCLUSIVAMENTE note olfattive reali, naso creatore e anno di lancio ufficiali.
+2. "famiglia_olfattiva": Scegli UNA SOLA PAROLA tra: "Agrumata", "Aromatica", "Marina", "Floreale", "Fruttata", "Verde", "Speziata", "Legnosa", "Ambrata", "Gourmand", "Cuoiata", "Muschiata".
+3. Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta:
 {
-  "nome": "Nome ufficiale esatto",
-  "brand": "Nome Maison",
-  "concentrazione": "Es. Extrait de Parfum, Eau de Parfum",
+  "nome": "Nome esatto",
+  "brand": "Maison",
+  "concentrazione": "Eau de Parfum / Extrait de Parfum",
   "anno_lancio": 2021,
-  "famiglia_olfattiva": "Una delle 12 famiglie pure",
-  "note_testa": "Note di testa separate da virgola",
-  "note_cuore": "Note di cuore separate da virgola",
-  "note_fondo": "Note di fondo separate da virgola",
-  "note_olfattive": "Elenco completo note separate da virgola",
-  "descrizione_ai": "Analisi tecnica oggettiva in 2 frasi",
-  "prezzo_stimato_euro": "Es. 50ml: €165 • 100ml: €230",
+  "famiglia_olfattiva": "Famiglia pura",
+  "note_testa": "Note di testa",
+  "note_cuore": "Note di cuore",
+  "note_fondo": "Note di fondo",
+  "note_olfattive": "Elenco completo",
+  "descrizione_ai": "Analisi tecnica professionale in 2 frasi",
+  "prezzo_stimato_euro": "50ml: €165 • 100ml: €230",
   "formato_ml": 100,
-  "stagione_ideale": "Es. Autunno / Inverno",
-  "occasione_ideale": "Es. Serata, Formale",
-  "naso": "Nome del Maître Parfumeur",
+  "stagione_ideale": "Stagione",
+  "occasione_ideale": "Occasione",
+  "naso": "Maître Parfumeur",
   "voto_longevita": 8,
   "voto_scia": 8,
   "voto_proiezione": 8,
   "voto_complessita": 8,
-  "url_foto_vetrina": ""
+  "url_foto_vetrina": "${officialRenderImage || ''}"
 }`;
 
     const parts: GeminiPart[] = [{ text: systemPrompt }];
-
     if (imageBase64 && typeof imageBase64 === 'string') {
       parts.push({
-        inlineData: {
-          mimeType: mimeType || 'image/jpeg',
-          data: imageBase64,
-        },
+        inlineData: { mimeType: mimeType || 'image/jpeg', data: imageBase64 },
       });
     }
 
-    const { text, modelUsed } = await callGeminiWithFallback(parts, {
+    const { text } = await callGeminiWithFallback(parts, {
       temperature: 0.1,
       jsonMode: true,
-      timeoutMs: 20000,
+      timeoutMs: 22000,
     });
 
     const parsed = extractJsonFromAiText<Record<string, any>>(text);
@@ -185,59 +251,37 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura:
       ? parsed.famiglia_olfattiva
       : normalizeFamilyServer(parsed.famiglia_olfattiva);
 
-    const normTesta = parsed.note_testa ? formatPerfumeNote(parsed.note_testa) : '';
-    const normCuore = parsed.note_cuore ? formatPerfumeNote(parsed.note_cuore) : '';
-    const normFondo = parsed.note_fondo ? formatPerfumeNote(parsed.note_fondo) : '';
-
-    const unifiedNotes =
-      [normTesta, normCuore, normFondo].filter(Boolean).join(', ') ||
-      (parsed.note_olfattive ? formatPerfumeNote(parsed.note_olfattive) : '');
-
     const finalPayload = {
-      nome: (dbVerifiedRecord?.name || parsed.nome || nome || searchTarget || 'Creazione').trim(),
+      nome: (dbVerifiedRecord?.name || parsed.nome || searchTarget || 'Creazione').trim(),
       brand: (dbVerifiedRecord?.brand || parsed.brand || brand || 'Maison').trim(),
       concentrazione: (dbVerifiedRecord?.concentration || parsed.concentrazione || 'Eau de Parfum').trim(),
       anno_lancio: Number(dbVerifiedRecord?.release_year || parsed.anno_lancio) || 2021,
       famiglia_olfattiva: pureFamily,
-      note_testa: normTesta,
-      note_cuore: normCuore,
-      note_fondo: normFondo,
-      note_olfattive: unifiedNotes,
+      note_testa: parsed.note_testa ? formatPerfumeNote(parsed.note_testa) : '',
+      note_cuore: parsed.note_cuore ? formatPerfumeNote(parsed.note_cuore) : '',
+      note_fondo: parsed.note_fondo ? formatPerfumeNote(parsed.note_fondo) : '',
+      note_olfattive: parsed.note_olfattive ? formatPerfumeNote(parsed.note_olfattive) : '',
       descrizione_ai: (parsed.descrizione_ai || '').trim(),
       prezzo_stimato_euro: (parsed.prezzo_stimato_euro || '').trim(),
       formato_ml: Number(parsed.formato_ml) >= 30 ? Number(parsed.formato_ml) : 100,
-      stagione_ideale: (parsed.stagione_ideale || 'Tutte le stagioni').trim(),
-      occasione_ideale: (parsed.occasione_ideale || 'Versatile').trim(),
+      stagione_ideale: (parsed.stagione_ideale || 'Versatile').trim(),
+      occasione_ideale: (parsed.occasione_ideale || 'Ogni occasione').trim(),
       naso: parsed.naso && String(parsed.naso).toLowerCase() !== 'non specificato' ? String(parsed.naso).trim() : null,
       voto_longevita: clampVote(parsed.voto_longevita, 8),
       voto_scia: clampVote(parsed.voto_scia, 8),
       voto_proiezione: clampVote(parsed.voto_proiezione, 8),
       voto_complessita: clampVote(parsed.voto_complessita, 8),
-      url_foto_vetrina: parsed.url_foto_vetrina || null,
-      _modelUsed: dbVerifiedRecord ? `soluzione_C_db+${modelUsed}` : `soluzione_A_live+${modelUsed}`,
+      url_foto_vetrina: officialRenderImage || parsed.url_foto_vetrina || null,
     };
 
-    // SOLUZIONE C (Auto-Apprendimento): Salva in cache su Supabase la scheda ricavata
+    // Cache automatica su Supabase per le ricerche future
     if (supabase && !imageBase64 && finalPayload.note_olfattive) {
       try {
         if (dbVerifiedRecord?.id) {
-          await supabase
-            .from('perfumes')
-            .update({ cached_ai_data: finalPayload })
-            .eq('id', dbVerifiedRecord.id);
-        } else {
-          await supabase.from('perfumes').insert([
-            {
-              name: finalPayload.nome,
-              brand: finalPayload.brand,
-              concentration: finalPayload.concentrazione,
-              release_year: finalPayload.anno_lancio,
-              cached_ai_data: finalPayload,
-            },
-          ]);
+          await supabase.from('perfumes').update({ cached_ai_data: finalPayload }).eq('id', dbVerifiedRecord.id);
         }
       } catch {
-        // Non blocca la risposta
+        // Silenzioso
       }
     }
 
