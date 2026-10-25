@@ -19,13 +19,6 @@ import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
-import {
-  buildScoutPrompt,
-  collectProposals,
-  filterNewProposals,
-  ownedListForPrompt,
-  parseScoutArray,
-} from '@/lib/scout-logic';
 
 const PURE_FAMILIES = [
   'Agrumata',
@@ -58,7 +51,7 @@ export default function CollezionePage() {
   const [selectedBrand, setSelectedBrand] = useState<string>('Tutti');
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
-  // Stati per lo Scouting Olfattivo (Radar)
+  // Stati per il Consultant di Scouting (Radar)
   const [scoutFamily, setScoutFamily] = useState<string>('Qualsiasi');
   const [includeNotes, setIncludeNotes] = useState<string[]>([]);
   const [currentIncludeInput, setCurrentIncludeInput] = useState('');
@@ -66,7 +59,6 @@ export default function CollezionePage() {
   const [currentExcludeInput, setCurrentExcludeInput] = useState('');
   const [scoutResults, setScoutResults] = useState<any[]>([]);
   const [scoutingLoading, setScoutingLoading] = useState(false);
-  const [scoutSavingIdx, setScoutSavingIdx] = useState<number | null>(null);
 
   const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
 
@@ -119,44 +111,35 @@ export default function CollezionePage() {
     setScoutingLoading(true);
     setScoutResults([]);
     try {
-      // Tutto ciò che è già in archivio (collezione e radar) non deve mai essere riproposto
-      const owned = profumi.map((p) => ({ brand: p.brand, nome: p.nome }));
-      const ownedList = ownedListForPrompt(owned);
+      const prompt = `Sei un esperto internazionale di alta profumeria, profumeria artistica indipendente e case di nicchia storiche e prestigiose.
+REGOLE TASSATIVE:
+- Escludi rigorosamente qualsiasi clone, dupe, imitazione economica o profumo arabo di massa.
+- Restituisci ESATTAMENTE 3 creazioni distinte: 1 Designer di alto profilo, 1 Artistico indipendente e 1 di Nicchia prestigiosa.
+Criteri di ricerca:
+- Famiglia olfattiva: ${scoutFamily}
+- Note da includere: ${includeNotes.length > 0 ? includeNotes.join(', ') : 'Nessuna specifica'}
+- Note da escludere: ${excludeNotes.length > 0 ? excludeNotes.join(', ') : 'Nessuna specifica'}
 
-      const accepted = await collectProposals({
-        wanted: 3,
-        owned,
-        fetchBatch: async ({ count, alsoExcluded, attempt }) => {
-          const prompt = buildScoutPrompt({
-            count,
-            family: scoutFamily,
-            include: includeNotes,
-            exclude: excludeNotes,
-            ownedList,
-            alsoExcluded,
-          });
-          const res = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, search: true }),
-          });
-          const data = await res.json();
-          if (!res.ok || !data.text) throw new Error('Errore durante la ricerca. Riprova tra poco.');
-          try {
-            return parseScoutArray(data.text);
-          } catch {
-            throw new Error("L'AI non ha restituito un formato valido. Riprova.");
-          }
-        },
+Restituisci un array JSON puro contenente esattamente 3 oggetti con questi campi esatti:
+brand, nome, concentrazione, famiglia_olfattiva, note_testa, note_cuore, note_fondo, categoria.
+Nessun testo fuori dal JSON.`;
+
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, search: true }),
       });
+      const data = await res.json();
+      if (!res.ok || !data.text) throw new Error('Errore durante la ricerca del consultant.');
 
-      if (accepted.length === 0) {
-        showToast('Nessuna proposta nuova: quelle suggerite erano già nella tua collezione. Riprova.', 'error');
-        return;
-      }
+      let cleanText = data.text.trim();
+      if (cleanText.startsWith('```json')) cleanText = cleanText.slice(7);
+      if (cleanText.startsWith('```')) cleanText = cleanText.slice(3);
+      if (cleanText.endsWith('```')) cleanText = cleanText.slice(0, -3);
 
-      setScoutResults(accepted);
-      showToast(accepted.length === 1 ? '1 proposta pronta.' : `${accepted.length} proposte pronte.`);
+      const parsed = JSON.parse(cleanText.trim());
+      setScoutResults(parsed);
+      showToast('Proposte generate con successo.');
     } catch (err: any) {
       showToast(err?.message || 'Errore durante lo scouting.', 'error');
     } finally {
@@ -164,18 +147,8 @@ export default function CollezionePage() {
     }
   }
 
-  async function handleSaveScoutToRadar(item: any, idx: number) {
-    if (scoutSavingIdx !== null) return;
-    setScoutSavingIdx(idx);
+  async function handleSaveScoutToRadar(item: any) {
     try {
-      // Controllo finale: non aggiungere ciò che nel frattempo è già in archivio
-      if (filterNewProposals([item], profumi.map((p) => ({ brand: p.brand, nome: p.nome }))).kept.length === 0) {
-        showToast(`${item.nome} è già nel tuo archivio.`, 'error');
-        setScoutResults((prev) => prev.filter((x) => x !== item));
-        return;
-      }
-
-      const notes = [item.note_testa, item.note_cuore, item.note_fondo].filter(Boolean).join(', ');
       const payload = {
         brand: item.brand,
         nome: item.nome,
@@ -185,8 +158,7 @@ export default function CollezionePage() {
         note_testa: item.note_testa || null,
         note_cuore: item.note_cuore || null,
         note_fondo: item.note_fondo || null,
-        note_olfattive: notes || null,
-        url_foto_vetrina: null, // mai link di immagini suggeriti dall'AI: spesso inventati
+        url_foto_vetrina: item.url_foto_vetrina || null,
         stato: 'radar',
       };
 
@@ -194,12 +166,9 @@ export default function CollezionePage() {
       if (error) throw error;
 
       setProfumi((prev) => [...prev, data]);
-      setScoutResults((prev) => prev.filter((x) => x !== item));
       showToast(`${item.nome} aggiunto al Testing Radar.`);
     } catch (err: any) {
       showToast(err?.message || 'Errore salvataggio nel Radar.', 'error');
-    } finally {
-      setScoutSavingIdx(null);
     }
   }
 
@@ -232,11 +201,7 @@ export default function CollezionePage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-8">
-      <PageHeader
-        title={activeTab === 'radar' ? 'Testing Radar' : 'La mia Collezione'}
-        subtitle="VETRINA"
-        rightSlot={
-          <div className="flex items-center gap-2.5">
+      <PageHeader 'La 'Testing 'radar' : <div ? Collezione'} Radar' className="flex items-center gap-2.5" mia rightSlot="{" subtitle="VETRINA" title="{activeTab">
             <div
               style={{ borderColor: `${aura.primary}40` }}
               className="flex rounded-full bg-[#0E0A16] p-1 border"
@@ -283,12 +248,7 @@ export default function CollezionePage() {
               </button>
             </div>
 
-            <Link
-              href="/scanner"
-              title="Acquisisci"
-              style={{ backgroundColor: aura.primary }}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg"
-            >
+            <Link aura.primary backgroundColor: className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg" href="/scanner" style="{{" title="Acquisisci" }}>
               <Plus className="h-4 w-4 stroke-[2.5]"/>
             </Link>
           </div>
@@ -309,21 +269,23 @@ export default function CollezionePage() {
               style={{ borderColor: `${aura.primary}55` }}
               className="inline-flex items-center gap-2 rounded-md bg-[#161024] border px-3 py-1"
             >
-              <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
+              <Sparkles aura.primary className="h-4 w-4" color: style="{{" }}/>
               <span
                 style={{ color: aura.primary }}
                 className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
               >
-                Scouting Olfattivo
+                Consultant & Scouting AI
               </span>
             </div>
+            <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">
+              Ricerca Alta Profumeria
+            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            {/* Filtro Famiglia */}
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
-                Famiglia Olfattiva (Opzionale)
+                Famiglia Olfattiva
               </label>
               <select
                 value={scoutFamily}
@@ -338,10 +300,9 @@ export default function CollezionePage() {
               </select>
             </div>
 
-            {/* Note da includere con tasto + */}
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
-                Note da Includere (+ per aggiungere)
+                Note da Includere (+)
               </label>
               <div className="flex gap-2 mb-2">
                 <input
@@ -377,10 +338,9 @@ export default function CollezionePage() {
               )}
             </div>
 
-            {/* Note da escludere con tasto + */}
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
-                Note da Escludere (+ per aggiungere)
+                Note da Escludere (+்க)
               </label>
               <div className="flex gap-2 mb-2">
                 <input
@@ -426,7 +386,7 @@ export default function CollezionePage() {
               className="flex items-center gap-2 rounded-full px-6 py-3 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50 shadow-lg"
             >
               {scoutingLoading ? <RefreshCw className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4 fill-current"/>}
-              <span>{scoutingLoading ? 'Ricerca in corso...' : 'Cerca nuove creazioni'}</span>
+              <span>{scoutingLoading ? 'Ricerca in corso...' : 'Avvia Scouting AI'}</span>
             </button>
           </div>
 
@@ -434,7 +394,7 @@ export default function CollezionePage() {
           {scoutResults.length > 0 && (
             <div className="pt-6 border-t border-white/15 space-y-4">
               <h4 className="font-mono text-xs uppercase tracking-widest text-[#F6EFE4] font-bold">
-                Proposte per il tuo Radar
+                Risultati Scouting
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {scoutResults.map((item, idx) => (
@@ -444,7 +404,10 @@ export default function CollezionePage() {
                     className="flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-3 shadow-xl"
                   >
                     <div className="space-y-1">
-                      <p style={{ color: aura.primary }} className="font-mono text-[10px] uppercase tracking-wider truncate">
+                      <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 text-[#B8A9C9] border border-white/10">
+                        {item.categoria || 'Nicchia'}
+                      </span>
+                      <p style={{ color: aura.primary }} className="font-mono text-[10px] uppercase tracking-wider pt-1 truncate">
                         {item.brand}
                       </p>
                       <h5 className="font-serif text-base text-[#F6EFE4] leading-tight">
@@ -455,16 +418,25 @@ export default function CollezionePage() {
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleSaveScoutToRadar(item, idx)}
-                      disabled={scoutSavingIdx !== null}
-                      style={{ borderColor: `${aura.primary}60`, color: aura.primary }}
-                      className="w-full flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-4 py-2 text-xs font-bold transition hover:bg-white/5 disabled:opacity-50"
-                    >
-                      <Check className="h-3.5 w-3.5"/>
-                      <span>{scoutSavingIdx === idx ? 'Salvataggio...' : 'Aggiungi al Radar'}</span>
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProfumo(item as Profumo)}
+                        style={{ borderColor: `${aura.primary}40`, color: '#F6EFE4' }}
+                        className="flex-1 flex items-center justify-center gap-1 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-semibold transition hover:bg-white/5"
+                      >
+                        Anteprima
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveScoutToRadar(item)}
+                        style={{ borderColor: `${aura.primary}60`, color: aura.primary }}
+                        className="flex-1 flex items-center justify-center gap-1 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-bold transition hover:bg-white/5"
+                      >
+                        <Check className="h-3.5 w-3.5"/>
+                        <span>Radar</span>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -618,7 +590,7 @@ export default function CollezionePage() {
             style={{ borderColor: `${aura.primary}35` }}
             className="rounded-[28px] border bg-[#161024]/90 p-16 text-center space-y-3 shadow-xl"
           >
-            <Compass style={{ color: aura.primary }} className="h-10 w-10 mx-auto opacity-50" />
+            <Compass aura.primary className="h-10 w-10 mx-auto opacity-50" color: style="{{" }}/>
             <h2 className="font-serif text-2xl text-[#F6EFE4]">
               Nessuna creazione trovata
             </h2>
@@ -645,13 +617,7 @@ export default function CollezionePage() {
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
                         style={{ backgroundColor: pAura.primary }}
                       />
-                      <BottlePedestal
-                        src={imgUrl}
-                        alt={p.nome}
-                        size="lg"
-                        showSigil={false}
-                        className="relative z-10 !h-52 w-full"
-                      />
+                      <BottlePedestal alt="{p.nome}" className="relative z-10 !h-52 w-full" showSigil="{false}" size="lg" src="{imgUrl}"/>
                     </div>
                   </div>
 
@@ -684,10 +650,8 @@ export default function CollezionePage() {
         )}
       </section>
 
-      {/* SCHEDA DI DETTAGLIO CONDIVISA */}
-      <ProfumoDetailModal
-        profumo={selectedProfumo}
-        onClose={() => {
+      {/* SCHEDA DI DETTAGLIO CONDIVISA (CON ANTEPRIMA SCOUT) */}
+      <ProfumoDetailModal onClose="{()" profumo="{selectedProfumo}"> {
           setSelectedProfumo(null);
           setCustomAura(
             activeTab === 'radar'
