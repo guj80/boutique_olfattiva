@@ -231,11 +231,8 @@ export async function callOpenRouterFree(
   opts?: FallbackOptions
 ): Promise<AiResult | null> {
   const deadline = opts?.deadline ?? Date.now() + 15000;
-
-  // Intervento immediato su Groq come primo e vero fallback
   const groq = await callGroqDirect(prompt, systemInstruction, { ...opts, deadline });
   if (groq) return groq;
-
   return null;
 }
 
@@ -245,7 +242,7 @@ export async function callGeminiWithFallback(
 ): Promise<AiResult> {
   const deadline = options?.deadline ?? Date.now() + 25000;
   const left = () => deadline - Date.now();
-  const perAttemptCap = options?.timeoutMs ?? 5000; // Timeout ridotto a 5s per reattività
+  const perAttemptCap = options?.timeoutMs ?? 5000;
   const errors: string[] = [];
 
   const normalized = normalizeParts(parts);
@@ -308,7 +305,6 @@ export async function callGeminiWithFallback(
     if (first) return first;
   }
 
-  // Paracadute istantaneo su Groq se Gemini fallisce
   if (!hasImage && left() > 1500) {
     const promptText = normalized.map((p) => p.text || '').filter(Boolean).join('\n');
     const fb = await callGroqDirect(promptText, options?.systemInstruction, {
@@ -319,4 +315,80 @@ export async function callGeminiWithFallback(
   }
 
   throw new Error(`Nessun motore AI ha risposto (${errors.join(', ') || 'nessun tentativo'}).`);
+}
+
+/* ------------------------------------------------------------------ */
+/* Estrazione JSON tollerante (Esportata per /api/extract)            */
+/* ------------------------------------------------------------------ */
+
+function repairJson(s: string): string {
+  return s
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1');
+}
+
+function balancedObjects(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') {
+      inStr = true;
+    } else if (c === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === '}' && depth > 0) {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        out.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return out;
+}
+
+export function extractJsonFromAiText<T = any>(rawText: string): T {
+  if (!rawText || typeof rawText !== 'string') {
+    throw new Error('Risposta AI vuota.');
+  }
+
+  const cleaned = rawText
+    .replace(/^\uFEFF/, '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  try {
+    const direct = JSON.parse(cleaned);
+    if (direct && typeof direct === 'object') return direct as T;
+  } catch {}
+
+  let best: any = null;
+  let bestLen = -1;
+  for (const candidate of balancedObjects(cleaned)) {
+    for (const variant of [candidate, repairJson(candidate)]) {
+      try {
+        const obj = JSON.parse(variant);
+        if (obj && typeof obj === 'object' && !Array.isArray(obj) && candidate.length > bestLen) {
+          best = obj;
+          bestLen = candidate.length;
+        }
+        break;
+      } catch {}
+    }
+  }
+  if (best) return best as T;
+
+  throw new Error('Formato JSON non riconosciuto.');
 }
