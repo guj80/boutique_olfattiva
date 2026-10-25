@@ -41,7 +41,6 @@ export function computePodio(indossi: IndossoItem[]) {
 }
 
 export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoItem[]) {
-  // Esclude i profumi in stato 'radar' (mantiene solo la collezione)
   const collection = profumi.filter((p) => p.stato !== 'radar');
   if (collection.length === 0) return [];
 
@@ -51,7 +50,6 @@ export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoIt
   const month = new Date().getMonth();
   const isCold = month < 3 || month >= 10;
 
-  // Mappa ultimo indosso per ogni profumo
   const lastWornMap: Record<string, string> = {};
   indossi.forEach((item) => {
     if (!lastWornMap[item.profumo_id]) {
@@ -59,7 +57,6 @@ export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoIt
     }
   });
 
-  // Calcola un punteggio di affinità basato su dati reali
   const scored = collection.map((p) => {
     let score = 0;
     const reasons: string[] = [];
@@ -69,7 +66,7 @@ export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoIt
 
     if (!lastWorn) {
       score += 15;
-      reasons.append?.('Mai indossato di recente');
+      reasons.push('Mai indossato di recente');
     } else if (daysSinceLast > 30) {
       score += 10;
       reasons.push(`Non indossato da ${daysSinceLast} giorni`);
