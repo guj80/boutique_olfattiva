@@ -1,54 +1,102 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { CalendarHeart, Trash2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { CalendarHeart, Sparkles, Check, Trash2, Calendar, Sun, Moon, Sunrise, Sunset } from 'lucide-react';
+import { supabase, Profumo, Momento } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
-import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
-import { SmartBottleImage } from '@/components/BottleImage';
+import { BottlePedestal } from '@/components/BottleImage';
+import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
+import { useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
+import { useSpruzzo } from '@/components/Spruzzo';
+import { getLocalIsoDate } from '@/lib/home-logic';
 
 export default function DiarioPage() {
+  const [profumi, setProfumi] = useState<Profumo[]>([]);
   const [indossi, setIndossi] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const { aura, setCustomAura } = useAura();
+
+  // Modale Scheda Dettaglio Condivisa
+  const [selectedDetailProfumo, setSelectedDetailProfumo] = useState<Profumo | null>(null);
+
+  // Form Registrazione Rapida Indosso
+  const [selectedProfumoId, setSelectedProfumoId] = useState<string>('');
+  const [wearData, setWearData] = useState<string>(getLocalIsoDate());
+  const [wearMomento, setWearMomento] = useState<Momento>('Mattina');
+  const [wearOutfit, setWearOutfit] = useState('');
+  const [wearNote, setWearNote] = useState('');
+  const [savingWear, setSavingWear] = useState(false);
+
+  const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
+  const { triggerSpruzzo } = useSpruzzo();
 
   useEffect(() => {
-    setCustomAura(SECTION_THEMES.diario);
-    fetchDiario();
+    setCustomAura(SECTION_THEMES.diario || SECTION_THEMES.atelier);
+    fetchDiarioData();
   }, [setCustomAura]);
 
-  async function fetchDiario() {
+  async function fetchDiarioData() {
     setLoading(true);
     try {
-      const { data: indossiData, error: errIndossi } = await supabase
-        .from('indossi')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [profumiRes, indossiRes] = await Promise.all([
+        supabase.from('profumi').select('*').order('nome', { ascending: true }),
+        supabase.from('indossi').select('*').order('created_at', { ascending: false }),
+      ]);
 
-      if (errIndossi) throw errIndossi;
+      if (profumiRes.error) throw profumiRes.error;
+      if (indossiRes.error) throw indossiRes.error;
 
-      const { data: profumiData, error: errProfumi } = await supabase
-        .from('profumi')
-        .select('*');
+      const profumiList = (profumiRes.data || []) as Profumo[];
+      setProfumi(profumiList);
+      if (profumiList.length > 0 && !selectedProfumoId) {
+        setSelectedProfumoId(profumiList[0].id);
+      }
 
-      if (errProfumi) throw errProfumi;
-
-      const profumiMap = new Map((profumiData || []).map((p: any) => [p.id, p]));
-
-      const enriched = (indossiData || []).map((item: any) => ({
+      const profumiMap = new Map(profumiList.map((p) => [p.id, p]));
+      const enriched = (indossiRes.data || []).map((item: any) => ({
         ...item,
-        profumi: profumiMap.get(item.profumo_id) || null,
+        profumo: profumiMap.get(item.profumo_id) || null,
       }));
-
       setIndossi(enriched);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Errore caricamento diario:', err);
-      showToast('Impossibile caricare il diario.', 'error');
+      showToast('Impossibile caricare il diario olfattivo.', 'error');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSaveIndosso(e: React.FormEvent) {
+    e.preventDefault();
+    if (savingWear || !selectedProfumoId) return;
+
+    setSavingWear(true);
+    try {
+      const customDate = new Date(`${wearData}T12:00:00`);
+      const now = new Date();
+      customDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+
+      const { error } = await supabase.from('indossi').insert([
+        {
+          profumo_id: selectedProfumoId,
+          momento_giornata: wearMomento,
+          contesto_outfit: wearOutfit.trim() || null,
+          note_giorno: wearNote.trim() || null,
+          created_at: customDate.toISOString(),
+        },
+      ]);
+      if (error) throw error;
+
+      triggerSpruzzo();
+      showToast('Indosso registrato nel Diario.');
+      setWearOutfit('');
+      setWearNote('');
+      fetchDiarioData();
+    } catch (err: any) {
+      showToast(err?.message || 'Errore salvataggio indosso.', 'error');
+    } finally {
+      setSavingWear(false);
     }
   }
 
@@ -56,160 +104,333 @@ export default function DiarioPage() {
     try {
       const { error } = await supabase.from('indossi').delete().eq('id', id);
       if (error) throw error;
-      setIndossi((prev) => prev.filter((item) => item.id !== id));
-      setDeleteId(null);
-      showToast('Indosso eliminato dal diario.');
+      showToast('Indosso rimosso dal Diario.');
+      fetchDiarioData();
     } catch (err: any) {
       showToast(err?.message || "Errore durante l'eliminazione.", 'error');
     }
   }
 
+  // Statistiche analitiche calcolate sugli indossi
   const stats = useMemo(() => {
-    if (indossi.length === 0) return { topProfumo: '-', topMomento: '-' };
-
-    const profumiCount: Record<string, number> = {};
-    const momentiCount: Record<string, number> = {};
+    const familyCounts: Record<string, number> = {};
+    const momentoCounts: Record<string, number> = { Mattina: 0, Pomeriggio: 0, Sera: 0, Notte: 0 };
 
     indossi.forEach((item) => {
-      const pName = item.profumi?.nome || 'Sconosciuto';
-      profumiCount[pName] = (profumiCount[pName] || 0) + 1;
+      const fam = item.profumo?.famiglia_olfattiva || 'Altro';
+      familyCounts[fam] = (familyCounts[fam] || 0) + 1;
 
-      const mom = item.momento_giornata || item.momento || 'Mattina';
-      momentiCount[mom] = (momentiCount[mom] || 0) + 1;
+      const mom = item.momento_giornata || 'Mattina';
+      if (momentoCounts[mom] !== undefined) {
+        momentoCounts[mom]++;
+      }
     });
 
-    const topProfumo =
-      Object.entries(profumiCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
-    const topMomento =
-      Object.entries(momentiCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+    const total = indossi.length || 1;
+    const sortedFamilies = Object.entries(familyCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([fam, count]) => ({
+        famiglia: fam,
+        count,
+        percent: Math.round((count / total) * 100),
+      }));
 
-    return { topProfumo, topMomento };
+    return { sortedFamilies, momentoCounts, totalIndossi: indossi.length };
   }, [indossi]);
 
+  function getMomentoIcon(momento: string) {
+    switch (momento) {
+      case 'Mattina':
+        return <Sunrise className="h-4 w-4 text-amber-300" />;
+      case 'Pomeriggio':
+        return <Sun className="h-4 w-4 text-sky-300" />;
+      case 'Sera':
+        return <Sunset className="h-4 w-4 text-orange-400" />;
+      default:
+        return <Moon className="h-4 w-4 text-indigo-300" />;
+    }
+  }
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
+    <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-36 space-y-10">
       <PageHeader
         title="Diario Olfattivo"
-        subtitle="Registro"
-        rightSlot={
-          <div
-           style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
-            className="flex items-center gap-2 rounded-full border bg-[#140D1C] px-4 py-2 font-mono text-xs"
-          >
-            <CalendarHeart className="h-4 w-4" />
-            <span>{indossi.length} Indossi</span>
-          </div>
-        }
+        subtitle="REGISTRO"
       />
 
-      <section className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="rounded-[22px] border border-white/10 bg-[#1E1428]/90 p-5">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-            Flacone più indossato
-          </p>
-          <p className="font-serif text-2xl text-[#F6EFE4] mt-1 truncate">
-            {stats.topProfumo}
-          </p>
+      {/* 1. FORM DI REGISTRAZIONE RAPIDA IN EVIDENZA */}
+      <section
+        style={{ borderColor: `${aura.primary}50` }}
+        className="rounded-[26px] border bg-[#0E0A16] p-6 shadow-2xl space-y-5"
+      >
+        <div
+          style={{ borderColor: `${aura.primary}25` }}
+          className="flex items-center justify-between border-b pb-3"
+        >
+          <div className="flex items-center gap-2">
+            <CalendarHeart style={{ color: aura.primary }} className="h-4 w-4" />
+            <span
+              style={{ color: aura.primary }}
+              className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
+            >
+              Registra Nuovo Indosso
+            </span>
+          </div>
+          <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">
+            Scelta Rapida
+          </span>
         </div>
-        <div className="rounded-[22px] border border-white/10 bg-[#1E1428]/90 p-5">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-[#B8A9C9]">
-            Momento preferito
-          </p>
-          <p className="font-serif text-2xl text-[#F6EFE4] mt-1 truncate">
-            {stats.topMomento}
-          </p>
-        </div>
-      </section>
 
-      <section className="mt-6 rounded-[28px] border border-white/10 bg-[#1E1428]/90 p-5 sm:p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-[#F6EFE4]">
-          Striscia temporale recente
-        </h2>
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {indossi.slice(0, 14).map((item) => {
-            const pAura = item.profumi
-              ? resolveAura(item.profumi.famiglia_olfattiva, item.profumi.nome)
-              : null;
-            return (
-              <div
-                key={item.id}
-                title={`${item.profumi?.nome || ''} (${item.momento_giornata || item.momento || ''})`}
-                style={pAura ? { backgroundColor: pAura.primary } : undefined}
-                className="h-8 w-8 shrink-0 rounded-full border border-white/20 bg-[#281B35] shadow-sm transition hover:scale-110"
+        <form onSubmit={handleSaveIndosso} className="space-y-4 text-xs">
+          <div>
+            <label htmlFor="select-profumo" className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
+              Seleziona Fragranza
+            </label>
+            <select
+              id="select-profumo"
+              value={selectedProfumoId}
+              onChange={(e) => setSelectedProfumoId(e.target.value)}
+              style={{ borderColor: `${aura.primary}40` }}
+              className="w-full rounded-[14px] bg-[#161024] border p-3 text-sm text-[#F6EFE4] focus:outline-none"
+            >
+              {profumi.map((p) => (
+                <option key={p.id} value={p.id} className="bg-[#161024]">
+                  {p.brand} — {p.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="input-data" className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
+                Data
+              </label>
+              <input
+                id="input-data"
+                type="date"
+                value={wearData}
+                max={getLocalIsoDate()}
+                onChange={(e) => setWearData(e.target.value)}
+                style={{ borderColor: `${aura.primary}40` }}
+                className="w-full rounded-[14px] bg-[#161024] border p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
               />
-            );
-          })}
-          {indossi.length === 0 && (
-            <p className="text-xs text-[#B8A9C9]">
-              Nessun indosso registrato di recente.
-            </p>
-          )}
-        </div>
+            </div>
+            <div>
+              <label htmlFor="select-momento" className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
+                Momento della Giornata
+              </label>
+              <select
+                id="select-momento"
+                value={wearMomento}
+                onChange={(e) => setWearMomento(e.target.value as Momento)}
+                style={{ borderColor: `${aura.primary}40` }}
+                className="w-full rounded-[14px] bg-[#161024] border p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
+              >
+                <option value="Mattina">Mattina</option>
+                <option value="Pomeriggio">Pomeriggio</option>
+                <option value="Sera">Sera</option>
+                <option value="Notte">Notte</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="input-outfit" className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
+                Contesto o Outfit (facoltativo)
+              </label>
+              <input
+                id="input-outfit"
+                type="text"
+                value={wearOutfit}
+                onChange={(e) => setWearOutfit(e.target.value)}
+                placeholder="Es. Ufficio, Abito formale, Casual..."
+                style={{ borderColor: `${aura.primary}40` }}
+                className="w-full rounded-[14px] bg-[#161024] border p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="input-note" className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
+                Sensazioni / Note (facoltativo)
+              </label>
+              <input
+                id="input-note"
+                type="text"
+                value={wearNote}
+                onChange={(e) => setWearNote(e.target.value)}
+                placeholder="Durata, scia, evoluzione sulla pelle..."
+                style={{ borderColor: `${aura.primary}40` }}
+                className="w-full rounded-[14px] bg-[#161024] border p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={savingWear}
+              style={{ backgroundColor: aura.primary }}
+              className="flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50 shadow-lg"
+            >
+              <Check className="h-4 w-4" />
+              <span>{savingWear ? 'Salvataggio...' : 'Conferma Indosso'}</span>
+            </button>
+          </div>
+        </form>
       </section>
 
-      <section className="mt-6 space-y-3">
-        <h2 className="text-sm font-semibold text-[#F6EFE4] px-1">
-          Timeline Storica
-        </h2>
+      {/* 2. ANALITICHE E GRAFICI OLFATTIVI */}
+      {stats.totalIndossi > 0 && (
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* Ripartizione Famiglie Olfattive */}
+          <div
+            style={{ borderColor: `${aura.primary}40` }}
+            className="rounded-[24px] border bg-[#0E0A16] p-5 space-y-4 shadow-xl"
+          >
+            <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
+              <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
+              <h3 className="font-mono text-xs uppercase tracking-widest font-bold text-[#F6EFE4]">
+                Famiglie Olfattive Preferite
+              </h3>
+            </div>
+            <div className="space-y-3 pt-1">
+              {stats.sortedFamilies.map(({ famiglia, count, percent }) => (
+                <div key={famiglia} className="space-y-1">
+                  <div className="flex justify-between font-mono text-[11px]">
+                    <span className="text-[#F6EFE4]">{famiglia}</span>
+                    <span className="text-[#B8A9C9]">{count} indossi ({percent}%)</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[#161024] border border-white/10">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${percent}%`,
+                        backgroundColor: aura.primary,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Breakdown Momenti della Giornata */}
+          <div
+            style={{ borderColor: `${aura.primary}40` }}
+            className="rounded-[24px] border bg-[#0E0A16] p-5 space-y-4 shadow-xl"
+          >
+            <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
+              <Calendar style={{ color: aura.primary }} className="h-4 w-4" />
+              <h3 className="font-mono text-xs uppercase tracking-widest font-bold text-[#F6EFE4]">
+                Indossi per Momento
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              {Object.entries(stats.momentoCounts).map(([mom, count]) => (
+                <div
+                  key={mom}
+                  style={{ borderColor: `${aura.primary}30` }}
+                  className="flex flex-col items-center justify-center rounded-[18px] border bg-[#161024] p-4 text-center space-y-1"
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {getMomentoIcon(mom)}
+                    <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">{mom}</span>
+                  </div>
+                  <span className="font-serif text-2xl text-[#F6EFE4] font-bold">{count}</span>
+                  <span className="font-mono text-[9px] text-[#B8A9C9]">registrazioni</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 3. CRONOLOGIA DEL DIARIO (TIMELINE STORICA) */}
+      <section className="space-y-4">
+        <div
+          style={{ borderColor: `${aura.primary}55` }}
+          className="inline-block rounded-md bg-[#0E0A16] border px-3.5 py-1"
+        >
+          <h2
+            style={{ color: aura.primary }}
+            className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
+          >
+            Storico Indossi ({indossi.length})
+          </h2>
+        </div>
 
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="h-20 rounded-[20px] aura-skeleton" />
+              <div key={n} className="h-24 rounded-[20px] aura-skeleton" />
             ))}
           </div>
         ) : indossi.length === 0 ? (
-          <div className="rounded-[24px] border border-white/10 bg-[#1E1428]/90 p-12 text-center space-y-2">
-            <p className="font-serif text-xl text-[#F6EFE4]">Il diario è vuoto</p>
-            <p className="text-xs text-[#B8A9C9]">
-              Registra il tuo primo indosso dalla home o dalla collezione.
-            </p>
+          <div
+            style={{ borderColor: `${aura.primary}35` }}
+            className="rounded-[24px] border bg-[#0E0A16] p-12 text-center text-xs text-[#B8A9C9]"
+          >
+            Nessun indosso registrato nel diario. Usa il form sopra per iniziare.
           </div>
         ) : (
           <div className="space-y-3">
             {indossi.map((item) => {
-              const p = item.profumi;
-              const pAura = p
-                ? resolveAura(p.famiglia_olfattiva, p.nome)
-                : null;
-              const dateStr = new Date(item.created_at).toLocaleDateString(
-                'it-IT',
-                {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                }
-              );
+              const profumo = item.profumo;
+              if (!profumo) return null;
+              const dateStr = new Date(item.created_at).toLocaleDateString('it-IT', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              });
 
               return (
                 <div
                   key={item.id}
-                  style={pAura ? { borderColor: `${pAura.primary}44` } : undefined}
-                  className="flex items-center justify-between gap-4 rounded-[22px] border border-white/10 bg-[#1E1428]/90 p-4 transition hover:border-white/30"
+                  style={{ borderColor: `${aura.primary}35` }}
+                  className="group flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-[22px] border bg-[#0E0A16] p-4 transition hover:border-white/30 shadow-lg gap-4"
                 >
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[14px] bg-[#140D1C] p-1.5 flex items-center justify-center border border-white/10">
-                      <SmartBottleImage
-                        src={p?.url_foto_vetrina || p?.immagine_url}
-                        alt={p?.nome || 'Profumo'}
-                        iconSize="w-5 h-5"
-                        className="w-full h-full object-contain"
+                    <div
+                      onClick={() => {
+                        setSelectedDetailProfumo(profumo);
+                        setAuraFromProfumo(profumo);
+                      }}
+                      className="h-14 w-14 flex items-center justify-center shrink-0 cursor-pointer transition group-hover:scale-105"
+                    >
+                      <BottlePedestal
+                        src={profumo.url_foto_vetrina || profumo.immagine_url}
+                        alt={profumo.nome}
+                        bare={true}
+                        className="h-full w-full"
                       />
                     </div>
-                    <div className="min-w-0">
-                      <p
-                        style={{ color: pAura?.primary || aura.primary }}
-                        className="font-mono text-[10px] uppercase tracking-wider"
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">
+                          {dateStr}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#161024] border border-white/10 px-2.5 py-0.5 font-mono text-[9px] text-[#F6EFE4]">
+                          {getMomentoIcon(item.momento_giornata)}
+                          <span>{item.momento_giornata}</span>
+                        </span>
+                      </div>
+                      <h4
+                        onClick={() => {
+                          setSelectedDetailProfumo(profumo);
+                          setAuraFromProfumo(profumo);
+                        }}
+                        className="font-serif text-base text-[#F6EFE4] cursor-pointer hover:underline truncate"
                       >
-                        {dateStr} • {item.momento_giornata || item.momento || 'Sera'}{' '}
-                        {item.contesto_outfit ? `(${item.contesto_outfit})` : ''}
-                      </p>
-                      <h3 className="font-serif text-xl text-[#F6EFE4] truncate mt-0.5">
-                        {p?.nome || 'Fragranza rimossa'}
-                      </h3>
-                      {(item.note_giorno || item.note_personali) && (
-                        <p className="text-xs text-[#B8A9C9] truncate mt-0.5">
-                          &ldquo;{item.note_giorno || item.note_personali}&rdquo;
+                        {profumo.brand} — <span className="font-bold">{profumo.nome}</span>
+                      </h4>
+                      {(item.contesto_outfit || item.note_giorno) && (
+                        <p className="font-mono text-[11px] text-[#B8A9C9] truncate">
+                          {item.contesto_outfit && <span className="text-[#F6EFE4]">Outfit: {item.contesto_outfit}</span>}
+                          {item.contesto_outfit && item.note_giorno && ' • '}
+                          {item.note_giorno && <span>{item.note_giorno}</span>}
                         </p>
                       )}
                     </div>
@@ -217,9 +438,9 @@ export default function DiarioPage() {
 
                   <button
                     type="button"
-                    onClick={() => setDeleteId(item.id)}
+                    onClick={() => handleDeleteIndosso(item.id)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#161024] text-red-400 hover:bg-red-500/10 border border-white/10 transition shrink-0 self-end sm:self-center"
                     title="Elimina indosso"
-                    className="p-2 text-[#B8A9C9] hover:text-red-400 transition"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -230,34 +451,27 @@ export default function DiarioPage() {
         )}
       </section>
 
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140D1C]/80 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#1E1428] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
-            <h3 className="font-serif text-xl text-[#F6EFE4]">
-              Eliminare questo indosso?
-            </h3>
-            <p className="text-xs text-[#B8A9C9]">
-              L&apos;evento verrà rimosso dallo storico del tuo diario.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteId(null)}
-                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
-              >
-                Annulla
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteIndosso(deleteId)}
-                className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-red-500"
-              >
-                Conferma Eliminazione
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* SCHEDA DI DETTAGLIO CONDIVISA */}
+      <ProfumoDetailModal
+        profumo={selectedDetailProfumo}
+        onClose={() => {
+          setSelectedDetailProfumo(null);
+          setCustomAura(SECTION_THEMES.diario || SECTION_THEMES.atelier);
+        }}
+        onUpdated={(updated) => {
+          setSelectedDetailProfumo(updated);
+          setProfumi((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+          fetchDiarioData();
+        }}
+        onDeleted={(deletedId) => {
+          setProfumi((prev) => prev.filter((p) => p.id !== deletedId));
+          setSelectedDetailProfumo(null);
+          fetchDiarioData();
+        }}
+        onIndossoRegistered={() => {
+          fetchDiarioData();
+        }}
+      />
     </main>
   );
 }
