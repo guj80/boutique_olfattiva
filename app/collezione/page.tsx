@@ -12,7 +12,6 @@ import {
   Sparkles,
   RefreshCw,
   X,
-  Tag,
   Check,
 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
@@ -544,7 +543,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
                     selectedFamily === 'Tutte'
                       ? { backgroundColor: aura.primary }
                       : { borderColor: `${aura.primary}35` }
-                    }
+                  }
                   className={`rounded-full px-3 py-1 text-xs transition border ${
                     selectedFamily === 'Tutte'
                       ? 'text-[#08060C] font-bold border-transparent'
