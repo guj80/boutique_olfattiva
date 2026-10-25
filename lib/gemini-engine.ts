@@ -26,7 +26,7 @@ export interface AiResult {
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Sovrascrivibile da env: GEMINI_MODELS="gemini-2.5-flash,gemini-2.0-flash"
-const DEFAULT_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+const DEFAULT_MODELS = ['gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest'];
 
 const DEAD_MODEL_TTL_MS = 6 * 60 * 60 * 1000;
 const DEAD_KEY_TTL_MS = 10 * 60 * 1000;
