@@ -340,7 +340,7 @@ Nessun testo fuori dal JSON.`;
 
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
-                Note da Escludere (+்க)
+                Note da Escludere (+)
               </label>
               <div className="flex gap-2 mb-2">
                 <input
@@ -650,7 +650,7 @@ Nessun testo fuori dal JSON.`;
         )}
       </section>
 
-      {/* SCHEDA DI DETTAGLIO CONDIVISA (CON ANTEPRIMA SCOUT) */}
+      {/* SCHEDA DI DETTAGLIO CONDIVISA */}
       <ProfumoDetailModal onClose="{()" profumo="{selectedProfumo}"> {
           setSelectedProfumo(null);
           setCustomAura(
