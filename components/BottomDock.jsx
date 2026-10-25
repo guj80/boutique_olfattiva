@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Library, ScanLine, Compass } from 'lucide-react';
+import { Library, ScanLine, Compass, CalendarHeart } from 'lucide-react';
 import { useAura, SECTION_THEMES } from './AuraProvider';
 
 function BottomDockInner() {
@@ -22,12 +22,15 @@ function BottomDockInner() {
       ? 'collezione'
       : pathname.startsWith('/scanner')
       ? 'scanner'
+      : pathname.startsWith('/diario')
+      ? 'diario'
       : 'collezione';
 
   const items = [
     { key: 'collezione', label: 'Collezione', href: '/collezione', icon: Library, theme: SECTION_THEMES.collezione },
     { key: 'scanner', label: '', href: '/scanner', icon: ScanLine, center: true, theme: SECTION_THEMES.scanner },
     { key: 'radar', label: 'Radar', href: '/collezione?vista=radar', icon: Compass, theme: SECTION_THEMES.radar },
+    { key: 'diario', label: 'Diario', href: '/diario', icon: CalendarHeart, theme: SECTION_THEMES.diario },
   ];
 
   return (
