@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -18,6 +18,14 @@ import { supabase, Profumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { useAura, resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
+
+type CatalogHit = {
+  id: string | number;
+  name: string;
+  brand: string;
+  release_year?: number | string | null;
+  concentration?: string | null;
+};
 
 const PURE_FAMILIES = [
   'Agrumata',
@@ -53,8 +61,36 @@ export default function ScannerPage() {
   const [modelSource, setModelSource] = useState<string>('');
   const [targetStato, setTargetStato] = useState<'collezione' | 'radar'>('collezione');
 
+  const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
+  const [showSuggest, setShowSuggest] = useState(false);
+
   const { aura, setCustomAura } = useAura();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    const q = inputName.trim();
+    if (mode !== 'name' || q.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/catalogo?q=${encodeURIComponent(q)}`, {
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setSuggestions(Array.isArray(data.results) ? data.results : []);
+      } catch {
+        // richiesta annullata o rete assente: nessun suggerimento
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [inputName, mode]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -139,7 +175,7 @@ export default function ScannerPage() {
       const extractedDraft: Partial<Profumo> = {
         nome: data.nome || '',
         brand: data.brand || '',
-        concentrazione: data.concentrazione || 'Extrait de Parfum',
+        concentrazione: data.concentrazione || '',
         famiglia_olfattiva: data.famiglia_olfattiva || 'Legnosa',
         naso: data.naso || '',
         note_testa: data.note_testa || '',
@@ -147,7 +183,7 @@ export default function ScannerPage() {
         note_fondo: data.note_fondo || '',
         note_olfattive: data.note_olfattive || '',
         descrizione_ai: '',
-        prezzo_stimato_euro: data.prezzo_stimato_euro || '€150',
+        prezzo_stimato_euro: data.prezzo_stimato_euro || '',
         formato_ml: Number(data.formato_ml) || 100,
         stagione_ideale: data.stagione_ideale || '',
         occasione_ideale: data.occasione_ideale || '',
@@ -163,7 +199,11 @@ export default function ScannerPage() {
       setModelSource(data._modelUsed || 'neural-engine');
       setDraft(extractedDraft);
       setCustomAura(resolveAura(extractedDraft.famiglia_olfattiva, extractedDraft.nome));
-      showToast('Scheda tecnica acquisita.');
+      showToast(
+        data._affidabilita === 'bassa'
+          ? 'Scheda acquisita con dati incerti: verifica prima di salvare.'
+          : 'Scheda tecnica acquisita.'
+      );
     } catch (err: any) {
       showToast(err?.message || "Impossibile completare l'estrazione.", 'error');
     } finally {
@@ -189,7 +229,7 @@ export default function ScannerPage() {
       const fullPayload: Record<string, any> = {
         nome: draft.nome.trim(),
         brand: draft.brand.trim(),
-        concentrazione: draft.concentrazione || 'Extrait de Parfum',
+        concentrazione: draft.concentrazione || '',
         famiglia_olfattiva: draft.famiglia_olfattiva || 'Legnosa',
         naso: draft.naso && draft.naso.trim() ? draft.naso.trim() : null,
         note_testa: draft.note_testa || '',
@@ -197,7 +237,7 @@ export default function ScannerPage() {
         note_fondo: draft.note_fondo || '',
         note_olfattive: unifiedNotes,
         descrizione_ai: '',
-        prezzo_stimato_euro: draft.prezzo_stimato_euro || '€150',
+        prezzo_stimato_euro: draft.prezzo_stimato_euro || '',
         formato_ml: Number(draft.formato_ml) || 100,
         stagione_ideale: draft.stagione_ideale || '',
         occasione_ideale: draft.occasione_ideale || '',
@@ -301,13 +341,47 @@ export default function ScannerPage() {
               Maison e Nome della Creazione
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="text"
-                value={inputName}
-                onChange={(e) => setInputName(e.target.value)}
-                placeholder="Es. Ex Nihilo Blue Talisman, Xerjoff Naxos..."
-                className="flex-1 rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:border-white/30 focus:outline-none"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={inputName}
+                  onChange={(e) => {
+                    setInputName(e.target.value);
+                    setShowSuggest(true);
+                  }}
+                  onFocus={() => setShowSuggest(true)}
+                  onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+                  autoComplete="off"
+                  placeholder="Es. Ex Nihilo Blue Talisman, Xerjoff Naxos..."
+                  className="w-full rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:border-white/30 focus:outline-none"
+                />
+                {showSuggest && suggestions.length > 0 && (
+                  <ul className="absolute left-0 right-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-[16px] border border-white/10 bg-[#140D1C] shadow-2xl">
+                    {suggestions.map((s) => (
+                      <li key={s.id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setInputName(`${s.brand} ${s.name}`);
+                            setSuggestions([]);
+                            setShowSuggest(false);
+                          }}
+                          className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-white/5"
+                        >
+                          <span className="min-w-0 truncate text-sm text-[#F6EFE4]">
+                            {s.name}
+                            <span className="text-[#B8A9C9]"> — {s.brand}</span>
+                          </span>
+                          <span className="shrink-0 font-mono text-[10px] text-[#B8A9C9]">
+                            {s.release_year || ''}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={extracting || !inputName.trim()}
