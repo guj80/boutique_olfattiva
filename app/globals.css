@@ -2,9 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  background-color: #060607;
-  color: #EDE9E0;
+/* Blocca lo sfondo nero assoluto ed evita qualsiasi flash bianco nativo */
+html, body {
+  background-color: #050308 !important;
+  color: #F6EFE4;
+  color-scheme: dark;
 }
 
 body {
