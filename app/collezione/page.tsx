@@ -12,6 +12,7 @@ import {
   Sparkles,
   RefreshCw,
   Check,
+  Eye,
 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
@@ -45,27 +46,27 @@ export default function CollezionePage() {
   const searchParams = useSearchParams();
   const vistaParam = searchParams.get('vista');
 
-  const [activeTab, setActiveTab] = useState<'collezione' | 'radar'>(
+  const [activeTab, setActiveTab] = useState(
     vistaParam === 'radar' ? 'radar' : 'collezione'
   );
-  const [profumi, setProfumi] = useState<Profumo[]>([]);
+  const [profumi, setProfumi] = useState([] as Profumo[]);
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFamily, setSelectedFamily] = useState<string>('Tutte');
-  const [selectedBrand, setSelectedBrand] = useState<string>('Tutti');
+  const [selectedFamily, setSelectedFamily] = useState('Tutte');
+  const [selectedBrand, setSelectedBrand] = useState('Tutti');
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   // Stati per il Consultant di Scouting (Radar)
-  const [scoutFamily, setScoutFamily] = useState<string>('Qualsiasi');
-  const [includeNotes, setIncludeNotes] = useState<string[]>([]);
+  const [scoutFamily, setScoutFamily] = useState('Qualsiasi');
+  const [includeNotes, setIncludeNotes] = useState([] as string[]);
   const [currentIncludeInput, setCurrentIncludeInput] = useState('');
-  const [excludeNotes, setExcludeNotes] = useState<string[]>([]);
+  const [excludeNotes, setExcludeNotes] = useState([] as string[]);
   const [currentExcludeInput, setCurrentExcludeInput] = useState('');
-  const [scoutResults, setScoutResults] = useState<any[]>([]);
+  const [scoutResults, setScoutResults] = useState([] as any[]);
   const [scoutingLoading, setScoutingLoading] = useState(false);
 
-  const [selectedProfumo, setSelectedProfumo] = useState<Profumo null |>(null);
+  const [selectedProfumo, setSelectedProfumo] = useState(null as Profumo | null);
 
   const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
@@ -88,7 +89,7 @@ export default function CollezionePage() {
         .select('*')
         .order('nome', { ascending: true });
       if (error) throw error;
-      setProfumi(data || []);
+      setProfumi((data || []) as Profumo[]);
     } catch {
       showToast('Impossibile caricare la collezione.', 'error');
     } finally {
@@ -97,17 +98,19 @@ export default function CollezionePage() {
   }
 
   function handleAddIncludeNote() {
-    if (!currentIncludeInput.trim()) return;
-    if (!includeNotes.includes(currentIncludeInput.trim())) {
-      setIncludeNotes([...includeNotes, currentIncludeInput.trim()]);
+    const val = currentIncludeInput.trim();
+    if (!val) return;
+    if (!includeNotes.includes(val)) {
+      setIncludeNotes([...includeNotes, val]);
     }
     setCurrentIncludeInput('');
   }
 
   function handleAddExcludeNote() {
-    if (!currentExcludeInput.trim()) return;
-    if (!excludeNotes.includes(currentExcludeInput.trim())) {
-      setExcludeNotes([...excludeNotes, currentExcludeInput.trim()]);
+    const val = currentExcludeInput.trim();
+    if (!val) return;
+    if (!excludeNotes.includes(val)) {
+      setExcludeNotes([...excludeNotes, val]);
     }
     setCurrentExcludeInput('');
   }
@@ -123,7 +126,7 @@ export default function CollezionePage() {
       );
       const filtered = filterNewProposals(proposals, ownedNames);
       setScoutResults(filtered);
-      showToast('Proposte generate con successo.');
+      showToast('Ricerca completata con successo.');
     } catch (err: any) {
       showToast(err?.message || 'Errore durante lo scouting.', 'error');
     } finally {
@@ -146,14 +149,40 @@ export default function CollezionePage() {
         stato: 'radar',
       };
 
-      const { data, error } = await supabase.from('profumi').insert([payload]).select().single();
+      const { data, error } = await supabase
+        .from('profumi')
+        .insert([payload])
+        .select()
+        .single();
       if (error) throw error;
 
-      setProfumi((prev) => [...prev, data]);
+      setProfumi((prev) => [...prev, data as Profumo]);
+      setScoutResults((prev) =>
+        prev.filter((r) => r.nome !== item.nome || r.brand !== item.brand)
+      );
       showToast(`${item.nome} aggiunto al Testing Radar.`);
     } catch (err: any) {
       showToast(err?.message || 'Errore salvataggio nel Radar.', 'error');
     }
+  }
+
+  function handlePreviewScoutItem(item: any) {
+    const tempProfumo = {
+      id: `preview-${Date.now()}`,
+      brand: item.brand || 'Maison',
+      nome: item.nome || 'Creazione',
+      concentrazione: item.concentrazione || 'Eau de Parfum',
+      famiglia_olfattiva: item.famiglia_olfattiva || 'Ambrata',
+      naso: item.naso || null,
+      note_testa: item.note_testa || null,
+      note_cuore: item.note_cuore || null,
+      note_fondo: item.note_fondo || null,
+      url_foto_vetrina: item.url_foto_vetrina || null,
+      stato: 'radar',
+    } as unknown as Profumo;
+
+    setSelectedProfumo(tempProfumo);
+    setAuraFromProfumo(tempProfumo);
   }
 
   const brands = useMemo(() => {
@@ -163,7 +192,8 @@ export default function CollezionePage() {
 
   const filteredProfumi = useMemo(() => {
     return profumi.filter((p) => {
-      const matchTab = activeTab === 'radar' ? isRadarProfumo(p) : isCollezioneProfumo(p);
+      const matchTab =
+        activeTab === 'radar' ? isRadarProfumo(p) : isCollezioneProfumo(p);
       if (!matchTab) return false;
 
       const q = searchQuery.toLowerCase();
@@ -173,7 +203,8 @@ export default function CollezionePage() {
 
       const matchSearch =
         !q || nomeSafe.includes(q) || brandSafe.includes(q) || noteSafe.includes(q);
-      const matchFamily = selectedFamily === 'Tutte' || p.famiglia_olfattiva === selectedFamily;
+      const matchFamily =
+        selectedFamily === 'Tutte' || p.famiglia_olfattiva === selectedFamily;
       const matchBrand = selectedBrand === 'Tutti' || p.brand === selectedBrand;
 
       return matchSearch && matchFamily && matchBrand;
@@ -183,63 +214,83 @@ export default function CollezionePage() {
   const activeFiltersCount =
     (selectedFamily !== 'Tutte' ? 1 : 0) + (selectedBrand !== 'Tutti' ? 1 : 0);
 
+  const pageTitle = activeTab === 'radar' ? 'Testing Radar' : 'La mia Collezione';
+
+  const headerRightActions = (
+    <div className="flex items-center gap-2.5">
+      <div
+        style={{ borderColor: `${aura.primary}40` }}
+        className="flex rounded-full bg-[#0E0A16] p-1 border"
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('collezione');
+            setCustomAura(SECTION_THEMES.collezione);
+            router.push('/collezione');
+          }}
+          style={
+            activeTab === 'collezione'
+              ? { backgroundColor: SECTION_THEMES.collezione.primary }
+              : undefined
+          }
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            activeTab === 'collezione'
+              ? 'text-[#08060C] font-bold'
+              : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+          }`}
+        >
+          {React.createElement(Library, { className: 'h-3.5 w-3.5' })}
+          <span className="hidden sm:inline">Collezione</span> (
+          {profumi.filter(isCollezioneProfumo).length})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('radar');
+            setCustomAura(SECTION_THEMES.radar);
+            router.push('/collezione?vista=radar');
+          }}
+          style={
+            activeTab === 'radar'
+              ? { backgroundColor: SECTION_THEMES.radar.primary }
+              : undefined
+          }
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            activeTab === 'radar'
+              ? 'text-[#08060C] font-bold'
+              : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
+          }`}
+        >
+          {React.createElement(Compass, { className: 'h-3.5 w-3.5' })}
+          <span className="hidden sm:inline">Radar</span> (
+          {profumi.filter(isRadarProfumo).length})
+        </button>
+      </div>
+
+      {React.createElement(
+        Link,
+        {
+          href: '/scanner',
+          title: 'Acquisisci',
+          style: { backgroundColor: aura.primary },
+          className:
+            'flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg',
+        },
+        React.createElement(Plus, { className: 'h-4 w-4 stroke-[2.5]' })
+      )}
+    </div>
+  );
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-8">
-      <PageHeader 'La 'Testing 'radar' : <div ? Collezione'} Radar' className="flex items-center gap-2.5" mia rightSlot="{" subtitle="VETRINA" title="{activeTab">
-            <div
-              style={{ borderColor: `${aura.primary}40` }}
-              className="flex rounded-full bg-[#0E0A16] p-1 border"
-            >
-              <button
-                onClick={() => {
-                  setActiveTab('collezione');
-                  setCustomAura(SECTION_THEMES.collezione);
-                  router.push('/collezione');
-                }}
-                style={
-                  activeTab === 'collezione'
-                    ? { backgroundColor: SECTION_THEMES.collezione.primary }
-                    : undefined
-                }
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  activeTab === 'collezione'
-                    ? 'text-[#08060C] font-bold'
-                    : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
-                }`}
-              >
-                <Library className="h-3.5 w-3.5"/>
-                <span className="hidden sm:inline">Collezione</span> ({profumi.filter(isCollezioneProfumo).length})
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('radar');
-                  setCustomAura(SECTION_THEMES.radar);
-                  router.push('/collezione?vista=radar');
-                }}
-                style={
-                  activeTab === 'radar'
-                    ? { backgroundColor: SECTION_THEMES.radar.primary }
-                    : undefined
-                }
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  activeTab === 'radar'
-                    ? 'text-[#08060C] font-bold'
-                    : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
-                }`}
-              >
-                <Compass className="h-3.5 w-3.5"/>
-                <span className="hidden sm:inline">Radar</span> ({profumi.filter(isRadarProfumo).length})
-              </button>
-            </div>
+      {React.createElement(PageHeader, {
+        title: pageTitle,
+        subtitle: 'VETRINA',
+        rightSlot: headerRightActions,
+      })}
 
-            <Link aura.primary backgroundColor: className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg" href="/scanner" style="{{" title="Acquisisci" }}>
-              <Plus className="h-4 w-4 stroke-[2.5]"/>
-            </Link>
-          </div>
-        }
-      />
-
-      {/* SEZIONE SPECIALE: CONSULTANT DI SCOUTING NEL RADAR */}
+      {/* SEZIONE SPECIALE: RICERCA OLFATTIVA AI NEL RADAR */}
       {activeTab === 'radar' && (
         <section
           style={{ borderColor: `${aura.primary}50` }}
@@ -253,17 +304,17 @@ export default function CollezionePage() {
               style={{ borderColor: `${aura.primary}55` }}
               className="inline-flex items-center gap-2 rounded-md bg-[#161024] border px-3 py-1"
             >
-              <Sparkles aura.primary className="h-4 w-4" color: style="{{" }}/>
+              {React.createElement(Sparkles, {
+                style: { color: aura.primary },
+                className: 'h-4 w-4',
+              })}
               <span
                 style={{ color: aura.primary }}
                 className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
               >
-                Consultant & Scouting AI
+                Ricerca Olfattiva AI
               </span>
             </div>
-            <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">
-              Ricerca Alta Profumeria
-            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
@@ -279,21 +330,28 @@ export default function CollezionePage() {
               >
                 <option value="Qualsiasi">Qualsiasi Famiglia</option>
                 {PURE_FAMILIES.map((fam) => (
-                  <option key={fam} value={fam}>{fam}</option>
+                  <option key={fam} value={fam}>
+                    {fam}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
-                Note da Includere (+)
+                Note da Includere
               </label>
               <div className="flex gap-2 mb-2">
                 <input
                   type="text"
                   value={currentIncludeInput}
                   onChange={(e) => setCurrentIncludeInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddIncludeNote(); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddIncludeNote();
+                    }
+                  }}
                   placeholder="Es. Iris, Cuoio..."
                   style={{ borderColor: `${aura.primary}40` }}
                   className="flex-1 rounded-[14px] bg-[#161024] border p-2.5 text-[#F6EFE4] placeholder:text-[#B8A9C9]/40 focus:outline-none"
@@ -302,7 +360,7 @@ export default function CollezionePage() {
                   type="button"
                   onClick={handleAddIncludeNote}
                   style={{ backgroundColor: aura.primary }}
-                  className="px-3 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
+                  className="px-3.5 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
                 >
                   +
                 </button>
@@ -312,10 +370,19 @@ export default function CollezionePage() {
                   {includeNotes.map((note, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 rounded-full bg-[#161024] border border-white/15 px-2.5 py-0.5 font-mono text-[10px] text-emerald-300"
+                      style={{ borderColor: `${aura.primary}40` }}
+                      className="inline-flex items-center gap-1 rounded-full bg-[#161024] border px-2.5 py-0.5 font-mono text-[10px] text-emerald-300"
                     >
                       {note}
-                      <button onClick={() => setIncludeNotes(includeNotes.filter((_, i) => i !== idx))} className="hover:text-white">×</button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setIncludeNotes(includeNotes.filter((_, i) => i !== idx))
+                        }
+                        className="hover:text-white"
+                      >
+                        ×
+                      </button>
                     </span>
                   ))}
                 </div>
@@ -324,14 +391,19 @@ export default function CollezionePage() {
 
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
-                Note da Escludere (+)
+                Note da Escludere
               </label>
               <div className="flex gap-2 mb-2">
                 <input
                   type="text"
                   value={currentExcludeInput}
                   onChange={(e) => setCurrentExcludeInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddExcludeNote(); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddExcludeNote();
+                    }
+                  }}
                   placeholder="Es. Vaniglia, Muschio..."
                   style={{ borderColor: `${aura.primary}40` }}
                   className="flex-1 rounded-[14px] bg-[#161024] border p-2.5 text-[#F6EFE4] placeholder:text-[#B8A9C9]/40 focus:outline-none"
@@ -340,7 +412,7 @@ export default function CollezionePage() {
                   type="button"
                   onClick={handleAddExcludeNote}
                   style={{ backgroundColor: aura.primary }}
-                  className="px-3 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
+                  className="px-3.5 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
                 >
                   +
                 </button>
@@ -350,10 +422,19 @@ export default function CollezionePage() {
                   {excludeNotes.map((note, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 rounded-full bg-[#161024] border border-white/15 px-2.5 py-0.5 font-mono text-[10px] text-red-300"
+                      style={{ borderColor: `${aura.primary}40` }}
+                      className="inline-flex items-center gap-1 rounded-full bg-[#161024] border px-2.5 py-0.5 font-mono text-[10px] text-red-300"
                     >
                       {note}
-                      <button onClick={() => setExcludeNotes(excludeNotes.filter((_, i) => i !== idx))} className="hover:text-white">×</button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExcludeNotes(excludeNotes.filter((_, i) => i !== idx))
+                        }
+                        className="hover:text-white"
+                      >
+                        ×
+                      </button>
                     </span>
                   ))}
                 </div>
@@ -369,32 +450,46 @@ export default function CollezionePage() {
               style={{ backgroundColor: aura.primary }}
               className="flex items-center gap-2 rounded-full px-6 py-3 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50 shadow-lg"
             >
-              {scoutingLoading ? <RefreshCw className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4 fill-current"/>}
-              <span>{scoutingLoading ? 'Ricerca in corso...' : 'Avvia Scouting AI'}</span>
+              {scoutingLoading
+                ? React.createElement(RefreshCw, { className: 'h-4 w-4 animate-spin' })
+                : React.createElement(Sparkles, { className: 'h-4 w-4 fill-current' })}
+              <span>{scoutingLoading ? 'Ricerca in corso...' : 'Avvia Ricerca'}</span>
             </button>
           </div>
 
           {/* Risultati Scouting */}
           {scoutResults.length > 0 && (
-            <div className="pt-6 border-t border-white/15 space-y-4">
+            <div
+              style={{ borderColor: `${aura.primary}25` }}
+              className="pt-6 border-t space-y-4"
+            >
               <h4 className="font-mono text-xs uppercase tracking-widest text-[#F6EFE4] font-bold">
-                Risultati Scouting
+                Proposte Selezionate
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {scoutResults.map((item, idx) => (
                   <div
                     key={idx}
                     style={{ borderColor: `${aura.primary}45` }}
-                    className="flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-3 shadow-xl"
+                    className="flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-4 shadow-xl"
                   >
-                    <div className="space-y-1">
-                      <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 text-[#B8A9C9] border border-white/10">
+                    <div
+                      onClick={() => handlePreviewScoutItem(item)}
+                      className="space-y-1 cursor-pointer group"
+                    >
+                      <span
+                        style={{ borderColor: `${aura.primary}35` }}
+                        className="inline-block font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E0A16] text-[#B8A9C9] border"
+                      >
                         {item.categoria || 'Nicchia'}
                       </span>
-                      <p style={{ color: aura.primary }} className="font-mono text-[10px] uppercase tracking-wider pt-1 truncate">
+                      <p
+                        style={{ color: aura.primary }}
+                        className="font-mono text-[10px] uppercase tracking-wider pt-1 truncate"
+                      >
                         {item.brand}
                       </p>
-                      <h5 className="font-serif text-base text-[#F6EFE4] leading-tight">
+                      <h5 className="font-serif text-base text-[#F6EFE4] leading-tight group-hover:underline">
                         {item.nome}
                       </h5>
                       <p className="font-mono text-[10px] text-[#B8A9C9]">
@@ -402,23 +497,27 @@ export default function CollezionePage() {
                       </p>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={() => setSelectedProfumo(item as Profumo)}
-                        style={{ borderColor: `${aura.primary}40`, color: '#F6EFE4' }}
-                        className="flex-1 flex items-center justify-center gap-1 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-semibold transition hover:bg-white/5"
+                        onClick={() => handlePreviewScoutItem(item)}
+                        style={{ borderColor: `${aura.primary}40` }}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:opacity-85"
                       >
-                        Anteprima
+                        {React.createElement(Eye, { className: 'h-3.5 w-3.5' })}
+                        <span>Scheda</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSaveScoutToRadar(item)}
-                        style={{ borderColor: `${aura.primary}60`, color: aura.primary }}
-                        className="flex-1 flex items-center justify-center gap-1 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-bold transition hover:bg-white/5"
+                        style={{
+                          borderColor: `${aura.primary}60`,
+                          color: aura.primary,
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-bold transition hover:opacity-85"
                       >
-                        <Check className="h-3.5 w-3.5"/>
-                        <span>Radar</span>
+                        {React.createElement(Check, { className: 'h-3.5 w-3.5' })}
+                        <span>Salva</span>
                       </button>
                     </div>
                   </div>
@@ -432,7 +531,9 @@ export default function CollezionePage() {
       {/* RICERCA E FILTRI */}
       <section className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]"/>
+          {React.createElement(Search, {
+            className: 'absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]',
+          })}
           <input
             type="text"
             value={searchQuery}
@@ -443,6 +544,7 @@ export default function CollezionePage() {
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#B8A9C9] hover:text-white"
             >
@@ -461,7 +563,7 @@ export default function CollezionePage() {
           }
           className="flex items-center gap-2.5 rounded-[18px] border bg-[#161024]/90 px-5 py-3 text-xs font-semibold text-[#F6EFE4] transition"
         >
-          <SlidersHorizontal className="h-4 w-4"/>
+          {React.createElement(SlidersHorizontal, { className: 'h-4 w-4' })}
           <span>Filtri {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}</span>
         </button>
       </section>
@@ -482,6 +584,7 @@ export default function CollezionePage() {
               Filtra per Maison e Famiglia Olfattiva
             </h3>
             <button
+              type="button"
               onClick={() => {
                 setSelectedFamily('Tutte');
                 setSelectedBrand('Tutti');
@@ -499,6 +602,7 @@ export default function CollezionePage() {
                 {brands.map((b) => (
                   <button
                     key={b}
+                    type="button"
                     onClick={() => setSelectedBrand(b)}
                     style={
                       selectedBrand === b
@@ -523,6 +627,7 @@ export default function CollezionePage() {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <button
+                  type="button"
                   onClick={() => setSelectedFamily('Tutte')}
                   style={
                     selectedFamily === 'Tutte'
@@ -540,6 +645,7 @@ export default function CollezionePage() {
                 {PURE_FAMILIES.map((f) => (
                   <button
                     key={f}
+                    type="button"
                     onClick={() => setSelectedFamily(f)}
                     style={
                       selectedFamily === f
@@ -574,7 +680,10 @@ export default function CollezionePage() {
             style={{ borderColor: `${aura.primary}35` }}
             className="rounded-[28px] border bg-[#161024]/90 p-16 text-center space-y-3 shadow-xl"
           >
-            <Compass aura.primary className="h-10 w-10 mx-auto opacity-50" color: style="{{" }}/>
+            {React.createElement(Compass, {
+              style: { color: aura.primary },
+              className: 'h-10 w-10 mx-auto opacity-50',
+            })}
             <h2 className="font-serif text-2xl text-[#F6EFE4]">
               Nessuna creazione trovata
             </h2>
@@ -601,7 +710,13 @@ export default function CollezionePage() {
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
                         style={{ backgroundColor: pAura.primary }}
                       />
-                      <BottlePedestal alt="{p.nome}" className="relative z-10 !h-52 w-full" showSigil="{false}" size="lg" src="{imgUrl}"/>
+                      {React.createElement(BottlePedestal, {
+                        src: imgUrl,
+                        alt: p.nome,
+                        size: 'lg',
+                        showSigil: false,
+                        className: 'relative z-10 !h-52 w-full',
+                      })}
                     </div>
                   </div>
 
@@ -635,23 +750,25 @@ export default function CollezionePage() {
       </section>
 
       {/* SCHEDA DI DETTAGLIO CONDIVISA */}
-      <ProfumoDetailModal onClose="{()" profumo="{selectedProfumo}"> {
+      {React.createElement(ProfumoDetailModal, {
+        profumo: selectedProfumo,
+        onClose: () => {
           setSelectedProfumo(null);
           setCustomAura(
-            activeTab === 'radar'
-              ? SECTION_THEMES.radar
-              : SECTION_THEMES.collezione
+            activeTab === 'radar' ? SECTION_THEMES.radar : SECTION_THEMES.collezione
           );
-        }}
-        onUpdated={(updated) => {
+        },
+        onUpdated: (updated: Profumo) => {
           setSelectedProfumo(updated);
-          setProfumi((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-        }}
-        onDeleted={(deletedId) => {
+          setProfumi((prev) =>
+            prev.map((item) => (item.id === updated.id ? updated : item))
+          );
+        },
+        onDeleted: (deletedId: string) => {
           setProfumi((prev) => prev.filter((p) => p.id !== deletedId));
           setSelectedProfumo(null);
-        }}
-      />
+        },
+      })}
     </main>
   );
 }
