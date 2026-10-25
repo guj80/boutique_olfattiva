@@ -41,11 +41,20 @@ export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
   const { aura } = useAura();
 
   return (
-    <header className="flex items-center justify-between border-b border-white/10 pb-5">
+    <header
+      style={{ borderColor: `${aura.primary}30` }}
+      className="flex items-center justify-between border-b pb-5"
+    >
       <div className="flex items-center gap-3.5">
         <Logo size="md" />
         <div className="space-y-1">
-          <div className="inline-block rounded-md bg-[#0E0A16] border border-white/15 px-2.5 py-0.5 shadow-sm">
+          <div
+            style={{
+              borderColor: `${aura.primary}55`,
+              backgroundColor: '#0E0A16',
+            }}
+            className="inline-block rounded-md border px-2.5 py-0.5 shadow-sm"
+          >
             <span
               style={{ color: aura.primary }}
               className="font-mono text-[10px] uppercase tracking-[0.22em] font-bold block"
