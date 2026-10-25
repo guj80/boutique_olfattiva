@@ -4,56 +4,90 @@ export interface ScoutFilters {
   excludeNotes: string[];
 }
 
-export function buildScoutPrompt(filters: ScoutFilters, ownedNames: string[] = []) {
-  const { scoutFamily, includeNotes, excludeNotes } = filters;
-  return `Sei un esperto internazionale di alta profumeria, profumeria artistica indipendente e case di nicchia storiche e prestigiose.
-REGOLE TASSATIVE:
-- Escludi rigorosamente qualsiasi clone, dupe, imitazione economica o profumo arabo di massa.
-- Escludi tassativamente qualsiasi profumo già presente in questa lista di proprietà dell'utente: [${ownedNames.join(', ')}].
-- Restituisci ESATTAMENTE 3 creazioni distinte: 1 Designer di alto profilo, 1 Artistico indipendente e 1 di Nicchia prestigiosa.
-Criteri di ricerca:
-- Famiglia olfattiva: ${scoutFamily}
-- Note da includere: ${includeNotes.length > 0 ? includeNotes.join(', ') : 'Nessuna specifica'}
-- Note da escludere: ${excludeNotes.length > 0 ? excludeNotes.join(', ') : 'Nessuna specifica'}
-
-Restituisci un array JSON puro contenente esattamente 3 oggetti con questi campi esatti:
-brand, nome, concentrazione, famiglia_olfattiva, naso, note_testa, note_cuore, note_fondo, categoria ("Designer", "Artistico", "Nicchia").
-Nessun testo fuori dal JSON.`;
+export function ownedListForPrompt(profumi: any[]): string[] {
+  return (profumi || [])
+    .map((p) => `${p.brand || ''} ${p.nome || ''}`.trim())
+    .filter(Boolean);
 }
 
-export function parseScoutArray(rawText: string) {
-  let cleanText = String(rawText).trim();
-  if (cleanText.startsWith('```json')) cleanText = cleanText.slice(7);
-  if (cleanText.startsWith('```')) cleanText = cleanText.slice(3);
-  if (cleanText.endsWith('```')) cleanText = cleanText.slice(0, -3);
+export function buildScoutPrompt(filters: ScoutFilters, ownedNames: string[] = []): string {
+  const { scoutFamily, includeNotes, excludeNotes } = filters;
+  const excludeOwnedText =
+    ownedNames.length > 0
+      ? `NON proporre MAI questi profumi già presenti in collezione: ${ownedNames.slice(0, 60).join(', ')}.`
+      : '';
 
-  const parsed = JSON.parse(cleanText.trim());
+  return `Sei un esperto internazionale di alta profumeria, profumeria artistica indipendente e case di nicchia storiche.
+REGOLE TASSATIVE:
+- Escludi rigorosamente qualsiasi clone, dupe, imitazione o profumo arabo di massa.
+- ${excludeOwnedText}
+- Restituisci ESATTAMENTE 3 creazioni reali e distinte: 1 Designer di alto profilo, 1 Artistico indipendente e 1 di Nicchia prestigiosa.
+
+Criteri richiesti:
+- Famiglia olfattiva: ${scoutFamily}
+- Note da includere: ${includeNotes.length > 0 ? includeNotes.join(', ') : 'Qualsiasi'}
+- Note da escludere: ${excludeNotes.length > 0 ? excludeNotes.join(', ') : 'Nessuna'}
+
+Restituisci SOLO un array JSON valido di 3 oggetti con queste chiavi esatte:
+[
+  {
+    "brand": "...",
+    "nome": "...",
+    "concentrazione": "Eau de Parfum",
+    "famiglia_olfattiva": "...",
+    "naso": "...",
+    "note_testa": "...",
+    "note_cuore": "...",
+    "note_fondo": "...",
+    "categoria": "Designer | Artistico | Nicchia"
+  }
+]`;
+}
+
+export function parseScoutArray(rawText: string): any[] {
+  const cleanText = String(rawText)
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const start = cleanText.indexOf('[');
+  const end = cleanText.lastIndexOf(']');
+  if (start === -1 || end <= start) {
+    throw new Error('Formato risposta non valido.');
+  }
+
+  const jsonSlice = cleanText.slice(start, end + 1);
+  const parsed = JSON.parse(jsonSlice);
   if (!Array.isArray(parsed)) {
-    throw new Error("L'AI non ha restituito un formato valido.");
+    throw new Error('Risposta non in formato lista.');
   }
   return parsed;
 }
 
-export async function collectProposals(filters: ScoutFilters, ownedNames: string[] = []) {
+export function filterNewProposals(proposals: any[], ownedNames: string[] = []): any[] {
+  const ownedLower = ownedNames.map((n) => n.toLowerCase());
+  return proposals.filter((item) => {
+    const full = `${item.brand || ''} ${item.nome || ''}`.toLowerCase();
+    const onlyName = String(item.nome || '').toLowerCase();
+    return !ownedLower.some((o) => o.includes(onlyName) || full.includes(o));
+  });
+}
+
+export async function collectProposals(
+  filters: ScoutFilters,
+  ownedNames: string[] = []
+): Promise<any[]> {
   const prompt = buildScoutPrompt(filters, ownedNames);
   const res = await fetch('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, search: true }),
+    body: JSON.stringify({ prompt, search: false }),
   });
+
   const data = await res.json();
   if (!res.ok || !data.text) {
-    throw new Error('Errore durante la ricerca del consultant.');
+    throw new Error(data?.error || 'Errore durante la ricerca AI.');
   }
+
   return parseScoutArray(data.text);
-}
-
-export function filterNewProposals(proposals: any[], ownedNames: string[] = []) {
-  return proposals.filter(
-    (item) => !ownedNames.some((name) => name.toLowerCase() === item.nome?.toLowerCase())
-  );
-}
-
-export function ownedListForPrompt(profumi: any[]) {
-  return profumi.map((p) => `${p.brand} - ${p.nome}`);
 }
