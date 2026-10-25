@@ -2,21 +2,24 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight, RefreshCw } from 'lucide-react';
+import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight, Trophy } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { SmartBottleImage } from '@/components/BottleImage';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
-import { getLocalIsoDate, getAutoMomento, computePodio, getSmartConsultantSuggestions } from '@/lib/home-logic';
+import { getLocalIsoDate, getAutoMomento, computePodio } from '@/lib/home-logic';
 
 export default function HomePage() {
   const [profumi, setProfumi] = useState<any[]>([]);
   const [indossi, setIndossi] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
 
+  // Modale Podio Completo
+  const [podioModalOpen, setPodioModalOpen] = useState(false);
+
+  // Modale Indosso
   const [wearModalOpen, setWearModalOpen] = useState(false);
   const [selectedProfumoId, setSelectedProfumoId] = useState<string>('');
   const [wearData, setWearData] = useState<string>(getLocalIsoDate());
@@ -24,8 +27,6 @@ export default function HomePage() {
   const [wearOutfit, setWearOutfit] = useState('');
   const [wearNote, setWearNote] = useState('');
   const [savingWear, setSavingWear] = useState(false);
-
-  const [consultantIndex, setConsultantIndex] = useState(0);
 
   const { aura, setCustomAura } = useAura();
   const { showToast } = useToast();
@@ -38,7 +39,6 @@ export default function HomePage() {
 
   async function fetchHomeData() {
     setLoading(true);
-    setLoadError(false);
     try {
       const [profumiRes, indossiRes] = await Promise.all([
         supabase.from('profumi').select('*').order('nome', { ascending: true }),
@@ -62,22 +62,14 @@ export default function HomePage() {
       setIndossi(enriched);
     } catch (err) {
       console.error('Errore caricamento home:', err);
-      setLoadError(true);
     } finally {
       setLoading(false);
     }
   }
 
-  // Salvataggio sicuro con protezione doppio invio e validazione data futura
   async function handleSaveIndosso(e: React.FormEvent) {
     e.preventDefault();
     if (savingWear || !selectedProfumoId) return;
-
-    const todayStr = getLocalIsoDate();
-    if (wearData > todayStr) {
-      showToast('Non puoi registrare indossi nel futuro.', 'error');
-      return;
-    }
 
     setSavingWear(true);
     try {
@@ -109,9 +101,8 @@ export default function HomePage() {
     }
   }
 
+  // Calcolo Podio (esclude rigorosamente i profumi con 0 indossi, ordinati per frequenza e data recente)
   const podio = useMemo(() => computePodio(indossi), [indossi]);
-  const smartSuggestions = useMemo(() => getSmartConsultantSuggestions(profumi, indossi), [profumi, indossi]);
-  const currentSuggestion = smartSuggestions[consultantIndex % (smartSuggestions.length || 1)] || null;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-8">
@@ -131,112 +122,99 @@ export default function HomePage() {
         }
       />
 
-      {loadError && (
-        <div className="rounded-[22px] border border-red-500/30 bg-red-500/10 p-4 flex items-center justify-between text-xs text-red-200">
-          <span>Errore di caricamento dei dati.</span>
-          <button onClick={fetchHomeData} className="underline font-bold flex items-center gap-1">
-            <RefreshCw className="w-3 h-3 animate-spin" /> Riprova
-          </button>
-        </div>
-      )}
-
-      {/* AI CONSULTANT BASATO SU DATI REALI */}
-      {currentSuggestion && (
-        <section
-          style={{ borderColor: `${aura.primary}45` }}
-          className="relative overflow-hidden rounded-[30px] border bg-gradient-to-br from-[#161024] to-[#0E0A16] p-6 sm:p-8 shadow-2xl"
-        >
-          <div className="absolute right-4 top-4 opacity-10">
-            <Sparkles style={{ color: aura.primary }} className="h-32 w-32" />
-          </div>
-          <div className="relative z-10 space-y-4">
-            <div className="flex items-center justify-between">
-              <span style={{ color: aura.primary }} className="font-mono text-[11px] uppercase tracking-widest font-bold">
-                Consultant Olfattivo • Selezione Mirata
-              </span>
-              {smartSuggestions.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setConsultantIndex((prev) => prev + 1)}
-                  className="text-[11px] font-mono text-[#B8A9C9] hover:text-white underline transition"
-                >
-                  Altro suggerimento ({consultantIndex + 1}/{smartSuggestions.length})
-                </button>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="space-y-1.5">
-                <h3 className="font-serif text-2xl sm:text-3xl text-[#F6EFE4]">
-                  {currentSuggestion.brand} — {currentSuggestion.nome}
-                </h3>
-                <p className="font-mono text-[11px] text-[#B8A9C9]">
-                  Famiglia: <span style={{ color: aura.primary }}>{currentSuggestion.famiglia_olfattiva || 'Nisba'}</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedProfumoId(currentSuggestion.id);
-                  setWearModalOpen(true);
-                }}
-                style={{ borderColor: `${aura.primary}70`, color: aura.primary }}
-                className="inline-flex items-center gap-2 rounded-full border bg-[#08060C] px-5 py-3 text-xs font-bold transition hover:bg-white/5 shrink-0"
-              >
-                <span>Indossa questa creazione</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* PODIO DEGLI INDOSSI */}
+      {/* PODIO A GRADINI REALE (SOLO PROFUMI VISSUTI) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h2 className="font-serif text-xl text-[#F6EFE4]">Il Podio Storico</h2>
-          <Link href="/diario" className="text-xs text-[#B8A9C9] hover:text-[#F6EFE4] transition">
-            Vedi tutto il Diario →
-          </Link>
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4" style={{ color: aura.primary }} />
+            <h2 className="font-serif text-xl text-[#F6EFE4]">Podio Storico</h2>
+          </div>
+          {podio.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPodioModalOpen(true)}
+              className="text-xs text-[#B8A9C9] hover:text-[#F6EFE4] transition underline"
+            >
+              Classifica Completa →
+            </button>
+          )}
         </div>
 
         {podio.length === 0 ? (
           <div className="rounded-[24px] border border-white/10 bg-[#161024]/90 p-8 text-center space-y-2">
-            <p className="text-xs text-[#B8A9C9]">Nessun indosso registrato. Usa il tasto &quot;Indossato oggi&quot; per iniziare.</p>
+            <p className="text-xs text-[#B8A9C9]">Nessun indosso registrato. Usa il tasto &quot;Indossato oggi&quot; per popolare il podio.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {podio.slice(0, 4).map(({ count, profumo }, idx) => {
-              const pAura = resolveAura(profumo.famiglia_olfattiva, profumo.nome);
-              return (
-                <div
-                  key={profumo.id}
-                  style={{ borderColor: `${pAura.primary}40` }}
-                  className="group relative flex flex-col items-center rounded-[24px] border bg-[#161024]/90 p-4 text-center transition hover:scale-105 shadow-lg"
-                >
-                  <span
-                    style={{ backgroundColor: pAura.primary }}
-                    className="absolute top-3 left-3 flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-bold text-[#08060C]"
-                  >
-                    #{idx + 1}
-                  </span>
-                  <div className="h-28 w-full flex items-center justify-center py-2">
-                    <SmartBottleImage
-                      src={profumo.url_foto_vetrina || profumo.immagine_url}
-                      alt={profumo.nome}
-                      iconSize="w-6 h-6"
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-                  <div className="mt-2 w-full space-y-0.5">
-                    <p style={{ color: pAura.primary }} className="font-mono text-[10px] uppercase tracking-wider truncate">
-                      {profumo.brand}
-                    </p>
-                    <h3 className="font-serif text-sm text-[#F6EFE4] truncate">{profumo.nome}</h3>
-                    <p className="font-mono text-[11px] text-[#B8A9C9]">{count} indossi</p>
-                  </div>
+          <div className="grid grid-cols-3 gap-3 items-end pt-6 pb-2">
+            {/* 2° Posto (Sinistra - Più basso) */}
+            {podio[1] ? (
+              <div
+                onClick={() => setPodioModalOpen(true)}
+                className="flex flex-col items-center rounded-[22px] border border-white/10 bg-[#161024]/90 p-4 text-center cursor-pointer transition hover:scale-105 shadow-lg h-56 justify-between"
+              >
+                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#2</span>
+                <div className="h-24 w-full flex items-center justify-center">
+                  <SmartBottleImage
+                    src={podio[1].profumo.url_foto_vetrina || podio[1].profumo.immagine_url}
+                    alt={podio[1].profumo.nome}
+                    iconSize="w-5 h-5"
+                    className="h-full w-full object-contain"
+                  />
                 </div>
-              );
-            })}
+                <div className="w-full space-y-0.5">
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9] truncate">{podio[1].profumo.brand}</p>
+                  <h3 className="font-serif text-xs text-[#F6EFE4] truncate">{podio[1].profumo.nome}</h3>
+                  <p className="font-mono text-[10px]" style={{ color: aura.primary }}>{podio[1].count} indossi</p>
+                </div>
+              </div>
+            ) : <div />}
+
+            {/* 1° Posto (Centro - Il più alto) */}
+            {podio[0] && (
+              <div
+                onClick={() => setPodioModalOpen(true)}
+                style={{ borderColor: `${aura.primary}50` }}
+                className="flex flex-col items-center rounded-[24px] border-2 bg-gradient-to-b from-[#1E1428] to-[#120D1C] p-4 text-center cursor-pointer transition hover:scale-105 shadow-2xl h-64 justify-between -mt-4"
+              >
+                <span className="font-mono text-sm font-bold" style={{ color: aura.primary }}>#1</span>
+                <div className="h-32 w-full flex items-center justify-center">
+                  <SmartBottleImage
+                    src={podio[0].profumo.url_foto_vetrina || podio[0].profumo.immagine_url}
+                    alt={podio[0].profumo.nome}
+                    iconSize="w-6 h-6"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="w-full space-y-0.5">
+                  <p className="font-mono text-[10px] uppercase tracking-wider truncate" style={{ color: aura.primary }}>{podio[0].profumo.brand}</p>
+                  <h3 className="font-serif text-sm text-[#F6EFE4] truncate font-bold">{podio[0].profumo.nome}</h3>
+                  <p className="font-mono text-[11px] text-[#B8A9C9]">{podio[0].count} indossi</p>
+                </div>
+              </div>
+            )}
+
+            {/* 3° Posto (Destra) */}
+            {podio[2] ? (
+              <div
+                onClick={() => setPodioModalOpen(true)}
+                className="flex flex-col items-center rounded-[22px] border border-white/10 bg-[#161024]/90 p-4 text-center cursor-pointer transition hover:scale-105 shadow-lg h-52 justify-between"
+              >
+                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#3</span>
+                <div className="h-20 w-full flex items-center justify-center">
+                  <SmartBottleImage
+                    src={podio[2].profumo.url_foto_vetrina || podio[2].profumo.immagine_url}
+                    alt={podio[2].profumo.nome}
+                    iconSize="w-5 h-5"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="w-full space-y-0.5">
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9] truncate">{podio[2].profumo.brand}</p>
+                  <h3 className="font-serif text-xs text-[#F6EFE4] truncate">{podio[2].profumo.nome}</h3>
+                  <p className="font-mono text-[10px]" style={{ color: aura.primary }}>{podio[2].count} indossi</p>
+                </div>
+              </div>
+            ) : <div />}
           </div>
         )}
       </section>
@@ -275,6 +253,63 @@ export default function HomePage() {
           </div>
         </Link>
       </section>
+
+      {/* MODALE CLASSIFICA COMPLETA */}
+      {podioModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPodioModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/85 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ borderColor: `${aura.primary}55` }}
+            className="relative w-full max-w-lg max-h-[80dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 text-[#F6EFE4] space-y-4 shadow-2xl no-scrollbar mb-16"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="font-serif text-2xl text-[#F6EFE4]">Classifica Generale Indossi</h3>
+              <button
+                type="button"
+                onClick={() => setPodioModalOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] text-[#B8A9C9] hover:text-white border border-white/10 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              {podio.map(({ count, profumo }, idx) => (
+                <div
+                  key={profumo.id}
+                  className="flex items-center justify-between rounded-[18px] border border-white/10 bg-[#0E0A16] p-3.5"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs font-bold w-6 text-center" style={{ color: aura.primary }}>
+                      #{idx + 1}
+                    </span>
+                    <div className="h-10 w-10 overflow-hidden rounded-xl bg-[#161024] p-1 flex items-center justify-center border border-white/5">
+                      <SmartBottleImage
+                        src={profumo.url_foto_vetrina || profumo.immagine_url}
+                        alt={profumo.nome}
+                        iconSize="w-4 h-4"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-serif text-sm text-[#F6EFE4]">{profumo.nome}</h4>
+                      <p className="font-mono text-[10px] uppercase text-[#B8A9C9]">{profumo.brand}</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-xs font-bold px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                    {count} indossi
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODALE INDOSSATO OGGI */}
       {wearModalOpen && (
@@ -322,7 +357,7 @@ export default function HomePage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="input-data" className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5">
-                    Data (a ritroso)
+                    Data
                   </label>
                   <input
                     id="input-data"
