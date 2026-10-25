@@ -9,7 +9,7 @@ export interface GeminiCallOptions {
   /** true = risposta JSON (responseMimeType su Gemini, json_object su Groq). */
   jsonMode?: boolean;
   systemInstruction?: string;
-  /** Tetto in ms per il singolo tentativo (default 9000). */
+  /** Tetto in ms per il singolo tentativo (default 5000). */
   timeoutMs?: number;
   /** Ricerca Google (grounding): ignorata se nella richiesta c'è un'immagine. */
   useGoogleSearch?: boolean;
@@ -26,7 +26,7 @@ export interface AiResult {
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Sovrascrivibile da env: GEMINI_MODELS="gemini-2.5-flash,gemini-2.0-flash"
-const DEFAULT_MODELS = ['gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest'];
+const DEFAULT_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
 
 const DEAD_MODEL_TTL_MS = 6 * 60 * 60 * 1000;
 const DEAD_KEY_TTL_MS = 10 * 60 * 1000;
