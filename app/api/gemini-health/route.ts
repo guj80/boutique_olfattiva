@@ -94,8 +94,8 @@ export async function GET() {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+       body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: 'Rispondi solo OK' }],
           max_tokens: 5,
         }),
