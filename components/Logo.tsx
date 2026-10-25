@@ -6,10 +6,10 @@ import { useAura } from './AuraProvider';
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
-  variant?: 'original' | 'minimal' | 'glow';
+  variant?: string;
 }
 
-export function Logo({ className = 'h-8 w-8', size = 'md', variant = 'original' }: LogoProps) {
+export function Logo({ className = 'h-8 w-8', size = 'md' }: LogoProps) {
   const { aura } = useAura();
 
   const sizeClasses = {
@@ -20,20 +20,16 @@ export function Logo({ className = 'h-8 w-8', size = 'md', variant = 'original' 
 
   return (
     <div className={`relative flex items-center justify-center ${sizeClasses[size]} ${className}`}>
-      <div
-        className="absolute inset-0 rounded-full blur-xl opacity-50"
-        style={{ backgroundColor: aura.primary }}
-      />
+      {/* Vettoriale SVG puro, linee nette, zero artifici o aloni luminosi */}
       <svg
         viewBox="0 0 100 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="relative z-10 h-full w-full drop-shadow-lg"
+        className="h-full w-full"
       >
         <path
           d="M30 20H70V30H30V20Z"
           fill={aura.primary}
-          fillOpacity="0.95"
         />
         <path
           d="M45 30H55V40H45V30Z"
@@ -45,7 +41,6 @@ export function Logo({ className = 'h-8 w-8', size = 'md', variant = 'original' 
           stroke={aura.primary}
           strokeWidth="3.5"
           fill="#08060C"
-          fillOpacity="0.9"
         />
         <path
           d="M38 52V74H62"
@@ -77,16 +72,19 @@ export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
 
   return (
     <header className="flex items-center justify-between border-b border-white/10 pb-5">
-      <div className="space-y-1">
-        <span
-          style={{ color: aura.primary }}
-          className="font-mono text-[11px] uppercase tracking-[0.25em] font-bold"
-        >
-          {subtitle}
-        </span>
-        <h1 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] tracking-tight">
-          {title}
-        </h1>
+      <div className="flex items-center gap-3">
+        <Logo size="md" />
+        <div className="space-y-0.5">
+          <span
+            style={{ color: aura.primary }}
+            className="font-mono text-[10px] uppercase tracking-[0.25em] font-bold"
+          >
+            {subtitle}
+          </span>
+          <h1 className="font-serif text-2xl sm:text-3xl text-[#F6EFE4] tracking-tight">
+            {title}
+          </h1>
+        </div>
       </div>
       {rightSlot && <div>{rightSlot}</div>}
     </header>
