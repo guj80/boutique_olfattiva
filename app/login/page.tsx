@@ -24,9 +24,11 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setError(error.message === 'Invalid login credentials'
-        ? 'Credenziali non valide. Controlla email e password.'
-        : error.message);
+      setError(
+        error.message === 'Invalid login credentials'
+          ? 'Credenziali non valide. Controlla email e password.'
+          : error.message
+      );
       setLoading(false);
     } else {
       router.push('/');
@@ -85,6 +87,7 @@ export default function LoginPage() {
               className="w-full bg-transparent border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-gold/50 transition-colors"
               placeholder="••••••••"
             />
+          </div>
 
           {error && (
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
