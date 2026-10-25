@@ -22,13 +22,15 @@ import {
   Sparkles,
   RefreshCw,
   Tag,
+  CalendarHeart,
 } from 'lucide-react';
-import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
+import { supabase, Profumo, Momento, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
+import { useSpruzzo } from '@/components/Spruzzo';
 
 const PURE_FAMILIES = [
   'Agrumata',
@@ -83,8 +85,23 @@ export default function CollezionePage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [loadingPrices, setLoadingPrices] = useState(false);
 
+  const [wearOpen, setWearOpen] = useState(false);
+  const [wearMomento, setWearMomento] = useState<Momento>('Mattina');
+  const [wearOutfit, setWearOutfit] = useState('');
+  const [wearNote, setWearNote] = useState('');
+  const [savingWear, setSavingWear] = useState(false);
+
   const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
+  const { triggerSpruzzo } = useSpruzzo();
+
+  function getDefaultMomento(): Momento {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) return 'Mattina';
+    if (h >= 12 && h < 18) return 'Pomeriggio';
+    if (h >= 18 && h < 23) return 'Sera';
+    return 'Notte';
+  });
 
   useEffect(() => {
     const isRadar = vistaParam === 'radar';
@@ -215,6 +232,32 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
       setSelectedProfumo({ ...selectedProfumo, ...editForm });
     } catch (err: any) {
       showToast(err?.message || "Errore durante l'aggiornamento.", 'error');
+    }
+  }
+
+  async function handleSaveIndosso(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedProfumo) return;
+    setSavingWear(true);
+    try {
+      const { error } = await supabase.from('indossi').insert([
+        {
+          profumo_id: selectedProfumo.id,
+          momento_giornata: wearMomento,
+          contesto_outfit: wearOutfit.trim() || null,
+          note_giorno: wearNote.trim() || null,
+        },
+      ]);
+      if (error) throw error;
+      triggerSpruzzo();
+      showToast(`Indosso registrato (${wearMomento}).`);
+      setWearOpen(false);
+      setWearOutfit('');
+      setWearNote('');
+    } catch (err: any) {
+      showToast(err?.message || 'Errore registrazione indosso.', 'error');
+    } finally {
+      setSavingWear(false);
     }
   }
 
@@ -883,7 +926,82 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                    {wearOpen && (
+                      <form
+                        onSubmit={handleSaveIndosso}
+                        style={{ borderColor: `${modalAura.primary}45` }}
+                        className="w-full rounded-2xl bg-[#0E0A16] p-4 border space-y-3 text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            style={{ color: modalAura.primary }}
+                            className="font-mono text-[10px] uppercase tracking-wider font-bold"
+                          >
+                            Registra nel Diario Olfattivo
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setWearOpen(false)}
+                            className="text-xs text-[#B8A9C9] hover:text-white"
+                          >
+                            Annulla
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as Momento[]).map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setWearMomento(m)}
+                              style={
+                                wearMomento === m
+                                  ? { backgroundColor: modalAura.primary }
+                                  : undefined
+                              }
+                              className={`rounded-xl py-2 text-[11px] font-semibold transition ${
+                                wearMomento === m
+                                  ? 'text-[#08060C] font-bold'
+                                  : 'bg-[#161024] text-[#B8A9C9] border border-white/10 hover:text-white'
+                              }`}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                          <input
+                            type="text"
+                            value={wearOutfit}
+                            onChange={(e) => setWearOutfit(e.target.value)}
+                            placeholder="Contesto o outfit (facoltativo)"
+                            className="w-full rounded-[12px] bg-[#161024] border border-white/10 px-3 py-2 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                          />
+                          <input
+                            type="text"
+                            value={wearNote}
+                            onChange={(e) => setWearNote(e.target.value)}
+                            placeholder="Sensazioni o note (facoltativo)"
+                            className="w-full rounded-[12px] bg-[#161024] border border-white/10 px-3 py-2 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            disabled={savingWear}
+                            style={{ backgroundColor: modalAura.primary }}
+                            className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                            <span>{savingWear ? 'Salvataggio...' : 'Conferma Indosso'}</span>
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-white/10">
                       <button
                         onClick={() => setDeleteConfirmId(selectedProfumo.id)}
                         className="flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-500/10 transition"
@@ -892,16 +1010,34 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                         <span>Rimuovi</span>
                       </button>
 
-                      <button
-                        onClick={() => {
-                          setSelectedProfumo(null);
-                          setIsEditing(false);
-                        }}
-                        style={{ backgroundColor: modalAura.primary }}
-                        className="rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90"
-                      >
-                        Chiudi
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {!wearOpen && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setWearMomento(getDefaultMomento());
+                              setWearOpen(true);
+                            }}
+                            style={{ borderColor: `${modalAura.primary}60`, color: modalAura.primary }}
+                            className="flex items-center gap-1.5 rounded-full border bg-[#0E0A16] px-4 py-2.5 text-xs font-bold transition hover:bg-white/5"
+                          >
+                            <CalendarHeart className="h-3.5 w-3.5" />
+                            <span>Indossato oggi</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            setSelectedProfumo(null);
+                            setIsEditing(false);
+                            setWearOpen(false);
+                          }}
+                          style={{ backgroundColor: modalAura.primary }}
+                          className="rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90"
+                        >
+                          Chiudi
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}
