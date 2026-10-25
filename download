@@ -1,0 +1,24 @@
+# dipendenze
+node_modules
+.pnp
+.pnp.js
+
+# build
+.next
+out
+build
+next-env.d.ts
+
+# segreti: mai su GitHub
+.env
+.env.*
+!.env.example
+app/.env.local
+
+# vari
+.DS_Store
+*.log
+npm-debug.log*
+.vercel
+.netlify
+*.tsbuildinfo
