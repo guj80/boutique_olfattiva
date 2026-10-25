@@ -2,14 +2,14 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight, Trophy } from 'lucide-react';
+import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight, Trophy, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { SmartBottleImage } from '@/components/BottleImage';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
-import { getLocalIsoDate, getAutoMomento, computePodio } from '@/lib/home-logic';
+import { getLocalIsoDate, getAutoMomento, computePodio, getSmartConsultantSuggestions } from '@/lib/home-logic';
 
 export default function HomePage() {
   const [profumi, setProfumi] = useState<any[]>([]);
@@ -27,6 +27,9 @@ export default function HomePage() {
   const [wearOutfit, setWearOutfit] = useState('');
   const [wearNote, setWearNote] = useState('');
   const [savingWear, setSavingWear] = useState(false);
+
+  // Indice per scorrere i suggerimenti del Consultant
+  const [consultantIndex, setConsultantIndex] = useState(0);
 
   const { aura, setCustomAura } = useAura();
   const { showToast } = useToast();
@@ -101,8 +104,12 @@ export default function HomePage() {
     }
   }
 
-  // Calcolo Podio (esclude rigorosamente i profumi con 0 indossi, ordinati per frequenza e data recente)
+  // Calcolo Podio (esclude i profumi con 0 indossi)
   const podio = useMemo(() => computePodio(indossi), [indossi]);
+
+  // Consultant Intelligente per la Home (basato su collezione, stagionalità e indossi)
+  const smartSuggestions = useMemo(() => getSmartConsultantSuggestions(profumi, indossi), [profumi, indossi]);
+  const currentSuggestion = smartSuggestions[consultantIndex % (smartSuggestions.length || 1)] || null;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-8">
@@ -121,6 +128,57 @@ export default function HomePage() {
           </button>
         }
       />
+
+      {/* AI CONSULTANT DELLA HOME (SELEZIONE MIRATA DALLA COLLEZIONE) */}
+      {currentSuggestion && (
+        <section
+          style={{ borderColor: `${aura.primary}45` }}
+          className="relative overflow-hidden rounded-[30px] border bg-gradient-to-br from-[#161024] to-[#0E0A16] p-6 sm:p-8 shadow-2xl"
+        >
+          <div className="absolute right-4 top-4 opacity-10">
+            <Sparkles style={{ color: aura.primary }} className="h-32 w-32" />
+          </div>
+          <div className="relative z-10 space-y-4">
+            <div className="flex items-center justify-between">
+              <span style={{ color: aura.primary }} className="font-mono text-[11px] uppercase tracking-widest font-bold">
+                Consultant Olfattivo • Selezione mirata dalla collezione
+              </span>
+              {smartSuggestions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setConsultantIndex((prev) => prev + 1)}
+                  className="text-[11px] font-mono text-[#B8A9C9] hover:text-white underline transition flex items-center gap-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Altro ({consultantIndex + 1}/{smartSuggestions.length})</span>
+                </button>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <div className="space-y-1.5">
+                <h3 className="font-serif text-2xl sm:text-3xl text-[#F6EFE4]">
+                  {currentSuggestion.brand} — {currentSuggestion.nome}
+                </h3>
+                <p className="font-mono text-[11px] text-[#B8A9C9]">
+                  Famiglia: <span style={{ color: aura.primary }}>{currentSuggestion.famiglia_olfattiva || 'Nisba'}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedProfumoId(currentSuggestion.id);
+                  setWearModalOpen(true);
+                }}
+                style={{ borderColor: `${aura.primary}70`, color: aura.primary }}
+                className="inline-flex items-center gap-2 rounded-full border bg-[#08060C] px-5 py-3 text-xs font-bold transition hover:bg-white/5 shrink-0"
+              >
+                <span>Indossa questa creazione</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* PODIO A GRADINI REALE (SOLO PROFUMI VISSUTI) */}
       <section className="space-y-4">
@@ -146,7 +204,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3 items-end pt-6 pb-2">
-            {/* 2° Posto (Sinistra - Più basso) */}
+            {/* 2° Posto (Sinistra) */}
             {podio[1] ? (
               <div
                 onClick={() => setPodioModalOpen(true)}
@@ -169,7 +227,7 @@ export default function HomePage() {
               </div>
             ) : <div />}
 
-            {/* 1° Posto (Centro - Il più alto) */}
+            {/* 1° Posto (Centro) */}
             {podio[0] && (
               <div
                 onClick={() => setPodioModalOpen(true)}
