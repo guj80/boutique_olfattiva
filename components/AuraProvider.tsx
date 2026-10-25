@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Profumo } from '@/lib/supabase';
+import { usePathname, useRouter } from 'next/navigation';
+import { supabase, Profumo } from '@/lib/supabase';
 
 export interface AuraPair {
   primary: string;
@@ -191,9 +191,33 @@ const AuraContext = createContext<AuraContextValue>({
 
 export function AuraProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [aura, setAura] = useState<AuraPair>(SECTION_THEMES.atelier);
   const [activeProfumo, setActiveProfumo] = useState<Profumo | null>(null);
   const [hideDock, setHideDock] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signup');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session && !isAuthRoute) {
+        router.replace('/login');
+      } else {
+        setAuthChecked(true);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session && !isAuthRoute) {
+        setAuthChecked(false);
+        router.replace('/login');
+      } else {
+        setAuthChecked(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [pathname, router]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -248,7 +272,7 @@ export function AuraProvider({ children }: { children: React.ReactNode }) {
         }
         className="min-h-[100dvh] w-full bg-[#08060C] text-[#F6EFE4] transition-colors duration-700"
       >
-        {children}
+        {authChecked || pathname.startsWith('/login') || pathname.startsWith('/signup') ? children : null}
       </div>
     </AuraContext.Provider>
   );
