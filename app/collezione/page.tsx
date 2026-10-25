@@ -101,7 +101,7 @@ export default function CollezionePage() {
     if (h >= 12 && h < 18) return 'Pomeriggio';
     if (h >= 18 && h < 23) return 'Sera';
     return 'Notte';
-  });
+  }
 
   useEffect(() => {
     const isRadar = vistaParam === 'radar';
