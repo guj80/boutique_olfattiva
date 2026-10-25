@@ -279,7 +279,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
                 style={{ color: aura.primary }}
                 className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
               >
-                Consultant & Scouting AI (Trio d'Eccellenza)
+                Consultant & Scouting AI (Trio d&apos;Eccellenza)
               </span>
             </div>
             <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">
@@ -402,7 +402,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
           {scoutResults.length > 0 && (
             <div className="pt-6 border-t border-white/15 space-y-4">
               <h4 className="font-mono text-xs uppercase tracking-widest text-[#F6EFE4] font-bold">
-                Proposte Selezionate dall'AI (Aggiungibili al Radar)
+                Proposte Selezionate dall&apos;AI (Aggiungibili al Radar)
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {scoutResults.map((item, idx) => (
