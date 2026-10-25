@@ -7,6 +7,7 @@ import { useAura } from './AuraProvider';
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  variant?: string; // Aggiunto per compatibilità con BottleImage.tsx
 }
 
 export function Logo({ className = 'h-9 w-9', size = 'md' }: LogoProps) {
@@ -18,7 +19,7 @@ export function Logo({ className = 'h-9 w-9', size = 'md' }: LogoProps) {
 
   return (
     <div className={`relative flex items-center justify-center shrink-0 ${sizeClasses[size]} ${className}`}>
-      {/* Utilizzo diretto dell'immagine ufficiale del logo con sfumature autentiche */}
+      {/* Immagine ufficiale del logo /LOGO_LG.jpg */}
       <Image
         src="/LOGO_LG.jpg"
         alt="Boutique Olfattiva Logo"
