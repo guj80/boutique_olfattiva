@@ -132,13 +132,20 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
       const data = await res.json();
       if (!res.ok || !data.text) throw new Error('Errore durante la ricerca del consultant.');
 
-      let parsed = [];
+      let parsed: any[] = [];
       try {
-        let cleanText = data.text.trim();
-        if (cleanText.startsWith('```json')) cleanText = cleanText.slice(7);
-        if (cleanText.startsWith('```')) cleanText = cleanText.slice(3);
-        if (cleanText.endsWith('```')) cleanText = cleanText.slice(0, -3);
-        parsed = JSON.parse(cleanText.trim());
+        let cleanText = String(data.text).replace(/```json/gi, '').replace(/```/g, '').trim();
+        try {
+          parsed = JSON.parse(cleanText);
+        } catch {
+          const start = cleanText.indexOf('[');
+          const end = cleanText.lastIndexOf(']');
+          if (start === -1 || end <= start) throw new Error('no array');
+          parsed = JSON.parse(cleanText.slice(start, end + 1).replace(/,\s*([}\]])/g, '$1'));
+        }
+        if (!Array.isArray(parsed)) throw new Error('not array');
+        parsed = parsed.filter((x) => x && x.brand && x.nome).slice(0, 3);
+        if (parsed.length === 0) throw new Error('empty');
       } catch {
         throw new Error("L'AI non ha restituito un formato valido. Riprova.");
       }
@@ -206,7 +213,11 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-8">
-      <PageHeader 'La 'Testing 'radar' : <div ? Collezione'} Radar' className="flex items-center gap-2.5" mia rightSlot="{" subtitle="VETRINA" title="{activeTab">
+      <PageHeader
+        title={activeTab === 'radar' ? 'Testing Radar' : 'La mia Collezione'}
+        subtitle="VETRINA"
+        rightSlot={
+          <div className="flex items-center gap-2.5">
             <div
               style={{ borderColor: `${aura.primary}40` }}
               className="flex rounded-full bg-[#0E0A16] p-1 border"
@@ -253,7 +264,12 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
               </button>
             </div>
 
-            <Link aura.primary backgroundColor: className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg" href="/scanner" style="{{" title="Acquisisci" }}>
+            <Link
+              href="/scanner"
+              title="Acquisisci"
+              style={{ backgroundColor: aura.primary }}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg"
+            >
               <Plus className="h-4 w-4 stroke-[2.5]"/>
             </Link>
           </div>
@@ -274,7 +290,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
               style={{ borderColor: `${aura.primary}55` }}
               className="inline-flex items-center gap-2 rounded-md bg-[#161024] border px-3 py-1"
             >
-              <Sparkles aura.primary className="h-4 w-4" color: style="{{" }}/>
+              <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
               <span
                 style={{ color: aura.primary }}
                 className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
@@ -588,7 +604,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
             style={{ borderColor: `${aura.primary}35` }}
             className="rounded-[28px] border bg-[#161024]/90 p-16 text-center space-y-3 shadow-xl"
           >
-            <Compass aura.primary className="h-10 w-10 mx-auto opacity-50" color: style="{{" }}/>
+            <Compass style={{ color: aura.primary }} className="h-10 w-10 mx-auto opacity-50" />
             <h2 className="font-serif text-2xl text-[#F6EFE4]">
               Nessuna creazione trovata
             </h2>
@@ -615,7 +631,13 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
                         style={{ backgroundColor: pAura.primary }}
                       />
-                      <BottlePedestal alt="{p.nome}" className="relative z-10 !h-52 w-full" showSigil="{false}" size="lg" src="{imgUrl}"/>
+                      <BottlePedestal
+                        src={imgUrl}
+                        alt={p.nome}
+                        size="lg"
+                        showSigil={false}
+                        className="relative z-10 !h-52 w-full"
+                      />
                     </div>
                   </div>
 
@@ -649,7 +671,9 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
       </section>
 
       {/* SCHEDA DI DETTAGLIO CONDIVISA */}
-      <ProfumoDetailModal onClose="{()" profumo="{selectedProfumo}"> {
+      <ProfumoDetailModal
+        profumo={selectedProfumo}
+        onClose={() => {
           setSelectedProfumo(null);
           setCustomAura(
             activeTab === 'radar'
