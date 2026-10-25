@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight, Trophy } from 'lucide-react';
+import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { SmartBottleImage } from '@/components/BottleImage';
@@ -28,7 +28,7 @@ export default function HomePage() {
   const [wearNote, setWearNote] = useState('');
   const [savingWear, setSavingWear] = useState(false);
 
-  // Consultant Interattivo Home (Filtri Occasione & Momento + Risultato Generato)
+  // Consultant AI Home
   const [consultantOccasione, setConsultantOccasione] = useState<string>('Tutti');
   const [consultantMomento, setConsultantMomento] = useState<string>('Tutti');
   const [generatedRecommendation, setGeneratedRecommendation] = useState<any>(null);
@@ -86,7 +86,7 @@ export default function HomePage() {
     const pool = filtered.length > 0 ? filtered : profumi;
     const randomIndex = Math.floor(Math.random() * pool.length);
     setGeneratedRecommendation(pool[randomIndex]);
-    showToast('Consultant: Creazione selezionata.');
+    showToast('Suggerimento AI generato.');
   }
 
   async function handleSaveIndosso(e: React.FormEvent) {
@@ -143,7 +143,7 @@ export default function HomePage() {
         }
       />
 
-      {/* CONSULTANT OLFATTIVO INTERATTIVO CON BOX ISOLATO PER PERFETTA LEGGIBILITÀ */}
+      {/* SUGGERIMENTO AI */}
       <section
         style={{ borderColor: `${aura.primary}40` }}
         className="relative overflow-hidden rounded-[24px] border bg-[#0E0A16]/95 p-6 shadow-2xl space-y-5 backdrop-blur-md"
@@ -152,7 +152,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
             <span style={{ color: aura.primary }} className="font-mono text-[11px] uppercase tracking-widest font-bold">
-              Consultant Olfattivo Dedicato
+              Suggerimento AI
             </span>
           </div>
           <span className="font-mono text-[10px] text-[#B8A9C9]">Analisi Collezione</span>
@@ -198,25 +198,26 @@ export default function HomePage() {
             type="button"
             onClick={handleGenerateConsultant}
             style={{ backgroundColor: aura.primary }}
-            className="rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 shadow-lg"
+            className="flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 shadow-lg"
           >
-            Genera Suggerimento
+            <Sparkles className="h-4 w-4 fill-current" />
+            <span>Genera Suggerimento</span>
           </button>
         </div>
 
         {generatedRecommendation && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-white/10 bg-[#161024]/60 p-4 rounded-[16px]">
-            <div className="flex items-center gap-3.5">
-              <div className="h-14 w-14 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 overflow-hidden rounded-2xl bg-[#08060C] p-2 flex items-center justify-center border border-white/10 shrink-0">
                 <SmartBottleImage
                   src={generatedRecommendation.url_foto_vetrina || generatedRecommendation.immagine_url}
                   alt={generatedRecommendation.nome}
                   className="h-full w-full object-contain"
                 />
               </div>
-              <div>
+              <div className="space-y-0.5">
                 <p className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">{generatedRecommendation.brand}</p>
-                <h3 className="font-serif text-lg text-[#F6EFE4] font-bold">{generatedRecommendation.nome}</h3>
+                <h3 className="font-serif text-lg text-[#F6EFE4] font-bold uppercase">{generatedRecommendation.nome}</h3>
               </div>
             </div>
             <button
@@ -235,7 +236,7 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* PODIO A SCATOLETTE NERE ELEGANTI CON #1, #2, #3 PRIMA DEL MARCHIO */}
+      {/* PODIO A SCATOLETTE NERE ELEGANTI - NOMI MAIUSCOLO E GRASSETTO */}
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="font-serif text-xl text-[#F6EFE4]">Podio</h2>
@@ -260,9 +261,8 @@ export default function HomePage() {
             {podio[1] ? (
               <div
                 onClick={() => setPodioModalOpen(true)}
-                className="flex flex-col items-center cursor-pointer transition hover:scale-105 rounded-[18px] border border-white/10 bg-[#0E0A16] p-3 shadow-lg space-y-2 h-44 justify-between"
+                className="flex flex-col items-center cursor-pointer transition hover:scale-105 rounded-[18px] border border-white/10 bg-[#0E0A16] p-3 shadow-lg space-y-1.5 h-48 justify-between"
               >
-                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#2</span>
                 <div className="h-20 w-full flex items-center justify-center">
                   <SmartBottleImage
                     src={podio[1].profumo.url_foto_vetrina || podio[1].profumo.immagine_url}
@@ -270,9 +270,10 @@ export default function HomePage() {
                     className="h-full w-full object-contain"
                   />
                 </div>
+                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#2</span>
                 <div className="space-y-0.5 w-full">
                   <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9] truncate">{podio[1].profumo.brand}</p>
-                  <h3 className="font-serif text-xs text-[#F6EFE4] truncate">{podio[1].profumo.nome}</h3>
+                  <h3 className="font-sans text-xs font-bold uppercase tracking-wide text-[#F6EFE4] truncate">{podio[1].profumo.nome}</h3>
                 </div>
               </div>
             ) : <div />}
@@ -282,9 +283,8 @@ export default function HomePage() {
               <div
                 onClick={() => setPodioModalOpen(true)}
                 style={{ borderColor: `${aura.primary}60` }}
-                className="flex flex-col items-center cursor-pointer transition hover:scale-105 rounded-[20px] border-2 bg-[#120D1C] p-3.5 shadow-2xl space-y-2 h-52 justify-between -mt-4"
+                className="flex flex-col items-center cursor-pointer transition hover:scale-105 rounded-[20px] border-2 bg-[#120D1C] p-3.5 shadow-2xl space-y-1.5 h-56 justify-between -mt-4"
               >
-                <span className="font-mono text-xs font-bold" style={{ color: aura.primary }}>#1</span>
                 <div className="h-28 w-full flex items-center justify-center">
                   <SmartBottleImage
                     src={podio[0].profumo.url_foto_vetrina || podio[0].profumo.immagine_url}
@@ -292,9 +292,10 @@ export default function HomePage() {
                     className="h-full w-full object-contain"
                   />
                 </div>
+                <span className="font-mono text-xs font-bold" style={{ color: aura.primary }}>#1</span>
                 <div className="space-y-0.5 w-full">
                   <p className="font-mono text-[9px] uppercase tracking-wider font-bold truncate" style={{ color: aura.primary }}>{podio[0].profumo.brand}</p>
-                  <h3 className="font-serif text-xs sm:text-sm text-[#F6EFE4] font-bold truncate">{podio[0].profumo.nome}</h3>
+                  <h3 className="font-sans text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#F6EFE4] leading-tight line-clamp-2">{podio[0].profumo.nome}</h3>
                 </div>
               </div>
             )}
@@ -303,9 +304,8 @@ export default function HomePage() {
             {podio[2] ? (
               <div
                 onClick={() => setPodioModalOpen(true)}
-                className="flex flex-col items-center cursor-pointer transition hover:scale-105 rounded-[18px] border border-white/10 bg-[#0E0A16] p-3 shadow-lg space-y-2 h-40 justify-between"
+                className="flex flex-col items-center cursor-pointer transition hover:scale-105 rounded-[18px] border border-white/10 bg-[#0E0A16] p-3 shadow-lg space-y-1.5 h-44 justify-between"
               >
-                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#3</span>
                 <div className="h-16 w-full flex items-center justify-center">
                   <SmartBottleImage
                     src={podio[2].profumo.url_foto_vetrina || podio[2].profumo.immagine_url}
@@ -313,9 +313,10 @@ export default function HomePage() {
                     className="h-full w-full object-contain"
                   />
                 </div>
+                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#3</span>
                 <div className="space-y-0.5 w-full">
                   <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9] truncate">{podio[2].profumo.brand}</p>
-                  <h3 className="font-serif text-xs text-[#F6EFE4] truncate">{podio[2].profumo.nome}</h3>
+                  <h3 className="font-sans text-xs font-bold uppercase tracking-wide text-[#F6EFE4] truncate">{podio[2].profumo.nome}</h3>
                 </div>
               </div>
             ) : <div />}
@@ -496,7 +497,7 @@ export default function HomePage() {
                 <input
                   id="input-outfit"
                   type="text"
-                  value={wearOutfit}
+                  value={wearOutput}
                   onChange={(e) => setWearOutfit(e.target.value)}
                   placeholder="Es. Ufficio, Cena elegante, Casual..."
                   className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
