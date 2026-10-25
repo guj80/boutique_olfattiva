@@ -1075,22 +1075,6 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
             </div>
           </div>
         </div>
-      )}>
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirmId)}
-                className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-red-500"
-              >
-                Conferma
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </main>
   );
