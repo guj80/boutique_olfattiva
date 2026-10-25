@@ -3,10 +3,9 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-2.0-flash',
-  'gemini-2.5-pro',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-pro',
 ];
 
 function getGeminiKeys(): string[] {
@@ -16,9 +15,6 @@ function getGeminiKeys(): string[] {
     process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     process.env.NEXT_PUBLIC_GEMINI_API_KEY,
     process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
-    process.env.GEMINI_API_KEY_1,
-    process.env.GEMINI_API_KEY_2,
-    process.env.GEMINI_API_KEY_BACKUP,
   ];
   return Array.from(new Set(candidates.map((k) => (k || '').trim()).filter(Boolean)));
 }
@@ -45,7 +41,7 @@ async function callSingleGeminiModel(
     };
 
     if (useSearch) {
-      payload.tools = [{ google_search: {} }];
+      payload.tools = [{ googleSearch: {} }];
     }
 
     const res = await fetch(url, {
@@ -89,7 +85,7 @@ async function callGroqFallback(prompt: string, groqKey: string): Promise<string
         Authorization: `Bearer ${groqKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.35,
         max_tokens: 1500,
@@ -111,38 +107,6 @@ async function callGroqFallback(prompt: string, groqKey: string): Promise<string
   }
 }
 
-async function callXaiFallback(prompt: string, xaiKey: string): Promise<string> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6500);
-
-  try {
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${xaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-2-latest',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.35,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error(`[xAI HTTP ${res.status}]`);
-    }
-
-    const data = await res.json();
-    const text = data?.choices?.[0]?.message?.content?.trim() || '';
-    if (!text) throw new Error('[xAI] Risposta vuota');
-    return text;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -155,27 +119,22 @@ export async function POST(req: Request) {
 
     const geminiKeys = getGeminiKeys();
     const groqKey = (process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '').trim();
-    const xaiKey = (process.env.XAI_API_KEY || process.env.GROK_API_KEY || '').trim();
 
     const errors: string[] = [];
 
-    if (geminiKeys.length === 0 && !groqKey && !xaiKey) {
+    if (geminiKeys.length === 0 && !groqKey) {
       return NextResponse.json(
-        {
-          error:
-            'Nessuna API Key trovata nelle variabili di Vercel (controlla GEMINI_API_KEY / GOOGLE_API_KEY / GROQ_API_KEY).',
-        },
+        { error: 'Nessuna API Key valida configurata nelle variabili di Vercel.' },
         { status: 500 }
       );
     }
 
-    // 1. Prova tutte le chiavi Gemini disponibili sui modelli ufficiali
+    // 1. Prova le chiavi Gemini sui modelli standard stabili
     for (const key of geminiKeys) {
       for (const model of GEMINI_MODELS) {
         try {
-          const shouldSearch = useSearch && model === 'gemini-2.5-flash';
-          const timeout = shouldSearch ? 7500 : 5500;
-          const text = await callSingleGeminiModel(model, prompt, key, shouldSearch, timeout);
+          const shouldSearch = useSearch && model === 'gemini-1.5-flash';
+          const text = await callSingleGeminiModel(model, prompt, key, shouldSearch, 6000);
           return NextResponse.json({ text, modelUsed: model });
         } catch (err: any) {
           errors.push(err?.message || String(err));
@@ -183,38 +142,27 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Fallback automatico su Groq (Llama 3.3 70B)
+    // 2. Fallback su Groq
     if (groqKey) {
       try {
         const text = await callGroqFallback(prompt, groqKey);
-        return NextResponse.json({ text, modelUsed: 'groq-llama-3.3-70b' });
-      } catch (err: any) {
-        errors.push(err?.message || String(err));
-      }
-    }
-
-    // 3. Fallback automatico su Grok / xAI
-    if (xaiKey) {
-      try {
-        const text = await callXaiFallback(prompt, xaiKey);
-        return NextResponse.json({ text, modelUsed: 'xai-grok' });
+        return NextResponse.json({ text, modelUsed: 'groq-llama-3.1-70b' });
       } catch (err: any) {
         errors.push(err?.message || String(err));
       }
     }
 
     console.error('Dettaglio errori AI:', errors);
-    const firstReason = errors[0] || 'Nessun modello disponibile';
     return NextResponse.json(
       {
-        error: `Errore AI: ${firstReason}`,
+        error: errors[0] || 'Errore di connessione ai servizi AI.',
         details: errors,
       },
       { status: 503 }
     );
   } catch (err: any) {
     return NextResponse.json(
-      { error: err?.message || 'Errore interno API Gemini.' },
+      { error: err?.message || 'Errore interno API.' },
       { status: 500 }
     );
   }
