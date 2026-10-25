@@ -19,6 +19,11 @@ import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
+import {
+  collectProposals,
+  filterNewProposals,
+  ownedListForPrompt,
+} from '@/lib/scout-logic';
 
 const PURE_FAMILIES = [
   'Agrumata',
@@ -60,7 +65,7 @@ export default function CollezionePage() {
   const [scoutResults, setScoutResults] = useState<any[]>([]);
   const [scoutingLoading, setScoutingLoading] = useState(false);
 
-  const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
+  const [selectedProfumo, setSelectedProfumo] = useState<Profumo null |>(null);
 
   const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
@@ -111,34 +116,13 @@ export default function CollezionePage() {
     setScoutingLoading(true);
     setScoutResults([]);
     try {
-      const prompt = `Sei un esperto internazionale di alta profumeria, profumeria artistica indipendente e case di nicchia storiche e prestigiose.
-REGOLE TASSATIVE:
-- Escludi rigorosamente qualsiasi clone, dupe, imitazione economica o profumo arabo di massa.
-- Restituisci ESATTAMENTE 3 creazioni distinte: 1 Designer di alto profilo, 1 Artistico indipendente e 1 di Nicchia prestigiosa.
-Criteri di ricerca:
-- Famiglia olfattiva: ${scoutFamily}
-- Note da includere: ${includeNotes.length > 0 ? includeNotes.join(', ') : 'Nessuna specifica'}
-- Note da escludere: ${excludeNotes.length > 0 ? excludeNotes.join(', ') : 'Nessuna specifica'}
-
-Restituisci un array JSON puro contenente esattamente 3 oggetti con questi campi esatti:
-brand, nome, concentrazione, famiglia_olfattiva, note_testa, note_cuore, note_fondo, categoria.
-Nessun testo fuori dal JSON.`;
-
-      const res = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, search: true }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.text) throw new Error('Errore durante la ricerca del consultant.');
-
-      let cleanText = data.text.trim();
-      if (cleanText.startsWith('```json')) cleanText = cleanText.slice(7);
-      if (cleanText.startsWith('```')) cleanText = cleanText.slice(3);
-      if (cleanText.endsWith('```')) cleanText = cleanText.slice(0, -3);
-
-      const parsed = JSON.parse(cleanText.trim());
-      setScoutResults(parsed);
+      const ownedNames = ownedListForPrompt(profumi);
+      const proposals = await collectProposals(
+        { scoutFamily, includeNotes, excludeNotes },
+        ownedNames
+      );
+      const filtered = filterNewProposals(proposals, ownedNames);
+      setScoutResults(filtered);
       showToast('Proposte generate con successo.');
     } catch (err: any) {
       showToast(err?.message || 'Errore durante lo scouting.', 'error');
