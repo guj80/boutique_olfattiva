@@ -19,6 +19,13 @@ import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
 import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
+import {
+  buildScoutPrompt,
+  collectProposals,
+  filterNewProposals,
+  ownedListForPrompt,
+  parseScoutArray,
+} from '@/lib/scout-logic';
 
 const PURE_FAMILIES = [
   'Agrumata',
@@ -51,7 +58,7 @@ export default function CollezionePage() {
   const [selectedBrand, setSelectedBrand] = useState<string>('Tutti');
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
-  // Stati per il Consultant di Scouting (Radar)
+  // Stati per lo Scouting Olfattivo (Radar)
   const [scoutFamily, setScoutFamily] = useState<string>('Qualsiasi');
   const [includeNotes, setIncludeNotes] = useState<string[]>([]);
   const [currentIncludeInput, setCurrentIncludeInput] = useState('');
@@ -59,6 +66,7 @@ export default function CollezionePage() {
   const [currentExcludeInput, setCurrentExcludeInput] = useState('');
   const [scoutResults, setScoutResults] = useState<any[]>([]);
   const [scoutingLoading, setScoutingLoading] = useState(false);
+  const [scoutSavingIdx, setScoutSavingIdx] = useState<number | null>(null);
 
   const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
 
@@ -111,47 +119,44 @@ export default function CollezionePage() {
     setScoutingLoading(true);
     setScoutResults([]);
     try {
-      const prompt = `Sei un esperto internazionale di alta profumeria, profumeria artistica indipendente e case di nicchia storiche e prestigiose.
-REGOLE TASSATIVE:
-- Escludi rigorosamente qualsiasi clone, dupe, imitazione economica o profumo arabo di massa.
-- Restituisci ESATTAMENTE 3 creazioni distinte: 1 Designer di alto profilo, 1 Artistico indipendente e 1 di Nicchia prestigiosa.
-Criteri di ricerca opzionali forniti dall'utente:
-- Famiglia olfattiva preferita: ${scoutFamily}
-- Note da includere: ${includeNotes.length > 0 ? includeNotes.join(', ') : 'Nessuna specifica'}
-- Note da escludere tassativamente: ${excludeNotes.length > 0 ? excludeNotes.join(', ') : 'Nessuna specifica'}
+      // Tutto ciò che è già in archivio (collezione e radar) non deve mai essere riproposto
+      const owned = profumi.map((p) => ({ brand: p.brand, nome: p.nome }));
+      const ownedList = ownedListForPrompt(owned);
 
-Per ciascuno dei 3 profumi restituisci un oggetto JSON con questi campi esatti:
-brand, nome, concentrazione (es. Extrait de Parfum), famiglia_olfattiva, naso (opzionale), note_testa, note_cuore, note_fondo, url_foto_vetrina (lascia stringa vuota o link immagine ufficiale se noto), categoria ("Designer", "Artistico", "Nicchia").
-Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza altro testo prima o dopo.`;
-
-      const res = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, search: true }),
+      const accepted = await collectProposals({
+        wanted: 3,
+        owned,
+        fetchBatch: async ({ count, alsoExcluded, attempt }) => {
+          const prompt = buildScoutPrompt({
+            count,
+            family: scoutFamily,
+            include: includeNotes,
+            exclude: excludeNotes,
+            ownedList,
+            alsoExcluded,
+          });
+          const res = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, search: true }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.text) throw new Error('Errore durante la ricerca. Riprova tra poco.');
+          try {
+            return parseScoutArray(data.text);
+          } catch {
+            throw new Error("L'AI non ha restituito un formato valido. Riprova.");
+          }
+        },
       });
-      const data = await res.json();
-      if (!res.ok || !data.text) throw new Error('Errore durante la ricerca del consultant.');
 
-      let parsed: any[] = [];
-      try {
-        let cleanText = String(data.text).replace(/```json/gi, '').replace(/```/g, '').trim();
-        try {
-          parsed = JSON.parse(cleanText);
-        } catch {
-          const start = cleanText.indexOf('[');
-          const end = cleanText.lastIndexOf(']');
-          if (start === -1 || end <= start) throw new Error('no array');
-          parsed = JSON.parse(cleanText.slice(start, end + 1).replace(/,\s*([}\]])/g, '$1'));
-        }
-        if (!Array.isArray(parsed)) throw new Error('not array');
-        parsed = parsed.filter((x) => x && x.brand && x.nome).slice(0, 3);
-        if (parsed.length === 0) throw new Error('empty');
-      } catch {
-        throw new Error("L'AI non ha restituito un formato valido. Riprova.");
+      if (accepted.length === 0) {
+        showToast('Nessuna proposta nuova: quelle suggerite erano già nella tua collezione. Riprova.', 'error');
+        return;
       }
 
-      setScoutResults(parsed);
-      showToast('Trio d\'Eccellenza generato con successo.');
+      setScoutResults(accepted);
+      showToast(accepted.length === 1 ? '1 proposta pronta.' : `${accepted.length} proposte pronte.`);
     } catch (err: any) {
       showToast(err?.message || 'Errore durante lo scouting.', 'error');
     } finally {
@@ -159,8 +164,18 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
     }
   }
 
-  async function handleSaveScoutToRadar(item: any) {
+  async function handleSaveScoutToRadar(item: any, idx: number) {
+    if (scoutSavingIdx !== null) return;
+    setScoutSavingIdx(idx);
     try {
+      // Controllo finale: non aggiungere ciò che nel frattempo è già in archivio
+      if (filterNewProposals([item], profumi.map((p) => ({ brand: p.brand, nome: p.nome }))).kept.length === 0) {
+        showToast(`${item.nome} è già nel tuo archivio.`, 'error');
+        setScoutResults((prev) => prev.filter((x) => x !== item));
+        return;
+      }
+
+      const notes = [item.note_testa, item.note_cuore, item.note_fondo].filter(Boolean).join(', ');
       const payload = {
         brand: item.brand,
         nome: item.nome,
@@ -170,7 +185,8 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
         note_testa: item.note_testa || null,
         note_cuore: item.note_cuore || null,
         note_fondo: item.note_fondo || null,
-        url_foto_vetrina: item.url_foto_vetrina || null,
+        note_olfattive: notes || null,
+        url_foto_vetrina: null, // mai link di immagini suggeriti dall'AI: spesso inventati
         stato: 'radar',
       };
 
@@ -178,9 +194,12 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
       if (error) throw error;
 
       setProfumi((prev) => [...prev, data]);
+      setScoutResults((prev) => prev.filter((x) => x !== item));
       showToast(`${item.nome} aggiunto al Testing Radar.`);
     } catch (err: any) {
       showToast(err?.message || 'Errore salvataggio nel Radar.', 'error');
+    } finally {
+      setScoutSavingIdx(null);
     }
   }
 
@@ -295,12 +314,9 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
                 style={{ color: aura.primary }}
                 className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
               >
-                Consultant & Scouting AI (Trio d&apos;Eccellenza)
+                Scouting Olfattivo
               </span>
             </div>
-            <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">
-              Designer • Artistico • Nicchia
-            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
@@ -410,7 +426,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
               className="flex items-center gap-2 rounded-full px-6 py-3 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50 shadow-lg"
             >
               {scoutingLoading ? <RefreshCw className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4 fill-current"/>}
-              <span>{scoutingLoading ? 'Scouting sul web in corso...' : 'Genera Trio d\'Eccellenza'}</span>
+              <span>{scoutingLoading ? 'Ricerca in corso...' : 'Cerca nuove creazioni'}</span>
             </button>
           </div>
 
@@ -418,7 +434,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
           {scoutResults.length > 0 && (
             <div className="pt-6 border-t border-white/15 space-y-4">
               <h4 className="font-mono text-xs uppercase tracking-widest text-[#F6EFE4] font-bold">
-                Proposte Selezionate dall&apos;AI (Aggiungibili al Radar)
+                Proposte per il tuo Radar
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {scoutResults.map((item, idx) => (
@@ -428,10 +444,7 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
                     className="flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-3 shadow-xl"
                   >
                     <div className="space-y-1">
-                      <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 text-[#B8A9C9] border border-white/10">
-                        {item.categoria || 'Nicchia'}
-                      </span>
-                      <p style={{ color: aura.primary }} className="font-mono text-[10px] uppercase tracking-wider pt-1 truncate">
+                      <p style={{ color: aura.primary }} className="font-mono text-[10px] uppercase tracking-wider truncate">
                         {item.brand}
                       </p>
                       <h5 className="font-serif text-base text-[#F6EFE4] leading-tight">
@@ -444,12 +457,13 @@ Restituisci un array JSON valido contenente esattamente questi 3 elementi, senza
 
                     <button
                       type="button"
-                      onClick={() => handleSaveScoutToRadar(item)}
+                      onClick={() => handleSaveScoutToRadar(item, idx)}
+                      disabled={scoutSavingIdx !== null}
                       style={{ borderColor: `${aura.primary}60`, color: aura.primary }}
-                      className="w-full flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-4 py-2 text-xs font-bold transition hover:bg-white/5"
+                      className="w-full flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-4 py-2 text-xs font-bold transition hover:bg-white/5 disabled:opacity-50"
                     >
                       <Check className="h-3.5 w-3.5"/>
-                      <span>Aggiungi al Radar</span>
+                      <span>{scoutSavingIdx === idx ? 'Salvataggio...' : 'Aggiungi al Radar'}</span>
                     </button>
                   </div>
                 ))}
