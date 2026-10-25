@@ -282,7 +282,7 @@ export async function callGroqDirect(
   if (!key || key === 'undefined') return null;
   const deadline = opts?.deadline ?? Date.now() + 15000;
 
-  for (const model of ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']) {
+  for (const model of ['llama-3.1-8b-instant']) {
     const left = deadline - Date.now();
     if (left < 1500) return null;
     const text = await chatCompletion(
