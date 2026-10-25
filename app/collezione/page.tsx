@@ -11,7 +11,6 @@ import {
   Library,
   Sparkles,
   RefreshCw,
-  X,
   Check,
 } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/supabase';
