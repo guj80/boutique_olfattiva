@@ -7,19 +7,16 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const prompt = String(body?.prompt || '').trim();
-    const useSearch = Boolean(body?.search);
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt mancante.' }, { status: 400 });
     }
 
-    // Sfruttiamo il motore centralizzato che gestisce modelli, chiavi e fallback
     const result = await callGeminiWithFallback(
       [{ text: prompt }],
       {
-        useGoogleSearch: useSearch,
         jsonMode: prompt.toLowerCase().includes('json'),
-        timeoutMs: 12000,
+        timeoutMs: 6000,
       }
     );
 
