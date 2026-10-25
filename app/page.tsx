@@ -2,14 +2,14 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight, RefreshCw } from 'lucide-react';
+import { CalendarHeart, Compass, Library, Sparkles, Check, X, ArrowRight, Trophy } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { SmartBottleImage } from '@/components/BottleImage';
 import { useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
-import { getLocalIsoDate, getAutoMomento, computePodio, getSmartConsultantSuggestions } from '@/lib/home-logic';
+import { getLocalIsoDate, getAutoMomento, computePodio } from '@/lib/home-logic';
 
 export default function HomePage() {
   const [profumi, setProfumi] = useState<any[]>([]);
@@ -28,7 +28,9 @@ export default function HomePage() {
   const [wearNote, setWearNote] = useState('');
   const [savingWear, setSavingWear] = useState(false);
 
-  const [consultantIndex, setConsultantIndex] = useState(0);
+  // Consultant Interattivo Home (Filtri Occasione & Momento)
+  const [consultantOccasione, setConsultantOccasione] = useState<string>('Tutti');
+  const [consultantMomento, setConsultantMomento] = useState<string>('Tutti');
 
   const { aura, setCustomAura } = useAura();
   const { showToast } = useToast();
@@ -104,8 +106,19 @@ export default function HomePage() {
   }
 
   const podio = useMemo(() => computePodio(indossi), [indossi]);
-  const smartSuggestions = useMemo(() => getSmartConsultantSuggestions(profumi, indossi), [profumi, indossi]);
-  const currentSuggestion = smartSuggestions[consultantIndex % (smartSuggestions.length || 1)] || null;
+
+  // Consultant Intelligente Filtrato per Occasione / Momento
+  const filteredConsultantList = useMemo(() => {
+    if (profumi.length === 0) return [];
+    return profumi.filter((p) => {
+      if (consultantMomento !== 'Tutti' && p.momento_ideale && !p.momento_ideale.toLowerCase().includes(consultantMomento.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+  }, [profumi, consultantMomento]);
+
+  const recommendedProfumo = filteredConsultantList[0] || profumi[0] || null;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-10">
@@ -125,55 +138,88 @@ export default function HomePage() {
         }
       />
 
-      {/* CONSULTANT OLFATTIVO */}
-      {currentSuggestion && (
-        <section
-          style={{ borderColor: `${aura.primary}40` }}
-          className="relative overflow-hidden rounded-[24px] border bg-[#161024]/90 p-6 shadow-xl"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span style={{ color: aura.primary }} className="font-mono text-[10px] uppercase tracking-widest font-bold">
-                Consultant Olfattivo
-              </span>
-              {smartSuggestions.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setConsultantIndex((prev) => prev + 1)}
-                  className="text-[10px] font-mono text-[#B8A9C9] hover:text-white transition flex items-center gap-1"
-                >
-                  <RefreshCw className="h-3 w-3" />
-                  <span>Altro ({consultantIndex + 1}/{smartSuggestions.length})</span>
-                </button>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <h3 className="font-serif text-2xl text-[#F6EFE4]">
-                  {currentSuggestion.brand} — {currentSuggestion.nome}
-                </h3>
-                <p className="font-mono text-[10px] text-[#B8A9C9]">
-                  Famiglia: <span style={{ color: aura.primary }}>{currentSuggestion.famiglia_olfattiva || 'Nisba'}</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedProfumoId(currentSuggestion.id);
-                  setWearModalOpen(true);
-                }}
-                style={{ borderColor: `${aura.primary}70`, color: aura.primary }}
-                className="inline-flex items-center gap-2 rounded-full border bg-[#08060C] px-4 py-2.5 text-xs font-bold transition hover:bg-white/5 shrink-0"
-              >
-                <span>Indossa</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+      {/* CONSULTANT OLFATTIVO INTERATTIVO (OCCASIONE & MOMENTO) */}
+      <section
+        style={{ borderColor: `${aura.primary}40` }}
+        className="relative overflow-hidden rounded-[24px] border bg-[#161024]/90 p-6 shadow-xl space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
+            <span style={{ color: aura.primary }} className="font-mono text-[11px] uppercase tracking-widest font-bold">
+              Consultant Olfattivo Dedicato
+            </span>
           </div>
-        </section>
-      )}
+          <span className="font-mono text-[10px] text-[#B8A9C9]">Seleziona parametri</span>
+        </div>
 
-      {/* PODIO ESSENZIALE A GRADINI (SOLO BOCCETTE E TESTO, ZERO BOX GIGANTI) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="consultant-occasione" className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">Occasione / Contesto</label>
+            <select
+              id="consultant-occasione"
+              value={consultantOccasione}
+              onChange={(e) => setConsultantOccasione(e.target.value)}
+              className="w-full rounded-[12px] bg-[#0E0A16] border border-white/10 p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
+            >
+              <option value="Tutti">Qualsiasi Occasione</option>
+              <option value="Ufficio">Ufficio / Professional</option>
+              <option value="Formale">Riunione formale</option>
+              <option value="Tempo libero">Tempo libero</option>
+              <option value="Cena">Aperitivo / Cena elegante</option>
+              <option value="Serata">Serata speciale</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="consultant-momento" className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">Momento della giornata</label>
+            <select
+              id="consultant-momento"
+              value={consultantMomento}
+              onChange={(e) => setConsultantMomento(e.target.value)}
+              className="w-full rounded-[12px] bg-[#0E0A16] border border-white/10 p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
+            >
+              <option value="Tutti">Automatico / Tutti</option>
+              <option value="Mattina">Mattina</option>
+              <option value="Pomeriggio">Pomeriggio</option>
+              <option value="Sera">Sera</option>
+              <option value="Notte">Notte</option>
+            </select>
+          </div>
+        </div>
+
+        {recommendedProfumo && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-3 border-t border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 flex items-center justify-center shrink-0">
+                <SmartBottleImage
+                  src={recommendedProfumo.url_foto_vetrina || recommendedProfumo.immagine_url}
+                  alt={recommendedProfumo.nome}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">{recommendedProfumo.brand}</p>
+                <h3 className="font-serif text-lg text-[#F6EFE4]">{recommendedProfumo.nome}</h3>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedProfumoId(recommendedProfumo.id);
+                setWearModalOpen(true);
+              }}
+              style={{ borderColor: `${aura.primary}70`, color: aura.primary }}
+              className="inline-flex items-center gap-2 rounded-full border bg-[#08060C] px-5 py-2.5 text-xs font-bold transition hover:bg-white/5 shrink-0"
+            >
+              <span>Indossa questa creazione</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* PODIO ESSENZIALE A GRADINI (SOLO BOCCETTE E NOMI, ZERO BOX, ZERO NUMERI DI INDOSSI VISIBILI) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="font-serif text-xl text-[#F6EFE4]">Podio</h2>
@@ -200,7 +246,6 @@ export default function HomePage() {
                 onClick={() => setPodioModalOpen(true)}
                 className="flex flex-col items-center cursor-pointer transition hover:scale-105 space-y-2"
               >
-                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#2</span>
                 <div className="h-28 w-full flex items-center justify-center">
                   <SmartBottleImage
                     src={podio[1].profumo.url_foto_vetrina || podio[1].profumo.immagine_url}
@@ -211,7 +256,6 @@ export default function HomePage() {
                 <div className="space-y-0.5">
                   <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9]">{podio[1].profumo.brand}</p>
                   <h3 className="font-serif text-xs text-[#F6EFE4]">{podio[1].profumo.nome}</h3>
-                  <p className="font-mono text-[10px]" style={{ color: aura.primary }}>{podio[1].count} indossi</p>
                 </div>
               </div>
             ) : <div />}
@@ -222,7 +266,6 @@ export default function HomePage() {
                 onClick={() => setPodioModalOpen(true)}
                 className="flex flex-col items-center cursor-pointer transition hover:scale-105 space-y-2 -mt-6"
               >
-                <span className="font-mono text-xs font-bold" style={{ color: aura.primary }}>#1</span>
                 <div className="h-36 w-full flex items-center justify-center">
                   <SmartBottleImage
                     src={podio[0].profumo.url_foto_vetrina || podio[0].profumo.immagine_url}
@@ -233,7 +276,6 @@ export default function HomePage() {
                 <div className="space-y-0.5">
                   <p className="font-mono text-[10px] uppercase tracking-wider font-bold" style={{ color: aura.primary }}>{podio[0].profumo.brand}</p>
                   <h3 className="font-serif text-sm text-[#F6EFE4] font-bold">{podio[0].profumo.nome}</h3>
-                  <p className="font-mono text-[10px] text-[#B8A9C9]">{podio[0].count} indossi</p>
                 </div>
               </div>
             )}
@@ -244,7 +286,6 @@ export default function HomePage() {
                 onClick={() => setPodioModalOpen(true)}
                 className="flex flex-col items-center cursor-pointer transition hover:scale-105 space-y-2"
               >
-                <span className="font-mono text-xs font-bold text-[#B8A9C9]">#3</span>
                 <div className="h-24 w-full flex items-center justify-center">
                   <SmartBottleImage
                     src={podio[2].profumo.url_foto_vetrina || podio[2].profumo.immagine_url}
@@ -255,7 +296,6 @@ export default function HomePage() {
                 <div className="space-y-0.5">
                   <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9]">{podio[2].profumo.brand}</p>
                   <h3 className="font-serif text-xs text-[#F6EFE4]">{podio[2].profumo.nome}</h3>
-                  <p className="font-mono text-[10px]" style={{ color: aura.primary }}>{podio[2].count} indossi</p>
                 </div>
               </div>
             ) : <div />}
@@ -451,7 +491,7 @@ export default function HomePage() {
                   id="input-note"
                   value={wearNote}
                   onChange={(e) => setWearNote(e.target.value)}
-                  placeholder="Cómo si è comportato sulla pelle?"
+                  placeholder="Come si è comportato sulla pelle?"
                   rows={2}
                   className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none resize-none"
                 />
