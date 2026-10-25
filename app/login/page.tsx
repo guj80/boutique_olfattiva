@@ -58,7 +58,10 @@ export default function LoginPage() {
               Email
             </label>
             <input
+              id="email"
+              name="email"
               type="email"
+              autoComplete="username"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -72,14 +75,16 @@ export default function LoginPage() {
               Password
             </label>
             <input
+              id="password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-transparent border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-gold/50 transition-colors"
               placeholder="••••••••"
             />
-          </div>
 
           {error && (
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
