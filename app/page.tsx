@@ -497,7 +497,7 @@ export default function HomePage() {
                 <input
                   id="input-outfit"
                   type="text"
-                  value={wearOutput}
+                  value={wearOutfit}
                   onChange={(e) => setWearOutfit(e.target.value)}
                   placeholder="Es. Ufficio, Cena elegante, Casual..."
                   className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
