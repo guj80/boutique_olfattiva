@@ -1049,10 +1049,33 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
       {deleteConfirmId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/90 backdrop-blur-md">
           <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#161024] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
-            <h3 className="font-serif text-xl text-[#F6EFE4]">
-              Rimuovere questa creazione?
-            </h3>
+            <div className="space-y-1.5">
+              <h3 className="font-serif text-xl text-[#F6EFE4]">
+                Rimuovere questa creazione?
+              </h3>
+              <p className="text-xs text-[#B8A9C9]">
+                Verranno eliminati anche tutti gli indossi registrati nel Diario per questo profumo.
+              </p>
+            </div>
             <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(deleteConfirmId)}
+                className="rounded-full bg-red-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-red-500"
+              >
+                Conferma
+              </button>
+            </div>
+          </div>
+        </div>
+      )}>
               <button
                 onClick={() => setDeleteConfirmId(null)}
                 className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
