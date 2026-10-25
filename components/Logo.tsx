@@ -44,13 +44,15 @@ export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
     <header className="flex items-center justify-between border-b border-white/10 pb-5">
       <div className="flex items-center gap-3.5">
         <Logo size="md" />
-        <div className="space-y-0.5">
-          <span
-            style={{ color: aura.primary }}
-            className="font-mono text-[11px] uppercase tracking-[0.25em] font-bold"
-          >
-            {subtitle}
-          </span>
+        <div className="space-y-1">
+          <div className="inline-block rounded-md bg-[#0E0A16] border border-white/15 px-2.5 py-0.5 shadow-sm">
+            <span
+              style={{ color: aura.primary }}
+              className="font-mono text-[10px] uppercase tracking-[0.22em] font-bold block"
+            >
+              {subtitle}
+            </span>
+          </div>
           <h1 className="font-serif text-2xl sm:text-3xl text-[#F6EFE4] tracking-tight">
             {title}
           </h1>
