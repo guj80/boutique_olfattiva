@@ -5,22 +5,16 @@ export interface ScoutFilters {
 }
 
 export function ownedListForPrompt(profumi: any[]): string[] {
-  return (profumi || [])
-    .map((p) => `${p.brand || ''} ${p.nome || ''}`.trim())
-    .filter(Boolean);
+  // Mantenuto per retrocompatibilità ma non filtrato
+  return [];
 }
 
 export function buildScoutPrompt(filters: ScoutFilters, ownedNames: string[] = []): string {
   const { scoutFamily, includeNotes, excludeNotes } = filters;
-  const excludeOwnedText =
-    ownedNames.length > 0
-      ? `NON proporre MAI questi profumi già presenti in collezione: ${ownedNames.slice(0, 60).join(', ')}.`
-      : '';
 
   return `Sei un esperto internazionale di alta profumeria, profumeria artistica indipendente e case di nicchia storiche.
 REGOLE TASSATIVE:
 - Escludi rigorosamente qualsiasi clone, dupe, imitazione o profumo arabo di massa.
-- ${excludeOwnedText}
 - Restituisci ESATTAMENTE 3 creazioni reali e distinte: 1 Designer di alto profilo, 1 Artistico indipendente e 1 di Nicchia prestigiosa.
 
 Criteri richiesti:
@@ -65,12 +59,8 @@ export function parseScoutArray(rawText: string): any[] {
 }
 
 export function filterNewProposals(proposals: any[], ownedNames: string[] = []): any[] {
-  const ownedLower = ownedNames.map((n) => n.toLowerCase());
-  return proposals.filter((item) => {
-    const full = `${item.brand || ''} ${item.nome || ''}`.toLowerCase();
-    const onlyName = String(item.nome || '').toLowerCase();
-    return !ownedLower.some((o) => o.includes(onlyName) || full.includes(o));
-  });
+  // Disattivato: restituisce direttamente tutte le proposte dell'AI senza scartare nulla
+  return proposals;
 }
 
 export async function collectProposals(
