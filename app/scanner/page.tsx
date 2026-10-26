@@ -13,6 +13,7 @@ import {
   FlaskConical,
   UserCheck,
   Library,
+  Compass,
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
@@ -55,11 +56,10 @@ export default function ScannerPage() {
   const [imageMime, setImageMime] = useState<string>('image/jpeg');
 
   const [extracting, setExtracting] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingTarget, setSavingTarget] = useState<'collezione' | 'radar' | null>(null);
 
   const [draft, setDraft] = useState<Partial<Profumo> | null>(null);
   const [modelSource, setModelSource] = useState<string>('');
-  const [targetStato, setTargetStato] = useState<'collezione' | 'radar'>('collezione');
 
   const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
@@ -83,7 +83,7 @@ export default function ScannerPage() {
         const data = await res.json();
         setSuggestions(Array.isArray(data.results) ? data.results : []);
       } catch {
-        // richiesta annullata o rete assente: nessun suggerimento
+        // richiesta annullata o rete assente
       }
     }, 250);
     return () => {
@@ -172,10 +172,18 @@ export default function ScannerPage() {
         throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
+      // MAI salvare la foto scattata al momento come url_foto_vetrina:
+      // usiamo solo l'immagine ufficiale trovata sul web oppure null (silhouette vettoriale).
+      const officialPhoto =
+        typeof data.url_foto_vetrina === 'string' &&
+        data.url_foto_vetrina.startsWith('http')
+          ? data.url_foto_vetrina
+          : null;
+
       const extractedDraft: Partial<Profumo> = {
         nome: data.nome || '',
         brand: data.brand || '',
-        concentrazione: data.concentrazione || '',
+        concentrazione: data.concentrazione || 'Eau de Parfum',
         famiglia_olfattiva: data.famiglia_olfattiva || 'Legnosa',
         naso: data.naso || '',
         note_testa: data.note_testa || '',
@@ -185,23 +193,23 @@ export default function ScannerPage() {
         descrizione_ai: '',
         prezzo_stimato_euro: data.prezzo_stimato_euro || '',
         formato_ml: Number(data.formato_ml) || 100,
-        stagione_ideale: data.stagione_ideale || '',
-        occasione_ideale: data.occasione_ideale || '',
+        stagione_ideale: data.stagione_ideale || 'Tutte le stagioni',
+        occasione_ideale: data.occasione_ideale || 'Versatile',
         voto_longevita: Number(data.voto_longevita) || 8,
         voto_scia: Number(data.voto_scia) || 8,
         voto_proiezione: Number(data.voto_proiezione) || 8,
         voto_complessita: Number(data.voto_complessita) || 8,
-        url_foto_vetrina: data.url_foto_vetrina || (mode === 'photo' ? imagePreview : null),
+        url_foto_vetrina: officialPhoto,
         note_mouche: '',
         note_pelle: '',
       };
 
-      setModelSource(data._modelUsed || 'neural-engine');
+      setModelSource(data._modelUsed || 'verified-engine');
       setDraft(extractedDraft);
       setCustomAura(resolveAura(extractedDraft.famiglia_olfattiva, extractedDraft.nome));
       showToast(
         data._affidabilita === 'bassa'
-          ? 'Scheda acquisita con dati incerti: verifica prima di salvare.'
+          ? 'Scheda acquisita con dati parziali: verifica i campi prima di salvare.'
           : 'Scheda tecnica acquisita.'
       );
     } catch (err: any) {
@@ -211,14 +219,13 @@ export default function ScannerPage() {
     }
   }
 
-  async function handleSaveToSupabase(e: React.FormEvent) {
-    e.preventDefault();
-    if (!draft || !draft.nome || !draft.brand) {
+  async function saveWithDestination(destination: 'collezione' | 'radar') {
+    if (!draft || !draft.nome?.trim() || !draft.brand?.trim()) {
       showToast('Assicurati che Maison e Nome siano compilati.', 'error');
       return;
     }
 
-    setSaving(true);
+    setSavingTarget(destination);
     try {
       const unifiedNotes =
         draft.note_olfattive ||
@@ -229,24 +236,24 @@ export default function ScannerPage() {
       const fullPayload: Record<string, any> = {
         nome: draft.nome.trim(),
         brand: draft.brand.trim(),
-        concentrazione: draft.concentrazione || '',
+        concentrazione: (draft.concentrazione || '').trim(),
         famiglia_olfattiva: draft.famiglia_olfattiva || 'Legnosa',
         naso: draft.naso && draft.naso.trim() ? draft.naso.trim() : null,
-        note_testa: draft.note_testa || '',
-        note_cuore: draft.note_cuore || '',
-        note_fondo: draft.note_fondo || '',
+        note_testa: (draft.note_testa || '').trim(),
+        note_cuore: (draft.note_cuore || '').trim(),
+        note_fondo: (draft.note_fondo || '').trim(),
         note_olfattive: unifiedNotes,
         descrizione_ai: '',
-        prezzo_stimato_euro: draft.prezzo_stimato_euro || '',
+        prezzo_stimato_euro: (draft.prezzo_stimato_euro || '').trim(),
         formato_ml: Number(draft.formato_ml) || 100,
-        stagione_ideale: draft.stagione_ideale || '',
-        occasione_ideale: draft.occasione_ideale || '',
+        stagione_ideale: draft.stagione_ideale || 'Tutte le stagioni',
+        occasione_ideale: draft.occasione_ideale || 'Versatile',
         voto_longevita: Number(draft.voto_longevita) || 8,
         voto_scia: Number(draft.voto_scia) || 8,
         voto_proiezione: Number(draft.voto_proiezione) || 8,
         voto_complessita: Number(draft.voto_complessita) || 8,
         url_foto_vetrina: draft.url_foto_vetrina || null,
-        stato: targetStato,
+        stato: destination,
         note_mouche: draft.note_mouche || null,
         note_pelle: draft.note_pelle || null,
       };
@@ -261,20 +268,22 @@ export default function ScannerPage() {
             famiglia_olfattiva: fullPayload.famiglia_olfattiva,
             naso: fullPayload.naso,
             note_olfattive: fullPayload.note_olfattive,
-            stato: targetStato,
+            stato: destination,
           },
         ]);
         if (fallbackErr) throw fallbackErr;
       }
 
-      showToast("Creazione registrata nell'Atelier.");
-      router.push(
-        targetStato === 'radar' ? '/collezione?vista=radar' : '/collezione'
+      showToast(
+        destination === 'radar'
+          ? 'Creazione inviata al Testing Radar.'
+          : "Creazione custodita nella Collezione."
       );
+      router.push(destination === 'radar' ? '/collezione?vista=radar' : '/collezione');
     } catch (err: any) {
       showToast(`Errore nel salvataggio: ${err?.message}`, 'error');
     } finally {
-      setSaving(false);
+      setSavingTarget(null);
     }
   }
 
@@ -320,7 +329,7 @@ export default function ScannerPage() {
             }`}
           >
             <Camera className="h-3.5 w-3.5" />
-            <span>Flacone</span>
+            <span>Etichetta</span>
           </button>
           <button
             type="button"
@@ -352,7 +361,7 @@ export default function ScannerPage() {
                   onFocus={() => setShowSuggest(true)}
                   onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
                   autoComplete="off"
-                  placeholder="Es. Ex Nihilo Blue Talisman, Xerjoff Naxos..."
+                  placeholder="Es. Lorenzo Pazzaglia Van Sea, Ex Nihilo Blue Talisman..."
                   className="w-full rounded-[16px] border border-white/10 bg-[#140D1C] px-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:border-white/30 focus:outline-none"
                 />
                 {showSuggest && suggestions.length > 0 && (
@@ -425,7 +434,9 @@ export default function ScannerPage() {
                   className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-white/30"
                 >
                   <Camera style={{ color: aura.primary }} className="h-6 w-6" />
-                  <span className="text-sm font-semibold text-[#F6EFE4]">Scatta Foto</span>
+                  <span className="text-sm font-semibold text-[#F6EFE4]">
+                    Inquadra Etichetta (Solo Lettura)
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -443,12 +454,12 @@ export default function ScannerPage() {
                 <div className="flex items-center gap-4">
                   <img
                     src={imagePreview}
-                    alt="Anteprima"
+                    alt="Anteprima lettura"
                     className="h-16 w-16 rounded-xl object-contain bg-transparent p-1"
                   />
                   <div>
                     <p className="text-sm font-semibold text-[#F6EFE4]">
-                      Acquisizione visiva pronta
+                      Immagine pronta per lettura OCR (non verrà salvata)
                     </p>
                     <button
                       type="button"
@@ -476,7 +487,7 @@ export default function ScannerPage() {
         {mode === 'url' && (
           <form onSubmit={handleExtract} className="space-y-3">
             <label className="block font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
-              URL Pagina Ufficiale della Maison
+              URL Pagina Ufficiale o Scheda Tecnica
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
@@ -504,7 +515,7 @@ export default function ScannerPage() {
           style={{ borderColor: `${aura.primary}45` }}
           className="mt-6 rounded-[28px] border bg-[#1E1428]/95 p-6 space-y-5 shadow-2xl"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div className="flex items-center gap-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#140D1C] border border-white/10">
                 {draft.url_foto_vetrina ? (
@@ -529,40 +540,9 @@ export default function ScannerPage() {
                 </h2>
               </div>
             </div>
-
-            <div className="flex rounded-full bg-[#140D1C] p-1 border border-white/10">
-              <button
-                type="button"
-                onClick={() => setTargetStato('collezione')}
-                style={
-                  targetStato === 'collezione'
-                    ? { backgroundColor: aura.primary }
-                    : undefined
-                }
-                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                  targetStato === 'collezione' ? 'text-[#140D1C]' : 'text-[#B8A9C9]'
-                }`}
-              >
-                Collezione
-              </button>
-              <button
-                type="button"
-                onClick={() => setTargetStato('radar')}
-                style={
-                  targetStato === 'radar'
-                    ? { backgroundColor: aura.primary }
-                    : undefined
-                }
-                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                  targetStato === 'radar' ? 'text-[#140D1C]' : 'text-[#B8A9C9]'
-                }`}
-              >
-                Radar
-              </button>
-            </div>
           </div>
 
-          <form onSubmit={handleSaveToSupabase} className="space-y-4">
+          <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label
@@ -635,6 +615,50 @@ export default function ScannerPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-[#B8A9C9] mb-1">
+                  Concentrazione
+                </label>
+                <input
+                  type="text"
+                  value={draft.concentrazione || ''}
+                  onChange={(e) => setDraft({ ...draft, concentrazione: e.target.value })}
+                  placeholder="Es. Extrait de Parfum"
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-[#B8A9C9] mb-1">
+                  Formato Riferimento (ml)
+                </label>
+                <input
+                  type="number"
+                  min={15}
+                  max={500}
+                  value={draft.formato_ml ?? 100}
+                  onChange={(e) =>
+                    setDraft({ ...draft, formato_ml: Number(e.target.value) || 100 })
+                  }
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-[#B8A9C9] mb-1">
+                  Prezzo Listino Ufficiale
+                </label>
+                <input
+                  type="text"
+                  value={draft.prezzo_stimato_euro || ''}
+                  onChange={(e) =>
+                    setDraft({ ...draft, prezzo_stimato_euro: e.target.value })
+                  }
+                  placeholder="Es. 50ml: €145 (vuoto se incerto)"
+                  className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               <div>
                 <label className="block text-[10px] font-mono uppercase text-[#B8A9C9] mb-1">
@@ -671,24 +695,48 @@ export default function ScannerPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-white/10">
               <button
                 type="button"
                 onClick={() => setDraft(null)}
-                className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
+                className="rounded-full px-4 py-2.5 text-xs font-semibold text-[#B8A9C9] hover:text-[#F6EFE4]"
               >
                 Annulla
               </button>
-              <button
-                type="submit"
-                disabled={saving}
-                style={{ backgroundColor: aura.primary }}
-                className="rounded-full px-6 py-2 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-50"
-              >
-                {saving ? 'Registrazione...' : 'Conferma e Custodisci'}
-              </button>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  disabled={savingTarget !== null}
+                  onClick={() => saveWithDestination('radar')}
+                  style={{ borderColor: aura.primary, color: aura.primary }}
+                  className="flex items-center justify-center gap-2 rounded-full border bg-[#140D1C] px-5 py-2.5 text-xs font-bold transition hover:bg-white/5 disabled:opacity-50"
+                >
+                  <Compass className="h-3.5 w-3.5" />
+                  <span>
+                    {savingTarget === 'radar'
+                      ? 'Invio al Radar...'
+                      : 'Invia al Testing Radar'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={savingTarget !== null}
+                  onClick={() => saveWithDestination('collezione')}
+                  style={{ backgroundColor: aura.primary }}
+                  className="flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-50"
+                >
+                  <Library className="h-3.5 w-3.5" />
+                  <span>
+                    {savingTarget === 'collezione'
+                      ? 'Registrazione...'
+                      : 'Custodisci in Collezione'}
+                  </span>
+                </button>
+              </div>
             </div>
-          </form>
+          </div>
         </section>
       )}
     </main>
