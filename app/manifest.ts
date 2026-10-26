@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Haute Parfumerie Collection & Olfactive Radar',
     start_url: '/',
     display: 'standalone',
-    background_color: '#050308',
-    theme_color: '#050308',
+    background_color: '#000000',
+    theme_color: '#000000',
     icons: [
       {
         src: '/LOGO_LG.jpg',
