@@ -13,6 +13,9 @@ import {
   Snowflake,
   Flower2,
   CalendarHeart,
+  Link2,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { supabase, Profumo, Momento, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
@@ -65,6 +68,10 @@ export function ProfumoDetailModal({
   const [editForm, setEditForm] = useState<any>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Stato per aggiornamento tramite Link ufficiale
+  const [enrichUrl, setEnrichUrl] = useState('');
+  const [enriching, setEnriching] = useState(false);
+
   const [wearOpen, setWearOpen] = useState(false);
   const [wearMomento, setWearMomento] = useState<Momento>('Mattina');
   const [wearOutfit, setWearOutfit] = useState('');
@@ -81,6 +88,7 @@ export function ProfumoDetailModal({
       setIsEditing(false);
       setWearOpen(false);
       setDeleteConfirmId(null);
+      setEnrichUrl('');
     }
   }, [profumo]);
 
@@ -90,6 +98,54 @@ export function ProfumoDetailModal({
   const seasons = getSeasonsForFamily(currentProfumo.famiglia_olfattiva);
   const pAny = currentProfumo as any;
   const isRadarItem = isRadarProfumo(currentProfumo);
+
+  async function handleEnrichViaLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!enrichUrl.trim() || !currentProfumo) return;
+
+    setEnriching(true);
+    try {
+      const res = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: enrichUrl.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Impossibile estrarre i dati dal link.');
+
+      const updatedPayload = {
+        nome: data.nome || currentProfumo.nome,
+        brand: data.brand || currentProfumo.brand,
+        concentrazione: data.concentrazione || currentProfumo.concentrazione,
+        famiglia_olfattiva: data.famiglia_olfattiva || currentProfumo.famiglia_olfattiva,
+        naso: data.naso || currentProfumo.naso,
+        prezzo_stimato_euro: data.prezzo_stimato_euro || currentProfumo.prezzo_stimato_euro,
+        note_testa: data.note_testa || currentProfumo.note_testa,
+        note_cuore: data.note_cuore || currentProfumo.note_cuore,
+        note_fondo: data.note_fondo || currentProfumo.note_fondo,
+        url_foto_vetrina: data.url_foto_vetrina || currentProfumo.url_foto_vetrina,
+      };
+
+      const { error } = await supabase
+        .from('profumi')
+        .update(updatedPayload)
+        .eq('id', currentProfumo.id);
+
+      if (error) throw error;
+
+      const updated = { ...currentProfumo, ...updatedPayload };
+      setCurrentProfumo(updated);
+      setEditForm(updated);
+      setEnrichUrl('');
+      onUpdated?.(updated);
+      showToast('Scheda aggiornata con successo dal link ufficiale.');
+    } catch (err: any) {
+      showToast(err?.message || 'Errore durante l’aggiornamento dal link.', 'error');
+    } finally {
+      setEnriching(false);
+    }
+  }
 
   async function handleSaveEdit() {
     if (!currentProfumo) return;
@@ -259,7 +315,7 @@ export function ProfumoDetailModal({
 
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
-                    Prezzi per Formato (Ufficiali)
+                    Prezzi per Formato (≥ 30ml)
                   </label>
                   <input
                     type="text"
@@ -270,7 +326,7 @@ export function ProfumoDetailModal({
                         prezzo_stimato_euro: e.target.value,
                       })
                     }
-                    placeholder="Es. 50ml: €190 • 100ml: €260 (lascia vuoto se non noto)"
+                    placeholder="Es. 50ml: €190 • 100ml: €260"
                     className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                   />
                 </div>
@@ -405,10 +461,51 @@ export function ProfumoDetailModal({
                   )}
                 </div>
 
+                {/* Sezione Aggiornamento tramite Link Ufficiale */}
+                <div className="mt-5 w-full rounded-2xl bg-[#0E0A16] p-4 border border-white/10 space-y-3 text-left">
+                  <div className="flex items-center justify-between">
+                    <span
+                      style={{ color: modalAura.primary }}
+                      className="font-mono text-[10px] uppercase tracking-wider font-bold"
+                    >
+                      Aggiorna da Link Ufficiale
+                    </span>
+                    <span className="font-mono text-[9px] text-[#B8A9C9]">
+                      Estrae note, prezzi (≥30ml) e foto
+                    </span>
+                  </div>
+                  <form onSubmit={handleEnrichViaLink} className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#B8A9C9]" />
+                      <input
+                        type="url"
+                        value={enrichUrl}
+                        onChange={(e) => setEnrichUrl(e.target.value)}
+                        placeholder="Incolla URL pagina ufficiale..."
+                        className="w-full rounded-[12px] bg-[#161024] border border-white/10 pl-9 pr-3 py-2 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={enriching || !enrichUrl.trim()}
+                      style={{ backgroundColor: modalAura.primary }}
+                      className="inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2 font-mono text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-40"
+                    >
+                      {enriching ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      <span>{enriching ? 'Lettura...' : 'Aggiorna'}</span>
+                    </button>
+                  </form>
+                </div>
+
+                {/* Mostra Prezzo se presente */}
                 {currentProfumo.prezzo_stimato_euro && (
                   <div className="mt-4 w-full rounded-2xl bg-[#0E0A16] p-3.5 border border-white/10 text-center">
                     <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9] block mb-1">
-                      Listino Ufficiale Verificato
+                      Listino Ufficiale (≥ 30ml)
                     </span>
                     <span className="font-mono text-xs text-[#F6EFE4] font-bold">
                       {currentProfumo.prezzo_stimato_euro}
