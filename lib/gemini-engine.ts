@@ -21,26 +21,10 @@ export interface AiResult {
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-// Modelli stabili e super affidabili in prima linea
-const DEFAULT_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+// UNICO modello stabile e super collaudato
+const DEFAULT_MODELS = ['gemini-1.5-flash'];
 
-const DEAD_MODEL_TTL_MS = 6 * 60 * 60 * 1000;
-const DEAD_KEY_TTL_MS = 10 * 60 * 1000;
-const DISCOVERY_TTL_MS = 6 * 60 * 60 * 1000;
-
-let lastWorkingModel: string | null = null;
-let keyDeadUntil = 0;
-const deadModels: Record<string, number> = {};
-const noThinkingModels: Record<string, boolean> = {};
-let discovered: { at: number; models: string[] } | null = null;
-
-export function __resetEngineState() {
-  lastWorkingModel = null;
-  keyDeadUntil = 0;
-  discovered = null;
-  Object.keys(deadModels).forEach((k) => delete deadModels[k]);
-  Object.keys(noThinkingModels).forEach((k) => delete noThinkingModels[k]);
-}
+export function __resetEngineState() {}
 
 function getGeminiKey(): string {
   const k = (
@@ -50,14 +34,6 @@ function getGeminiKey(): string {
     ''
   ).trim();
   return k && k !== 'undefined' ? k : '';
-}
-
-function configuredModels(): string[] {
-  const fromEnv = (process.env.GEMINI_MODELS || '')
-    .split(',')
-    .map((s) => s.trim().replace(/^models\//, ''))
-    .filter(Boolean);
-  return fromEnv.length > 0 ? fromEnv : DEFAULT_MODELS;
 }
 
 function normalizeParts(parts: GeminiPart[]): any[] {
@@ -71,85 +47,6 @@ function normalizeParts(parts: GeminiPart[]): any[] {
     }
     return p;
   });
-}
-
-const SAFETY_SETTINGS = [
-  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-];
-
-type GeminiAttempt =
-  | { ok: true; text: string }
-  | { ok: false; status: number | 'timeout' | 'network' | 'empty' | 'blocked'; detail: string };
-
-async function geminiRequest(
-  model: string,
-  apiKey: string,
-  parts: any[],
-  options: GeminiCallOptions | undefined,
-  mode: { search: boolean; strict: boolean },
-  withThinkingCfg: boolean,
-  timeoutMs: number
-): Promise<GeminiAttempt> {
-  const generationConfig: Record<string, any> = {
-    temperature: options?.temperature ?? 0.1,
-    maxOutputTokens: options?.maxOutputTokens ?? 4096,
-  };
-  if (mode.strict) generationConfig.responseMimeType = 'application/json';
-
-  const payload: Record<string, any> = {
-    contents: [{ role: 'user', parts }],
-    generationConfig,
-    safetySettings: SAFETY_SETTINGS,
-  };
-  if (options?.systemInstruction) {
-    payload.systemInstruction = { parts: [{ text: options.systemInstruction }] };
-  }
-  if (mode.search) payload.tools = [{ googleSearch: {} }];
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      let detail = '';
-      try {
-        detail = (await res.text()).slice(0, 400);
-      } catch {}
-      return { ok: false, status: res.status, detail };
-    }
-
-    const data = await res.json();
-    const rawParts: any[] = data?.candidates?.[0]?.content?.parts || [];
-    const text = rawParts
-      .filter((p) => !p?.thought)
-      .map((p) => p?.text || '')
-      .join('')
-      .trim();
-
-    if (text.length > 2) return { ok: true, text };
-    if (data?.promptFeedback?.blockReason) {
-      return { ok: false, status: 'blocked', detail: String(data.promptFeedback.blockReason) };
-    }
-    return { ok: false, status: 'empty', detail: String(data?.candidates?.[0]?.finishReason || '') };
-  } catch (err: any) {
-    return {
-      ok: false,
-      status: err?.name === 'AbortError' ? 'timeout' : 'network',
-      detail: String(err?.message || ''),
-    };
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 async function chatCompletion(
@@ -193,15 +90,10 @@ function buildMessages(prompt: string, systemInstruction: string | undefined, js
   return messages;
 }
 
-export interface FallbackOptions {
-  deadline?: number;
-  json?: boolean;
-}
-
 export async function callGroqDirect(
   prompt: string,
   systemInstruction?: string,
-  opts?: FallbackOptions
+  opts?: { deadline?: number; json?: boolean }
 ): Promise<AiResult | null> {
   const key = (process.env.GROQ_API_KEY || '').trim();
   if (!key || key === 'undefined') return null;
@@ -228,12 +120,9 @@ export const callGroqFallback = callGroqDirect;
 export async function callOpenRouterFree(
   prompt: string,
   systemInstruction?: string,
-  opts?: FallbackOptions
+  opts?: { deadline?: number; json?: boolean }
 ): Promise<AiResult | null> {
-  const deadline = opts?.deadline ?? Date.now() + 15000;
-  const groq = await callGroqDirect(prompt, systemInstruction, { ...opts, deadline });
-  if (groq) return groq;
-  return null;
+  return callGroqDirect(prompt, systemInstruction, opts);
 }
 
 export async function callGeminiWithFallback(
@@ -241,121 +130,51 @@ export async function callGeminiWithFallback(
   options?: GeminiCallOptions
 ): Promise<AiResult> {
   const deadline = options?.deadline ?? Date.now() + 25000;
-  const left = () => deadline - Date.now();
-  const perAttemptCap = options?.timeoutMs ?? 5000;
-  const errors: string[] = [];
-
-  const normalized = normalizeParts(parts);
-  const hasImage = normalized.some((p) => p.inlineData);
   const apiKey = getGeminiKey();
-
+  const normalized = normalizeParts(parts);
+  const promptText = normalized.map((p) => p.text || '').filter(Boolean).join('\n');
   const jsonMode = options?.jsonMode ?? false;
-  const modes: Array<{ search: boolean; strict: boolean }> = [{ search: false, strict: jsonMode }];
 
-  const tried: Record<string, boolean> = {};
+  // PROVA SUBITO GROQ SE È DISPONIBILE (è fulmineo e azzera i 429/503 di Gemini)
+  const groqResult = await callGroqDirect(promptText, options?.systemInstruction, {
+    deadline,
+    json: jsonMode,
+  });
+  if (groqResult) return groqResult;
 
-  async function runModels(models: string[]): Promise<AiResult | null> {
-    for (const model of models) {
-      if (tried[model]) continue;
-      if ((deadModels[model] || 0) > Date.now()) continue;
-      tried[model] = true;
+  // SE GROQ NON C'È, USA GEMINI 1.5 FLASH
+  if (apiKey) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(`${GEMINI_BASE}/models/gemini-1.5-flash:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: normalized }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096,
+            ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+          },
+        }),
+        signal: controller.signal,
+        cache: 'no-store',
+      });
 
-      for (const mode of modes) {
-        if (left() < 1500) return null;
-        let attempt: GeminiAttempt | null = null;
-
-        for (let retry = 0; retry < 1; retry++) {
-          const timeoutMs = Math.max(1200, Math.min(perAttemptCap, left() - 300));
-          attempt = await geminiRequest(
-            model,
-            apiKey,
-            normalized,
-            options,
-            mode,
-            false,
-            timeoutMs
-          );
-          if (attempt.ok) {
-            lastWorkingModel = model;
-            return { text: attempt.text, modelUsed: model };
-          }
-          break;
-        }
-
-        if (!attempt || attempt.ok) continue;
-        errors.push(`${model}:${attempt.status}`);
-
-        if (attempt.status === 404) {
-          deadModels[model] = Date.now() + DEAD_MODEL_TTL_MS;
-          break;
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || '').join('').trim();
+        if (text && text.length > 2) {
+          return { text, modelUsed: 'gemini-1.5-flash' };
         }
       }
-    }
-    return null;
-  }
-
-  if (apiKey && keyDeadUntil <= Date.now()) {
-    const queue: string[] = [];
-    const base = (lastWorkingModel ? [lastWorkingModel] : []).concat(configuredModels());
-    base.forEach((m) => {
-      if (queue.indexOf(m) === -1) queue.push(m);
-    });
-
-    const first = await runModels(queue);
-    if (first) return first;
-  }
-
-  if (!hasImage && left() > 1500) {
-    const promptText = normalized.map((p) => p.text || '').filter(Boolean).join('\n');
-    const fb = await callGroqDirect(promptText, options?.systemInstruction, {
-      deadline,
-      json: jsonMode,
-    });
-    if (fb) return fb;
-  }
-
-  throw new Error(`Nessun motore AI ha risposto (${errors.join(', ') || 'nessun tentativo'}).`);
-}
-
-/* ------------------------------------------------------------------ */
-/* Estrazione JSON tollerante (Esportata per /api/extract)            */
-/* ------------------------------------------------------------------ */
-
-function repairJson(s: string): string {
-  return s
-    .replace(/[\u201C\u201D]/g, '"')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/,\s*([}\]])/g, '$1');
-}
-
-function balancedObjects(text: string): string[] {
-  const out: string[] = [];
-  let depth = 0;
-  let start = -1;
-  let inStr = false;
-  let esc = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (c === '\\') esc = true;
-      else if (c === '"') inStr = false;
-      continue;
-    }
-    if (c === '"') {
-      inStr = true;
-    } else if (c === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (c === '}' && depth > 0) {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        out.push(text.slice(start, i + 1));
-        start = -1;
-      }
+    } catch {} finally {
+      clearTimeout(timer);
     }
   }
-  return out;
+
+  throw new Error('Nessun motore AI ha risposto.');
 }
 
 export function extractJsonFromAiText<T = any>(rawText: string): T {
@@ -374,21 +193,14 @@ export function extractJsonFromAiText<T = any>(rawText: string): T {
     if (direct && typeof direct === 'object') return direct as T;
   } catch {}
 
-  let best: any = null;
-  let bestLen = -1;
-  for (const candidate of balancedObjects(cleaned)) {
-    for (const variant of [candidate, repairJson(candidate)]) {
-      try {
-        const obj = JSON.parse(variant);
-        if (obj && typeof obj === 'object' && !Array.isArray(obj) && candidate.length > bestLen) {
-          best = obj;
-          bestLen = candidate.length;
-        }
-        break;
-      } catch {}
-    }
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try {
+      const obj = JSON.parse(cleaned.slice(start, end + 1));
+      if (obj && typeof obj === 'object') return obj as T;
+    } catch {}
   }
-  if (best) return best as T;
 
   throw new Error('Formato JSON non riconosciuto.');
 }
