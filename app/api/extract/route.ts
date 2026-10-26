@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { lookup } from 'dns/promises';
-import { isIP } from 'net';
 import {
   callGeminiWithFallback,
-  callOpenRouterFree,
   extractJsonFromAiText,
   GeminiPart,
 } from '@/lib/gemini-engine';
@@ -20,7 +17,8 @@ const MAX_QUERY_LEN = 160;
 const MAX_URL_LEN = 2048;
 const MAX_IMAGE_B64_CHARS = 7_000_000;
 const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'];
-const CACHE_VERSION = 2;
+
+type DbRecord = Record<string, any>;
 
 const SYSTEM_PROMPT = `Sei uno schedatore tecnico di profumeria di nicchia e artistica. Compili schede per un catalogo personale: la precisione conta più della completezza.
 - Meglio un campo vuoto che un dato inventato. Se non sei ragionevolmente certo, usa "" per i testi e null per i numeri.
@@ -119,7 +117,7 @@ function searchTokens(target: string): string[] {
     .slice(0, 5);
 }
 
-function pickTrueMatch(target: string, matches: any[]): any | null {
+function pickTrueMatch(target: string, matches: DbRecord[]): DbRecord | null {
   const tokens = searchTokens(target);
   if (tokens.length === 0) return null;
   for (const rec of matches) {
@@ -129,7 +127,7 @@ function pickTrueMatch(target: string, matches: any[]): any | null {
   return null;
 }
 
-async function findDbMatch(supabase: any, target: string): Promise<any | null> {
+async function findDbMatch(supabase: any, target: string): Promise<DbRecord | null> {
   try {
     const tokens = searchTokens(target).slice(0, 2);
     if (tokens.length === 0) return null;
@@ -157,6 +155,16 @@ function stripBrandFromName(nome: string, brand: string): string {
     return nome.slice(brand.length).replace(/^[\s\-–—:]+/, '').trim() || nome;
   }
   return nome;
+}
+
+function cleanYear(v: unknown): number | null {
+  const n = Number(v);
+  const max = new Date().getFullYear() + 1;
+  return Number.isInteger(n) && n > 1700 && n <= max ? n : null;
+}
+
+function cleanNaso(v: unknown): string {
+  return toText(v, 160);
 }
 
 function parseImageInput(imageBase64: unknown, mimeType: unknown): { mime: string; data: string } | null {
@@ -228,7 +236,6 @@ export async function POST(req: Request) {
       aiText = res.text;
       modelUsed = res.modelUsed;
     } catch {
-      // PARACADUTE DETERMINISTICO LOCALE: Se l'AI è occupata o in timeout, usiamo il DB o un fallback strutturato
       if (dbRecord) {
         return NextResponse.json({
           nome: dbRecord.name || searchTarget,
@@ -256,7 +263,6 @@ export async function POST(req: Request) {
         });
       }
 
-      // Fallback universale se anche il DB non ha il record esatto
       return NextResponse.json({
         nome: searchTarget || 'Creazione Artistica',
         brand: 'Alta Profumeria',
