@@ -37,7 +37,7 @@ export function SplashIntro() {
             opacity: 0,
             transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
           }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050308] overflow-hidden select-none"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000000] overflow-hidden select-none"
         >
           {/* Bagliore atmosferico sinistro (Magenta) */}
           <motion.div
