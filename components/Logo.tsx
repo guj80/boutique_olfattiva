@@ -2,29 +2,39 @@
 
 import React from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useAura } from './AuraProvider';
 
 interface LogoProps {
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   variant?: string;
 }
 
-export function Logo({ className = 'h-9 w-9', size = 'md' }: LogoProps) {
+export function Logo({ className = '', size = 'md' }: LogoProps) {
   const sizeClasses = {
-    sm: 'h-7 w-7',
-    md: 'h-10 w-10',
-    lg: 'h-14 w-14',
+    sm: 'h-8 w-8',
+    md: 'h-11 w-11',
+    lg: 'h-16 w-16',
+    xl: 'h-44 w-44 sm:h-52 sm:w-52',
   };
 
   return (
-    <div className={`relative flex items-center justify-center shrink-0 ${sizeClasses[size]} ${className}`}>
+    <div
+      style={{
+        WebkitMaskImage:
+          'radial-gradient(circle at center, black 64%, transparent 98%)',
+        maskImage:
+          'radial-gradient(circle at center, black 64%, transparent 98%)',
+      }}
+      className={`relative flex items-center justify-center shrink-0 select-none ${sizeClasses[size]} ${className}`}
+    >
       <Image
         src="/LOGO_LG.jpg"
-        alt="Boutique Olfattiva Logo"
+        alt="Atelier LG"
         fill
-        sizes="(max-width: 768px) 40px, 60px"
-        className="object-contain rounded-xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+        sizes="(max-width: 768px) 180px, 240px"
+        className="object-contain mix-blend-screen brightness-110 contrast-125"
         priority
       />
     </div>
@@ -46,7 +56,18 @@ export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
       className="flex items-center justify-between border-b pb-5"
     >
       <div className="flex items-center gap-3.5">
-        <Logo size="md" />
+        <Link
+          href="/"
+          title="Torna alla Home"
+          className="group relative flex items-center justify-center transition-transform duration-300 hover:scale-105 active:scale-95"
+        >
+          <div
+            style={{ backgroundColor: aura.primary }}
+            className="absolute inset-0 rounded-full blur-md opacity-0 transition-opacity duration-300 group-hover:opacity-35"
+          />
+          <Logo size="md" />
+        </Link>
+
         <div className="space-y-1">
           <div
             style={{
