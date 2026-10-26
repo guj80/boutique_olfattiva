@@ -26,7 +26,7 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: 'Atelier LG',
   description: 'Haute Parfumerie Collection',
-  themeColor: '#050308',
+  themeColor: '#000000',
   viewport: { width: 'device-width', initialScale: 1, viewportFit: 'cover' },
 icons: {
     icon: '/LOGO_LG.jpg',
