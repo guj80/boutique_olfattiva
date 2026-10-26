@@ -12,9 +12,6 @@ import {
   Leaf,
   Snowflake,
   Flower2,
-  Sparkles,
-  RefreshCw,
-  Tag,
   CalendarHeart,
 } from 'lucide-react';
 import { supabase, Profumo, Momento, isRadarProfumo } from '@/lib/supabase';
@@ -67,7 +64,6 @@ export function ProfumoDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [loadingPrices, setLoadingPrices] = useState(false);
 
   const [wearOpen, setWearOpen] = useState(false);
   const [wearMomento, setWearMomento] = useState<Momento>('Mattina');
@@ -94,44 +90,6 @@ export function ProfumoDetailModal({
   const seasons = getSeasonsForFamily(currentProfumo.famiglia_olfattiva);
   const pAny = currentProfumo as any;
   const isRadarItem = isRadarProfumo(currentProfumo);
-
-  async function handleFetchFormatsPrices(p: Profumo) {
-    setLoadingPrices(true);
-    try {
-      const prompt = `Sei un esperto di listini ufficiali di alta profumeria di nicchia e artistica.
-Indica i formati di vendita ufficiali (ESCLUSIVAMENTE da 30 ml in su: es. 30ml, 50ml, 70ml, 75ml, 100ml) e i relativi prezzi di listino ufficiali in Euro per il profumo "${p.brand} - ${p.nome}".
-REGOLA TASSATIVA: Ignora ed escludi qualsiasi formato inferiore a 30ml (vietato inserire 2ml, 5ml, 10ml o campioncini).
-Rispondi SOLO con una stringa sintetica in questo formato esatto:
-"50ml: €190 • 100ml: €265"`;
-
-      const res = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, search: true, format: 'prezzi' }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.text) throw new Error('Impossibile recuperare i listini.');
-
-      const cleanPrices = String(data.text)
-        .replace(/^["']|["']$/g, '')
-        .replace(/\n/g, ' • ')
-        .trim();
-
-      await supabase
-        .from('profumi')
-        .update({ prezzo_stimato_euro: cleanPrices })
-        .eq('id', p.id);
-
-      const updated = { ...p, prezzo_stimato_euro: cleanPrices };
-      setCurrentProfumo(updated);
-      onUpdated?.(updated);
-      showToast('Listino formati (≥ 30ml) aggiornato.');
-    } catch (err: any) {
-      showToast(err?.message || 'Errore recupero prezzi per formato.', 'error');
-    } finally {
-      setLoadingPrices(false);
-    }
-  }
 
   async function handleSaveEdit() {
     if (!currentProfumo) return;
@@ -301,7 +259,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
 
                 <div>
                   <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
-                    Prezzi per Formato (≥ 30ml)
+                    Prezzi per Formato (Ufficiali)
                   </label>
                   <input
                     type="text"
@@ -312,7 +270,7 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                         prezzo_stimato_euro: e.target.value,
                       })
                     }
-                    placeholder="Es. 50ml: €190 • 100ml: €260"
+                    placeholder="Es. 50ml: €190 • 100ml: €260 (lascia vuoto se non noto)"
                     className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
                   />
                 </div>
@@ -447,36 +405,14 @@ Rispondi SOLO con una stringa sintetica in questo formato esatto:
                   )}
                 </div>
 
-                {isRadarItem && (
-                  <div className="mt-4 w-full rounded-2xl bg-[#0E0A16] p-4 border border-purple-400/35 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-purple-300">
-                        <Tag className="h-3.5 w-3.5" />
-                        <span className="font-mono text-[10px] uppercase tracking-wider">
-                          Listino Formati Ufficiali (≥ 30ml)
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleFetchFormatsPrices(currentProfumo)}
-                        disabled={loadingPrices}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-purple-400 px-3 py-1 font-mono text-[10px] font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
-                      >
-                        {loadingPrices ? (
-                          <RefreshCw className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-3 w-3" />
-                        )}
-                        <span>
-                          {loadingPrices ? 'Ricerca...' : 'Calcola Prezzi Formati AI'}
-                        </span>
-                      </button>
-                    </div>
-                    <p className="font-mono text-xs text-[#F6EFE4] text-left">
-                      {currentProfumo.prezzo_stimato_euro
-                        ? currentProfumo.prezzo_stimato_euro
-                        : 'Premi "Calcola Prezzi Formati AI" per estrarre i prezzi ufficiali da 30ml, 50ml, 100ml (esclusi campioncini).'}
-                    </p>
+                {currentProfumo.prezzo_stimato_euro && (
+                  <div className="mt-4 w-full rounded-2xl bg-[#0E0A16] p-3.5 border border-white/10 text-center">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9] block mb-1">
+                      Listino Ufficiale Verificato
+                    </span>
+                    <span className="font-mono text-xs text-[#F6EFE4] font-bold">
+                      {currentProfumo.prezzo_stimato_euro}
+                    </span>
                   </div>
                 )}
 
