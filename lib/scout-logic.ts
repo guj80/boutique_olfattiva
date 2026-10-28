@@ -292,7 +292,34 @@ const CURATED_VAULT: ScoutProposal[] = [
 ];
 
 export function ownedListForPrompt(profumi: any[]): string[] {
-  return [];
+  return (profumi || [])
+    .map((p) => `${p.brand || ''} ${p.nome || ''}`.trim())
+    .filter(Boolean);
+}
+
+/** Mappa occasioni → famiglia olfattiva. Utile per suggerimenti mirati. */
+const OCCASION_FAMILY_MAP: Record<string, string> = {
+  ufficio: 'Agrumata',
+  'ufficio / lavoro': 'Agrumata',
+  'ufficio/lavoro': 'Agrumata',
+  formale: 'Legnosa',
+  'riunione formale': 'Legnosa',
+  'riunione': 'Legnosa',
+  'tempo libero': 'Agrumata',
+  cena: 'Ambrata',
+  'aperitivo': 'Ambrata',
+  'aperitivo / cena': 'Ambrata',
+  serata: 'Ambrata',
+  notte: 'Ambrata',
+  sera: 'Ambrata',
+  mattina: 'Agrumata',
+  pomeriggio: 'Agrumata',
+  'cena / serata': 'Ambrata',
+};
+
+export function getFamilyFromOccasione(occasione: string): string {
+  const key = occasione.toLowerCase().trim();
+  return OCCASION_FAMILY_MAP[key] || 'Qualsiasi';
 }
 
 export function buildScoutPrompt(filters: ScoutFilters, ownedNames: string[] = []): string {
@@ -345,7 +372,13 @@ export function parseScoutArray(rawText: string): any[] {
 }
 
 export function filterNewProposals(proposals: any[], ownedNames: string[] = []): any[] {
-  return proposals;
+  if (!ownedNames || ownedNames.length === 0) return proposals;
+  const owned = ownedNames.map((n) => n.toLowerCase().trim());
+  return proposals.filter((p) => {
+    const key = `${p.brand || ''} ${p.nome || ''}`.toLowerCase().trim();
+    // Escluso se è proprio nel possesso dell'utente (match esatto o contenuto)
+    return !owned.some((o) => key === o || key.includes(o) || o.includes(key));
+  });
 }
 
 /**
@@ -424,6 +457,7 @@ export async function collectProposals(
   filters: ScoutFilters,
   ownedNames: string[] = []
 ): Promise<any[]> {
+  let aiProposals: any[] = [];
   try {
     const prompt = buildScoutPrompt(filters, ownedNames);
     const res = await fetch('/api/gemini', {
@@ -435,16 +469,45 @@ export async function collectProposals(
     if (res.ok) {
       const data = await res.json();
       if (data?.text) {
-        const aiProposals = parseScoutArray(data.text);
-        if (aiProposals.length > 0) {
-          return aiProposals;
+        const parsed = parseScoutArray(data.text);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          aiProposals = parsed;
         }
       }
     }
   } catch {
-    // Se l'API esterna fallisce o è in rate-limit, usiamo silenziosamente il Vault Curato
+    // Se l'API fallisce o è in rate-limit, usiamo silenziosamente il Vault Curato
   }
 
-  // Fallback deterministico istantaneo a 0 ms di latenza
-  return selectFromCuratedVault(filters);
+  // Aggregazione: preferisce l'AI, completa con il vault se manca materiale
+  const candidates: any[] = [];
+  if (aiProposals.length >= 1) candidates.push(...aiProposals);
+  if (candidates.length < 3) candidates.push(...selectFromCuratedVault(filters));
+
+  // Filtra possedimenti e duplicati
+  const filtered = filterNewProposals(candidates, ownedNames);
+
+  // Garanzia esatti 3, una per categoria (Designer / Artistico / Nicchia)
+  const categories: Array<'Designer' | 'Artistico' | 'Nicchia'> = ['Designer', 'Artistico', 'Nicchia'];
+  const result: any[] = [];
+  const seen = new Set<string>();
+  for (const cat of categories) {
+    const match = filtered.find((p) => p.categoria === cat && !seen.has(`${p.brand || ''}-${p.nome || ''}`));
+    if (match) {
+      seen.add(`${match.brand || ''}-${match.nome || ''}`);
+      result.push(match);
+    }
+  }
+
+  // Completa eventuali slot mancanti dal vault (esclusi i possessi)
+  for (const item of filtered) {
+    if (result.length >= 3) break;
+    const key = `${item.brand || ''}-${item.nome || ''}`;
+    if (!seen.has(key) && !result.includes(item)) {
+      seen.add(key);
+      result.push(item);
+    }
+  }
+
+  return result.slice(0, 3);
 }

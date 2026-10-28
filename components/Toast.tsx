@@ -7,11 +7,11 @@ import { springSnappy } from '@/lib/motion';
 interface ToastItem {
   id: number;
   message: string;
-  tone?: 'default' | 'error';
+  tone?: 'default' | 'error' | 'success';
 }
 
 interface ToastContextValue {
-  showToast: (message: string, tone?: 'default' | 'error') => void;
+  showToast: (message: string, tone?: 'default' | 'error' | 'success') => void;
 }
 
 const ToastContext = createContext<ToastContextValue>({
@@ -21,7 +21,7 @@ const ToastContext = createContext<ToastContextValue>({
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const showToast = useCallback((message: string, tone: 'default' | 'error' = 'default') => {
+  const showToast = useCallback((message: string, tone: ToastItem['tone'] = 'default') => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, tone }]);
     setTimeout(() => {
@@ -42,8 +42,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <AnimatePresence>
           {toasts.map((t) => {
             const isError = t.tone === 'error';
+            const isSuccess = t.tone === 'success';
             const boxStyle = isError
               ? 'border border-[#E5484D]/50 bg-[#281B35]/95 text-[#F6EFE4]'
+              : isSuccess
+              ? 'border border-[#4ADE80]/40 bg-[#143020]/95 text-[#F6EFE4]'
               : 'border border-[#D8B995]/40 bg-[#1E1428]/95 text-[#F6EFE4]';
             return (
               <motion.div
