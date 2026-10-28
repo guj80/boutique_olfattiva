@@ -147,7 +147,7 @@ export function usePerfumeSearch(options: UsePerfumeSearchOptions = {}) {
       const next = { ...prev };
       // Numeric keys
       if (key === 'page' || key === 'limit') {
-        next[key] = typeof value === 'number' ? value : Number(value);
+        (next[key] as number) = typeof value === 'number' ? value : Number(value);
       } else if (key === 'sortBy' || key === 'sortOrder') {
         (next as any)[key] = value as string;
       } else if (key === 'position') {

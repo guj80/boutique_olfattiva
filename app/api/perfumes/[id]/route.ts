@@ -63,7 +63,7 @@ export async function GET(
       .select('*')
       .or(`note_a_id.eq.${id},note_b_id.eq.${id}`)
       .limit(50);
-    const prices = (perfume.prices || []) as number[];
+    const prices = (perfume as any).prices || [] as number[];
     const minPrice = prices.length > 0 ? Math.min(...prices) : null;
     const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
 
