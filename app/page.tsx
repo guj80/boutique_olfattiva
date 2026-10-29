@@ -2,12 +2,11 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X } from 'lucide-react';
+import { BookOpen, CalendarHeart, Compass, Library, Sparkles, Check, X } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
-import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
 import { getLocalIsoDate, getAutoMomento, computePodio } from '@/lib/home-logic';
@@ -41,14 +40,14 @@ export default function HomePage() {
   const [catalogSyncError, setCatalogSyncError] = useState<string | null>(null);
   const [catalogSynced, setCatalogSynced] = useState(false);
 
-  const { aura, setAuraFromProfumo, setCustomAura } = useAura();
+  const accent = '#C98A3A';
   const { showToast } = useToast();
   const { triggerSpruzzo } = useSpruzzo();
 
   useEffect(() => {
-    setCustomAura(SECTION_THEMES.atelier);
+    ;
     fetchHomeData();
-  }, [setCustomAura]);
+  }, []);
 
   async function fetchHomeData() {
     setLoading(true);
@@ -221,7 +220,7 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => setWearModalOpen(true)}
-            style={{ backgroundColor: aura.primary }}
+            style={{ backgroundColor: '#C98A3A' }}
             className="flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-95 shadow-xl"
           >
             <CalendarHeart className="h-4 w-4" />
@@ -233,20 +232,20 @@ export default function HomePage() {
       {/* SUGGERIMENTO AI — proposte AI suddivise in 3 categorie (Designer / Artistico / Nicchia) */}
       <section className="mx-auto max-w-5xl space-y-4">
         <div
-          style={{ borderColor: `${aura.primary}50` }}
+          style={{ borderColor: '#C98A3A' }}
           className="rounded-[26px] border bg-[#0E0A16] p-5 shadow-2xl space-y-4"
         >
           <div
-            style={{ borderColor: `${aura.primary}25` }}
+            style={{ borderColor: '#C98A3A' }}
             className="flex items-center justify-between border-b pb-3"
           >
             <div
-              style={{ borderColor: `${aura.primary}55` }}
+              style={{ borderColor: '#C98A3A' }}
               className="inline-flex items-center gap-2 rounded-md bg-[#161024] border px-2.5 py-1"
             >
-              <Sparkles style={{ color: aura.primary }} className="h-3.5 w-3.5" />
+              <Sparkles style={{ color: '#C98A3A' }} className="h-3.5 w-3.5" />
               <span
-                style={{ color: aura.primary }}
+                style={{ color: '#C98A3A' }}
                 className="font-mono text-[10px] uppercase tracking-[0.2em] font-bold"
               >
                 Suggerimento AI
@@ -269,7 +268,7 @@ export default function HomePage() {
                 id="consultant-occasione"
                 value={consultantOccasione}
                 onChange={(e) => setConsultantOccasione(e.target.value)}
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="w-full rounded-[14px] bg-[#161024] border px-3.5 py-2.5 text-xs text-[#F6EFE4] focus:outline-none"
               >
                 <option value="Tutti">Qualsiasi Occasione</option>
@@ -292,7 +291,7 @@ export default function HomePage() {
                 id="consultant-momento"
                 value={consultantMomento}
                 onChange={(e) => setConsultantMomento(e.target.value)}
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="w-full rounded-[14px] bg-[#161024] border px-3.5 py-2.5 text-xs text-[#F6EFE4] focus:outline-none"
               >
                 <option value="Tutti">Automatico / Tutti</option>
@@ -308,7 +307,7 @@ export default function HomePage() {
               onClick={generateSuggestions}
               title="Genera Suggerimento AI"
               aria-label="Genera Suggerimento AI"
-              style={{ backgroundColor: aura.primary }}
+              style={{ backgroundColor: '#C98A3A' }}
               className={`flex h-[42px] sm:w-[46px] items-center justify-center rounded-[14px] text-[#08060C] transition hover:scale-105 active:scale-95 shadow-lg shrink-0 px-4 sm:px-0 ${suggLoading ? 'opacity-60 pointer-events-none' : ''}`}
             >
               {suggLoading ? (
@@ -332,23 +331,23 @@ export default function HomePage() {
         {suggestions.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {suggestions.map((s, idx) => {
-              const catAura = resolveAura(s.famiglia_olfattiva, s.nome);
+              const catAccent = '#C98A3A';
               const sImg = s.url_foto_vetrina || s.immagine_url || undefined;
               return (
                 <div
                   key={idx}
                   onClick={() => {
                     setSelectedDetailProfumo(s);
-                    setAuraFromProfumo(s);
+                    ;
                   }}
-                  style={{ borderColor: `${catAura.primary}60` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="group relative flex flex-col justify-between rounded-[24px] border bg-[#161024]/95 p-4 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
                 >
                   <div className="flex justify-center py-1">
                     <div className="relative w-full">
                       <div
                         className="absolute inset-0 rounded-[20px] blur-2xl opacity-30 transition-opacity group-hover:opacity-60"
-                        style={{ backgroundColor: catAura.primary }}
+                        style={{ backgroundColor: '#C98A3A' }}
                       />
                       <BottlePedestal
                         src={sImg}
@@ -361,7 +360,7 @@ export default function HomePage() {
                   </div>
                   <div className="mt-3 space-y-1 text-center">
                     <p
-                      style={{ color: catAura.primary }}
+                      style={{ color: '#C98A3A' }}
                       className="font-mono text-[9px] uppercase tracking-wider truncate"
                     >
                       {s.brand}
@@ -375,7 +374,7 @@ export default function HomePage() {
                   </div>
                   <div className="mt-2 flex justify-center">
                     <span
-                      style={{ color: catAura.primary }}
+                      style={{ color: '#C98A3A' }}
                       className="font-mono text-[8px] uppercase tracking-widest"
                     >
                       #{idx + 1}
@@ -392,11 +391,11 @@ export default function HomePage() {
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <div
-            style={{ borderColor: `${aura.primary}55` }}
+            style={{ borderColor: '#C98A3A' }}
             className="inline-block rounded-md bg-[#0E0A16] border px-3 py-1"
           >
             <h2
-              style={{ color: aura.primary }}
+              style={{ color: '#C98A3A' }}
               className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
             >
               Podio
@@ -406,7 +405,7 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setPodioModalOpen(true)}
-              style={{ borderColor: `${aura.primary}55`, color: aura.primary }}
+              style={{ borderColor: '#C98A3A', color: '#C98A3A' }}
               className="rounded-full bg-[#0E0A16] border px-3.5 py-1.5 font-mono text-[11px] font-bold hover:opacity-85 transition"
             >
               Classifica Completa →
@@ -416,7 +415,7 @@ export default function HomePage() {
 
         {podio.length === 0 ? (
           <div
-            style={{ borderColor: `${aura.primary}35` }}
+            style={{ borderColor: '#C98A3A' }}
             className="rounded-[20px] border bg-[#0E0A16] p-6 text-center text-xs text-[#B8A9C9]"
           >
             Nessun indosso registrato. Usa il tasto &quot;Indossato oggi&quot;.
@@ -428,9 +427,9 @@ export default function HomePage() {
               <div
                 onClick={() => {
                   setSelectedDetailProfumo(podio[1].profumo);
-                  setAuraFromProfumo(podio[1].profumo);
+                  ;
                 }}
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="group flex flex-col items-center justify-between cursor-pointer transition hover:scale-[1.03] rounded-[20px] border bg-[#0E0A16] px-2.5 py-3.5 shadow-xl h-48"
               >
                 <div className="h-20 w-full flex items-center justify-center">
@@ -460,9 +459,9 @@ export default function HomePage() {
               <div
                 onClick={() => {
                   setSelectedDetailProfumo(podio[0].profumo);
-                  setAuraFromProfumo(podio[0].profumo);
+                  ;
                 }}
-                style={{ borderColor: aura.primary }}
+                style={{ borderColor: '#C98A3A' }}
                 className="group flex flex-col items-center justify-between cursor-pointer transition hover:scale-[1.03] rounded-[22px] border-2 bg-[#0E0A16] px-3 py-4 shadow-2xl h-56 -mt-4"
               >
                 <div className="h-24 w-full flex items-center justify-center">
@@ -474,14 +473,14 @@ export default function HomePage() {
                   />
                 </div>
                 <span
-                  style={{ color: aura.primary }}
+                  style={{ color: '#C98A3A' }}
                   className="font-mono text-sm font-extrabold tracking-tight"
                 >
                   #1
                 </span>
                 <div className="space-y-0.5 w-full">
                   <p
-                    style={{ color: aura.primary }}
+                    style={{ color: '#C98A3A' }}
                     className="font-mono text-[9px] uppercase tracking-wider font-bold truncate"
                   >
                     {podio[0].profumo.brand}
@@ -498,9 +497,9 @@ export default function HomePage() {
               <div
                 onClick={() => {
                   setSelectedDetailProfumo(podio[2].profumo);
-                  setAuraFromProfumo(podio[2].profumo);
+                  ;
                 }}
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="group flex flex-col items-center justify-between cursor-pointer transition hover:scale-[1.03] rounded-[20px] border bg-[#0E0A16] px-2.5 py-3.5 shadow-xl h-44"
               >
                 <div className="h-16 w-full flex items-center justify-center">
@@ -532,16 +531,16 @@ export default function HomePage() {
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Link
           href="/collezione"
-          style={{ borderColor: `${aura.primary}50` }}
+          style={{ borderColor: '#C98A3A' }}
           className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
         >
           <div className="space-y-1.5">
             <div
-              style={{ borderColor: `${aura.primary}55` }}
+              style={{ borderColor: '#C98A3A' }}
               className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
             >
               <span
-                style={{ color: aura.primary }}
+                style={{ color: '#C98A3A' }}
                 className="font-mono text-[10px] uppercase tracking-widest font-bold block"
               >
                 Vetrina
@@ -551,7 +550,7 @@ export default function HomePage() {
             <p className="text-xs text-[#B8A9C9]">{profumi.length} creazioni catalogate</p>
           </div>
           <div
-            style={{ backgroundColor: `${aura.primary}20`, color: aura.primary, borderColor: `${aura.primary}45` }}
+            style={{ backgroundColor: '#C98A3A', color: '#C98A3A', borderColor: '#C98A3A' }}
             className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
           >
             <Library className="h-5 w-5" />
@@ -560,16 +559,16 @@ export default function HomePage() {
 
         <Link
           href="/scanner"
-          style={{ borderColor: `${aura.primary}50` }}
+          style={{ borderColor: '#C98A3A' }}
           className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
         >
           <div className="space-y-1.5">
             <div
-              style={{ borderColor: `${aura.primary}55` }}
+              style={{ borderColor: '#C98A3A' }}
               className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
             >
               <span
-                style={{ color: aura.primary }}
+                style={{ color: '#C98A3A' }}
                 className="font-mono text-[10px] uppercase tracking-widest font-bold block"
               >
                 Acquisizione
@@ -579,24 +578,48 @@ export default function HomePage() {
             <p className="text-xs text-[#B8A9C9]">Aggiungi flaconi o campioni</p>
           </div>
           <div
-            style={{ backgroundColor: `${aura.primary}20`, color: aura.primary, borderColor: `${aura.primary}45` }}
+            style={{ backgroundColor: '#C98A3A', color: '#C98A3A', borderColor: '#C98A3A' }}
             className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
           >
             <Compass className="h-5 w-5" />
           </div>
         </Link>
         <Link
-          href="/collezione"
-          style={{ borderColor: `${aura.primary}45` }}
+          href="/enciclopedia"
+          style={{ borderColor: '#C98A3A' }}
           className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
         >
           <div className="space-y-1.5">
             <div
-              style={{ borderColor: `${aura.primary}55` }}
+              style={{ borderColor: '#C98A3A' }}
+              className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
+            >
+              <span style={{ color: '#C98A3A' }} className="font-mono text-[10px] uppercase tracking-widest font-bold block">
+                Enciclopedia
+              </span>
+            </div>
+            <h3 className="font-serif text-2xl text-[#F6EFE4]">Enciclopedia Olfattiva</h3>
+            <p className="text-xs text-[#B8A9C9]">Cerca profumi, note, accordi</p>
+          </div>
+          <div
+            style={{ backgroundColor: '#C98A3A', color: '#C98A3A', borderColor: '#C98A3A' }}
+            className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
+          >
+            <BookOpen className="h-5 w-5" />
+          </div>
+        </Link>
+        <Link
+          href="/collezione"
+          style={{ borderColor: '#C98A3A' }}
+          className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
+        >
+          <div className="space-y-1.5">
+            <div
+              style={{ borderColor: '#C98A3A' }}
               className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
             >
               <span
-                style={{ color: aura.primary }}
+                style={{ color: '#C98A3A' }}
                 className="font-mono text-[10px] uppercase tracking-widest font-bold block"
               >
                 Catalogo Profumo
@@ -611,9 +634,9 @@ export default function HomePage() {
           </div>
           <div
             style={{
-              backgroundColor: catalogSyncing ? 'rgba(255,255,255,0.08)' : `${aura.primary}30`,
-              color: aura.primary,
-              borderColor: `${aura.primary}55`,
+              backgroundColor: catalogSyncing ? 'rgba(255,255,255,0.08)' : '#C98A3A',
+              color: '#C98A3A',
+              borderColor: '#C98A3A',
             }}
             className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
           >
@@ -639,18 +662,18 @@ export default function HomePage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ borderColor: `${aura.primary}60` }}
+            style={{ borderColor: '#C98A3A' }}
             className="relative w-full max-w-lg max-h-[80dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 text-[#F6EFE4] space-y-4 shadow-2xl no-scrollbar mb-16"
           >
             <div
-              style={{ borderColor: `${aura.primary}25` }}
+              style={{ borderColor: '#C98A3A' }}
               className="flex items-center justify-between pb-3 border-b"
             >
               <h3 className="font-serif text-2xl text-[#F6EFE4]">Classifica Generale Indossi</h3>
               <button
                 type="button"
                 onClick={() => setPodioModalOpen(false)}
-                style={{ borderColor: `${aura.primary}40`, color: aura.primary }}
+                style={{ borderColor: '#C98A3A', color: '#C98A3A' }}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] hover:text-white border transition"
               >
                 <X className="h-4 w-4" />
@@ -664,15 +687,15 @@ export default function HomePage() {
                   onClick={() => {
                     setPodioModalOpen(false);
                     setSelectedDetailProfumo(profumo);
-                    setAuraFromProfumo(profumo);
+                    ;
                   }}
-                  style={{ borderColor: `${aura.primary}35` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="flex items-center justify-between rounded-[18px] border bg-[#0E0A16] p-3.5 cursor-pointer transition hover:opacity-90"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
                     <span
                       className="font-mono text-xs font-extrabold w-7 text-center shrink-0"
-                      style={{ color: aura.primary }}
+                      style={{ color: '#C98A3A' }}
                     >
                       #{idx + 1}
                     </span>
@@ -694,7 +717,7 @@ export default function HomePage() {
                     </div>
                   </div>
                   <span
-                    style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
+                    style={{ borderColor: '#C98A3A', color: '#C98A3A' }}
                     className="font-mono text-xs font-bold px-3 py-1 rounded-full bg-[#161024] border shrink-0 ml-2"
                   >
                     {count} {count === 1 ? 'indosso' : 'indossi'}
@@ -716,18 +739,18 @@ export default function HomePage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ borderColor: `${aura.primary}60` }}
+            style={{ borderColor: '#C98A3A' }}
             className="relative w-full max-w-md rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-5 shadow-2xl mb-16"
           >
             <div
-              style={{ borderColor: `${aura.primary}25` }}
+              style={{ borderColor: '#C98A3A' }}
               className="flex items-center justify-between pb-3 border-b"
             >
               <h3 className="font-serif text-2xl text-[#F6EFE4]">Registra Indosso</h3>
               <button
                 type="button"
                 onClick={() => setWearModalOpen(false)}
-                style={{ borderColor: `${aura.primary}40`, color: aura.primary }}
+                style={{ borderColor: '#C98A3A', color: '#C98A3A' }}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] hover:text-white border transition"
               >
                 <X className="h-4 w-4" />
@@ -743,7 +766,7 @@ export default function HomePage() {
                   id="select-profumo"
                   value={selectedProfumoId}
                   onChange={(e) => setSelectedProfumoId(e.target.value)}
-                  style={{ borderColor: `${aura.primary}35` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="w-full rounded-[14px] bg-[#0E0A16] border p-3 text-sm text-[#F6EFE4] focus:outline-none"
                 >
                   {profumi.map((p) => (
@@ -765,7 +788,7 @@ export default function HomePage() {
                     value={wearData}
                     max={getLocalIsoDate()}
                     onChange={(e) => setWearData(e.target.value)}
-                    style={{ borderColor: `${aura.primary}35` }}
+                    style={{ borderColor: '#C98A3A' }}
                     className="w-full rounded-[14px] bg-[#0E0A16] border p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
                   />
                 </div>
@@ -777,7 +800,7 @@ export default function HomePage() {
                     id="select-momento"
                     value={wearMomento}
                     onChange={(e) => setWearMomento(e.target.value as any)}
-                    style={{ borderColor: `${aura.primary}35` }}
+                    style={{ borderColor: '#C98A3A' }}
                     className="w-full rounded-[14px] bg-[#0E0A16] border p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
                   >
                     <option value="Mattina">Mattina</option>
@@ -798,7 +821,7 @@ export default function HomePage() {
                   value={wearOutfit}
                   onChange={(e) => setWearOutfit(e.target.value)}
                   placeholder="Es. Ufficio, Cena elegante, Casual..."
-                  style={{ borderColor: `${aura.primary}35` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="w-full rounded-[14px] bg-[#0E0A16] border p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
                 />
               </div>
@@ -813,13 +836,13 @@ export default function HomePage() {
                   onChange={(e) => setWearNote(e.target.value)}
                   placeholder="Come si è comportato sulla pelle?"
                   rows={2}
-                  style={{ borderColor: `${aura.primary}35` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="w-full rounded-[14px] bg-[#0E0A16] border p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none resize-none"
                 />
               </div>
 
               <div
-                style={{ borderColor: `${aura.primary}25` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="flex justify-end gap-2 pt-3 border-t"
               >
                 <button
@@ -832,7 +855,7 @@ export default function HomePage() {
                 <button
                   type="submit"
                   disabled={savingWear}
-                  style={{ backgroundColor: aura.primary }}
+                  style={{ backgroundColor: '#C98A3A' }}
                   className="flex items-center gap-1.5 rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
                 >
                   <Check className="h-3.5 w-3.5" />
@@ -849,7 +872,7 @@ export default function HomePage() {
         profumo={selectedDetailProfumo}
         onClose={() => {
           setSelectedDetailProfumo(null);
-          setCustomAura(SECTION_THEMES.atelier);
+          ;
         }}
         onUpdated={(updated) => {
           setSelectedDetailProfumo(updated);

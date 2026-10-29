@@ -45,7 +45,7 @@ body {
   background: #33333d;
 }
 /* ==========================================================================
-   AGGIUNTE NUOVO DESIGN AURA (Compatibile con Tailwind 3.3.3)
+   DARK LUXURY DESIGN SYSTEM (Compatibile con Tailwind 3.3.3)
    ========================================================================== */
 
 :root {
@@ -54,9 +54,6 @@ body {
   --bg-surf-2: #281b35;
   --text-ivory: #f6efe4;
   --text-muted: #b8a9c9;
-  --champagne: #d8b995;
-  --aura-1: #d8b995;
-  --aura-2: #3a1f4d;
   --font-sans: var(--font-bricolage);
   --font-serif: var(--font-instrument);
 }
@@ -75,40 +72,37 @@ body {
 /* Piedistallo luminoso per i flaconi */
 .pedestal-surface {
   background: radial-gradient(circle at 50% 42%, #ffffff 0%, #f6efe4 68%, #e6d9c6 100%);
-  box-shadow:
-    0 20px 50px -12px color-mix(in srgb, var(--aura-1) 35%, transparent),
-    inset 0 2px 6px rgba(255, 255, 255, 0.8);
+  box-shadow: 0 20px 50px -12px rgba(255, 255, 255, 0.12), inset 0 2px 6px rgba(255, 255, 255, 0.06);
 }
 
-/* Ombra morbida tinta dall'aura */
-.aura-shadow {
-  box-shadow: 0 16px 40px -12px color-mix(in srgb, var(--aura-1) 28%, rgba(20, 13, 28, 0.7));
+/* Ombra morbida per gli elementi dell'interfaccia */
+.card-shadow {
+  box-shadow: 0 16px 40px -12px rgba(10, 6, 15, 0.7);
 }
 
-/* Skeleton con brillantezza d'aura */
-@keyframes auraShimmer {
+/* Skeleton con brillantezza sottile */
+@keyframes skeletonShimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-.aura-skeleton {
-  background: linear-gradient(
-    110deg,
-    #1e1428 25%,
-    color-mix(in srgb, var(--aura-1) 24%, #281b35) 50%,
-    #1e1428 75%
-  );
+.skeleton-shimmer {
+  background: linear-gradient(110deg, #1e1428 25%, #281b35 50%, #1e1428 75%);
   background-size: 200% 100%;
-  animation: auraShimmer 2.2s infinite linear;
+  animation: skeletonShimmer 2.2s infinite linear;
 }
 @media (prefers-reduced-motion: reduce) {
-  .aura-skeleton { animation: none; background: #1e1428; }
+  .skeleton-shimmer { animation: none; background: #1e1428; }
 }
 
 /* Grana sottile */
-.aura-grain {
+.grain-texture {
   background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 200px 200px;
 }
+
+/* Nasconde la scrollbar nei caroselli orizzontali */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* Nasconde la scrollbar nei caroselli orizzontali */
 .no-scrollbar::-webkit-scrollbar { display: none; }

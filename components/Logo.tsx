@@ -3,7 +3,6 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useAura } from './AuraProvider';
 
 interface LogoProps {
   className?: string;
@@ -48,11 +47,11 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
-  const { aura } = useAura();
+  const accent = '#C98A3A';
 
   return (
     <header
-      style={{ borderColor: `${aura.primary}30` }}
+      style={{ borderColor: '#C98A3A' }}
       className="flex items-center justify-between border-b pb-5"
     >
       <div className="flex items-center gap-3.5">
@@ -62,7 +61,7 @@ export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
           className="group relative flex items-center justify-center transition-transform duration-300 hover:scale-105 active:scale-95"
         >
           <div
-            style={{ backgroundColor: aura.primary }}
+            style={{ backgroundColor: '#C98A3A' }}
             className="absolute inset-0 rounded-full blur-md opacity-0 transition-opacity duration-300 group-hover:opacity-35"
           />
           <Logo size="md" />
@@ -71,13 +70,13 @@ export function PageHeader({ title, subtitle, rightSlot }: PageHeaderProps) {
         <div className="space-y-1">
           <div
             style={{
-              borderColor: `${aura.primary}55`,
+              borderColor: '#C98A3A',
               backgroundColor: '#0E0A16',
             }}
             className="inline-block rounded-md border px-2.5 py-0.5 shadow-sm"
           >
             <span
-              style={{ color: aura.primary }}
+              style={{ color: '#C98A3A' }}
               className="font-mono text-[10px] uppercase tracking-[0.22em] font-bold block"
             >
               {subtitle}

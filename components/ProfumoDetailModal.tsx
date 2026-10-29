@@ -20,7 +20,6 @@ import {
 import { supabase, Profumo, Momento, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
 import { BottlePedestal } from './BottleImage';
-import { resolveAura } from './AuraProvider';
 import { useToast } from './Toast';
 import { useSpruzzo } from './Spruzzo';
 
@@ -94,7 +93,7 @@ export function ProfumoDetailModal({
 
   if (!currentProfumo) return null;
 
-  const modalAura = resolveAura(currentProfumo.famiglia_olfattiva, currentProfumo.nome);
+  const modalAccent = '#C98A3A';
   const seasons = getSeasonsForFamily(currentProfumo.famiglia_olfattiva);
   const pAny = currentProfumo as any;
   const isRadarItem = isRadarProfumo(currentProfumo);
@@ -227,13 +226,13 @@ export function ProfumoDetailModal({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          style={{ borderColor: `${modalAura.primary}55` }}
+          style={{ borderColor: '#C98A3A' }}
           className="relative w-full max-w-lg max-h-[88dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16"
         >
           <div className="absolute right-5 top-5 flex items-center gap-2 z-20">
             <button
               onClick={() => setIsEditing(!isEditing)}
-              style={{ color: modalAura.primary }}
+              style={{ color: '#C98A3A' }}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] hover:text-white border border-white/10 transition"
               title="Modifica scheda"
             >
@@ -395,7 +394,7 @@ export function ProfumoDetailModal({
                 </button>
                 <button
                   onClick={handleSaveEdit}
-                  style={{ backgroundColor: modalAura.primary }}
+                  style={{ backgroundColor: '#C98A3A' }}
                   className="flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#08060C]"
                 >
                   <Check className="h-3.5 w-3.5" />
@@ -409,7 +408,7 @@ export function ProfumoDetailModal({
                 <div className="relative mb-4">
                   <div
                     className="absolute inset-0 rounded-[36px] blur-2xl opacity-55"
-                    style={{ backgroundColor: modalAura.primary }}
+                    style={{ backgroundColor: '#C98A3A' }}
                   />
                   <BottlePedestal
                     src={
@@ -424,7 +423,7 @@ export function ProfumoDetailModal({
                 </div>
 
                 <span
-                  style={{ color: modalAura.primary }}
+                  style={{ color: '#C98A3A' }}
                   className="font-mono text-xs uppercase tracking-[0.2em]"
                 >
                   {currentProfumo.brand}
@@ -440,11 +439,11 @@ export function ProfumoDetailModal({
                 <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                   {currentProfumo.naso && (
                     <div
-                      style={{ borderColor: `${modalAura.primary}40` }}
+                      style={{ borderColor: '#C98A3A' }}
                       className="inline-flex items-center gap-1.5 rounded-full bg-[#0E0A16] px-3.5 py-1.5 border font-mono text-[11px] text-[#F6EFE4]"
                     >
                       <UserCheck
-                        style={{ color: modalAura.primary }}
+                        style={{ color: '#C98A3A' }}
                         className="h-3.5 w-3.5"
                       />
                       <span>Naso: {currentProfumo.naso}</span>
@@ -453,7 +452,7 @@ export function ProfumoDetailModal({
                   {pAny.anno_lancio && (
                     <div className="inline-flex items-center gap-1.5 rounded-full bg-[#0E0A16] px-3.5 py-1.5 border border-white/10 font-mono text-[11px] text-[#B8A9C9]">
                       <Calendar
-                        style={{ color: modalAura.primary }}
+                        style={{ color: '#C98A3A' }}
                         className="h-3.5 w-3.5"
                       />
                       <span>Anno: {pAny.anno_lancio}</span>
@@ -465,7 +464,7 @@ export function ProfumoDetailModal({
                 <div className="mt-5 w-full rounded-2xl bg-[#0E0A16] p-4 border border-white/10 space-y-3 text-left">
                   <div className="flex items-center justify-between">
                     <span
-                      style={{ color: modalAura.primary }}
+                      style={{ color: '#C98A3A' }}
                       className="font-mono text-[10px] uppercase tracking-wider font-bold"
                     >
                       Aggiorna da Link Ufficiale
@@ -488,7 +487,7 @@ export function ProfumoDetailModal({
                     <button
                       type="submit"
                       disabled={enriching || !enrichUrl.trim()}
-                      style={{ backgroundColor: modalAura.primary }}
+                      style={{ backgroundColor: '#C98A3A' }}
                       className="inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2 font-mono text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-40"
                     >
                       {enriching ? (
@@ -515,7 +514,7 @@ export function ProfumoDetailModal({
 
                 <div className="mt-5 w-full space-y-2.5 text-left">
                   <h3
-                    style={{ color: modalAura.primary }}
+                    style={{ color: '#C98A3A' }}
                     className="font-mono text-[10px] uppercase tracking-[0.2em]"
                   >
                     Piramide Olfattiva
@@ -524,7 +523,7 @@ export function ProfumoDetailModal({
                     {currentProfumo.note_testa && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
                         <span
-                          style={{ color: modalAura.primary }}
+                          style={{ color: '#C98A3A' }}
                           className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
                         >
                           Testa
@@ -537,7 +536,7 @@ export function ProfumoDetailModal({
                     {currentProfumo.note_cuore && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
                         <span
-                          style={{ color: modalAura.primary }}
+                          style={{ color: '#C98A3A' }}
                           className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
                         >
                           Cuore
@@ -550,7 +549,7 @@ export function ProfumoDetailModal({
                     {currentProfumo.note_fondo && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
                         <span
-                          style={{ color: modalAura.primary }}
+                          style={{ color: '#C98A3A' }}
                           className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
                         >
                           Fondo
@@ -621,12 +620,12 @@ export function ProfumoDetailModal({
               {wearOpen && (
                 <form
                   onSubmit={handleSaveIndosso}
-                  style={{ borderColor: `${modalAura.primary}45` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="w-full rounded-2xl bg-[#0E0A16] p-4 border space-y-3 text-left"
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      style={{ color: modalAura.primary }}
+                      style={{ color: '#C98A3A' }}
                       className="font-mono text-[10px] uppercase tracking-wider font-bold"
                     >
                       Registra nel Diario Olfattivo
@@ -648,7 +647,7 @@ export function ProfumoDetailModal({
                         onClick={() => setWearMomento(m)}
                         style={
                           wearMomento === m
-                            ? { backgroundColor: modalAura.primary }
+                            ? { backgroundColor: '#C98A3A' }
                             : undefined
                         }
                         className={`rounded-xl py-2 text-[11px] font-semibold transition ${
@@ -683,7 +682,7 @@ export function ProfumoDetailModal({
                     <button
                       type="submit"
                       disabled={savingWear}
-                      style={{ backgroundColor: modalAura.primary }}
+                      style={{ backgroundColor: '#C98A3A' }}
                       className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
                     >
                       <Check className="h-3.5 w-3.5" />
@@ -710,7 +709,7 @@ export function ProfumoDetailModal({
                         setWearMomento(getDefaultMomento());
                         setWearOpen(true);
                       }}
-                      style={{ borderColor: `${modalAura.primary}60`, color: modalAura.primary }}
+                      style={{ borderColor: '#C98A3A', color: '#C98A3A' }}
                       className="flex items-center gap-1.5 rounded-full border bg-[#0E0A16] px-4 py-2.5 text-xs font-bold transition hover:bg-white/5"
                     >
                       <CalendarHeart className="h-3.5 w-3.5" />
@@ -720,7 +719,7 @@ export function ProfumoDetailModal({
 
                   <button
                     onClick={onClose}
-                    style={{ backgroundColor: modalAura.primary }}
+                    style={{ backgroundColor: '#C98A3A' }}
                     className="rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90"
                   >
                     Chiudi

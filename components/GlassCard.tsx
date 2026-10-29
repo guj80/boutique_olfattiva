@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAura } from './AuraProvider';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -16,8 +15,8 @@ export function GlassCard({
   accentColor,
   interactive = false,
 }: GlassCardProps) {
-  const { aura } = useAura();
-  const color = accentColor || aura.primary;
+  const accent = '#C98A3A';
+  const color = accentColor || '#C98A3A';
   const [coords, setCoords] = useState({ x: 50, y: 0, active: false });
 
   function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {

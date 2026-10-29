@@ -15,16 +15,6 @@ const config: Config = {
           light: '#111116',
           card: '#0D0D11',
         },
-        champagne: {
-          DEFAULT: '#F7E7CE',
-          muted: '#D8C3A5',
-          dark: '#C5A059',
-        },
-        gold: {
-          DEFAULT: '#C5A059',
-          light: '#F7E7CE',
-          dim: '#8A6D3B',
-        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -70,12 +60,11 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       backgroundImage: {
-        'champagne-gradient': 'linear-gradient(135deg, #F7E7CE 0%, #C5A059 100%)',
         'obsidian-radial': 'radial-gradient(circle at top, rgba(197, 160, 89, 0.12) 0%, rgba(8, 8, 10, 0) 70%)',
       },
       boxShadow: {
-        'champagne-glow': '0 0 25px -5px rgba(247, 231, 206, 0.15)',
-        'champagne-intense': '0 0 35px -5px rgba(197, 160, 89, 0.35)',
+        'obsidian-glow': '0 0 25px -5px rgba(197, 160, 89, 0.12)',
+        'obsidian-intense': '0 0 35px -5px rgba(197, 160, 89, 0.30)',
       },
     },
   },

@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
-import { useAura, resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 
 type CatalogHit = {
@@ -64,7 +63,7 @@ export default function ScannerPage() {
   const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
 
-  const { aura, setCustomAura } = useAura();
+  const accent = '#C98A3A';
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -206,7 +205,7 @@ export default function ScannerPage() {
 
       setModelSource(data._modelUsed || 'verified-engine');
       setDraft(extractedDraft);
-      setCustomAura(resolveAura(extractedDraft.famiglia_olfattiva, extractedDraft.nome));
+      
       showToast(
         data._affidabilita === 'bassa'
           ? 'Scheda acquisita con dati parziali: verifica i campi prima di salvare.'
@@ -295,24 +294,24 @@ export default function ScannerPage() {
         rightSlot={
           <Link
             href="/collezione"
-            style={{ borderColor: `${aura.primary}45` }}
+            style={{ borderColor: '#C98A3A' }}
             className="flex items-center gap-2 rounded-full border bg-[#140D1C] px-4 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:border-white/50"
           >
-            <Library style={{ color: aura.primary }} className="h-3.5 w-3.5" />
+            <Library style={{ color: '#C98A3A' }} className="h-3.5 w-3.5" />
             <span>Collezione</span>
           </Link>
         }
       />
 
       <section
-        style={{ borderColor: `${aura.primary}30` }}
-        className="mt-6 rounded-[28px] border bg-[#1E1428]/90 p-5 sm:p-6 aura-shadow space-y-5"
+        style={{ borderColor: '#C98A3A' }}
+        className="mt-6 rounded-[28px] border bg-[#1E1428]/90 p-5 sm:p-6  space-y-5"
       >
         <div className="grid grid-cols-3 gap-2 rounded-full bg-[#140D1C] p-1.5 border border-white/10">
           <button
             type="button"
             onClick={() => setMode('name')}
-            style={mode === 'name' ? { backgroundColor: aura.primary } : undefined}
+            style={mode === 'name' ? { backgroundColor: '#C98A3A' } : undefined}
             className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
               mode === 'name' ? 'text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
@@ -323,7 +322,7 @@ export default function ScannerPage() {
           <button
             type="button"
             onClick={() => setMode('photo')}
-            style={mode === 'photo' ? { backgroundColor: aura.primary } : undefined}
+            style={mode === 'photo' ? { backgroundColor: '#C98A3A' } : undefined}
             className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
               mode === 'photo' ? 'text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
@@ -334,7 +333,7 @@ export default function ScannerPage() {
           <button
             type="button"
             onClick={() => setMode('url')}
-            style={mode === 'url' ? { backgroundColor: aura.primary } : undefined}
+            style={mode === 'url' ? { backgroundColor: '#C98A3A' } : undefined}
             className={`flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold transition ${
               mode === 'url' ? 'text-[#140D1C]' : 'text-[#B8A9C9] hover:text-[#F6EFE4]'
             }`}
@@ -394,7 +393,7 @@ export default function ScannerPage() {
               <button
                 type="submit"
                 disabled={extracting || !inputName.trim()}
-                style={{ backgroundColor: aura.primary }}
+                style={{ backgroundColor: '#C98A3A' }}
                 className="flex items-center justify-center gap-2 rounded-[16px] px-6 py-3 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-40"
               >
                 {extracting ? (
@@ -433,7 +432,7 @@ export default function ScannerPage() {
                   onClick={() => cameraInputRef.current?.click()}
                   className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-white/30"
                 >
-                  <Camera style={{ color: aura.primary }} className="h-6 w-6" />
+                  <Camera style={{ color: '#C98A3A' }} className="h-6 w-6" />
                   <span className="text-sm font-semibold text-[#F6EFE4]">
                     Inquadra Etichetta (Solo Lettura)
                   </span>
@@ -443,7 +442,7 @@ export default function ScannerPage() {
                   onClick={() => galleryInputRef.current?.click()}
                   className="flex flex-col items-center justify-center gap-3 rounded-[22px] border border-white/10 bg-[#140D1C] p-6 transition hover:border-white/30"
                 >
-                  <ImageIcon style={{ color: aura.primary }} className="h-6 w-6" />
+                  <ImageIcon style={{ color: '#C98A3A' }} className="h-6 w-6" />
                   <span className="text-sm font-semibold text-[#F6EFE4]">
                     Seleziona da Libreria
                   </span>
@@ -474,7 +473,7 @@ export default function ScannerPage() {
                   type="button"
                   onClick={() => handleExtract()}
                   disabled={extracting}
-                  style={{ backgroundColor: aura.primary }}
+                  style={{ backgroundColor: '#C98A3A' }}
                   className="rounded-full px-6 py-3 text-xs font-bold text-[#140D1C]"
                 >
                   {extracting ? 'Analisi...' : 'Avvia Riconoscimento'}
@@ -500,7 +499,7 @@ export default function ScannerPage() {
               <button
                 type="submit"
                 disabled={extracting || !inputUrl.trim()}
-                style={{ backgroundColor: aura.primary }}
+                style={{ backgroundColor: '#C98A3A' }}
                 className="rounded-[16px] px-6 py-3 text-xs font-bold text-[#140D1C]"
               >
                 {extracting ? 'Lettura...' : 'Estrai'}
@@ -512,7 +511,7 @@ export default function ScannerPage() {
 
       {draft && (
         <section
-          style={{ borderColor: `${aura.primary}45` }}
+          style={{ borderColor: '#C98A3A' }}
           className="mt-6 rounded-[28px] border bg-[#1E1428]/95 p-6 space-y-5 shadow-2xl"
         >
           <div className="flex items-center justify-between gap-4 pb-4 border-b border-white/10">
@@ -525,12 +524,12 @@ export default function ScannerPage() {
                     className="h-full w-full object-contain p-1.5"
                   />
                 ) : (
-                  <FlaskConical style={{ color: aura.primary }} className="h-5 w-5" />
+                  <FlaskConical style={{ color: '#C98A3A' }} className="h-5 w-5" />
                 )}
               </div>
               <div>
                 <span
-                  style={{ color: aura.primary }}
+                  style={{ color: '#C98A3A' }}
                   className="font-mono text-[10px] uppercase tracking-wider"
                 >
                   Fonte: {modelSource}
@@ -546,7 +545,7 @@ export default function ScannerPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div>
                 <label
-                  style={{ color: aura.primary }}
+                  style={{ color: '#C98A3A' }}
                   className="block text-[10px] font-mono uppercase mb-1"
                 >
                   Maison
@@ -560,7 +559,7 @@ export default function ScannerPage() {
               </div>
               <div>
                 <label
-                  style={{ color: aura.primary }}
+                  style={{ color: '#C98A3A' }}
                   className="block text-[10px] font-mono uppercase mb-1"
                 >
                   Creazione
@@ -574,7 +573,7 @@ export default function ScannerPage() {
               </div>
               <div>
                 <label
-                  style={{ color: aura.primary }}
+                  style={{ color: '#C98A3A' }}
                   className="block text-[10px] font-mono uppercase mb-1"
                 >
                   Famiglia Pura
@@ -584,7 +583,7 @@ export default function ScannerPage() {
                   onChange={(e) => {
                     const nextFam = e.target.value;
                     setDraft({ ...draft, famiglia_olfattiva: nextFam });
-                    setCustomAura(resolveAura(nextFam, draft.nome));
+                    
                   }}
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 >
@@ -597,7 +596,7 @@ export default function ScannerPage() {
               </div>
               <div>
                 <label
-                  style={{ color: aura.primary }}
+                  style={{ color: '#C98A3A' }}
                   className="block text-[10px] font-mono uppercase mb-1"
                 >
                   Naso (Maître Parfumeur)
@@ -709,7 +708,7 @@ export default function ScannerPage() {
                   type="button"
                   disabled={savingTarget !== null}
                   onClick={() => saveWithDestination('radar')}
-                  style={{ borderColor: aura.primary, color: aura.primary }}
+                  style={{ borderColor: '#C98A3A', color: '#C98A3A' }}
                   className="flex items-center justify-center gap-2 rounded-full border bg-[#140D1C] px-5 py-2.5 text-xs font-bold transition hover:bg-white/5 disabled:opacity-50"
                 >
                   <Compass className="h-3.5 w-3.5" />
@@ -724,7 +723,7 @@ export default function ScannerPage() {
                   type="button"
                   disabled={savingTarget !== null}
                   onClick={() => saveWithDestination('collezione')}
-                  style={{ backgroundColor: aura.primary }}
+                  style={{ backgroundColor: '#C98A3A' }}
                   className="flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-50"
                 >
                   <Library className="h-3.5 w-3.5" />

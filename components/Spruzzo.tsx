@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useAura } from './AuraProvider';
 
 export type SpruzzoAnchor =
   | DOMRect
@@ -72,7 +71,7 @@ function resolveAnchorOrigin(anchor?: SpruzzoAnchor): { x: number; y: number } {
 
 export function SpruzzoProvider({ children }: { children: React.ReactNode }) {
   const [burst, setBurst] = useState<BurstState | null>(null);
-  const { aura } = useAura();
+  const accent = '#C98A3A';
   const prefersReducedMotion = useReducedMotion();
 
   const triggerSpruzzo = useCallback((anchor?: SpruzzoAnchor) => {
@@ -121,8 +120,8 @@ export function SpruzzoProvider({ children }: { children: React.ReactNode }) {
                   style={{
                     width: p.size,
                     height: p.size,
-                    backgroundColor: p.id % 2 === 0 ? aura.primary : '#F6EFE4',
-                    boxShadow: `0 0 12px ${aura.primary}`,
+                    backgroundColor: p.id % 2 === 0 ? '#C98A3A' : '#F6EFE4',
+                    boxShadow: `0 0 12px '#C98A3A'`,
                   }}
                   className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full will-change-transform"
                 />

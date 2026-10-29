@@ -44,7 +44,7 @@ export function BottlePedestal({ src, alt = 'Profumo', size = 'md', className = 
 
       {showSigil && (
         <div className="absolute bottom-2.5 right-3 z-20 flex h-7 w-7 items-center justify-center overflow-hidden rounded-md border border-[#D8B995]/30 bg-[#140D1C]/90 shadow-md backdrop-blur-sm">
-          <img src="/logo.jpg" alt="Logo L'Aura" className="h-full w-full object-cover opacity-90" />
+          <img src="/logo.jpg" alt="Logo Firma" className="h-full w-full object-cover opacity-90" />
         </div>
       )}
     </div>

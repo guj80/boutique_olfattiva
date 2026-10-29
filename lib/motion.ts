@@ -12,7 +12,7 @@ export const springSnappy: Transition = {
   damping: 32,
 };
 
-export const auraTransition: Transition = {
+export const darkTransition: Transition = {
   duration: 0.8,
   ease: [0.22, 1, 0.36, 1],
 };

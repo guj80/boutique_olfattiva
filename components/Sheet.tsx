@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, PanInfo, useDragControls } from 'framer-motion';
 import { X } from 'lucide-react';
 import { springSoft } from '@/lib/motion';
-import { useAura } from './AuraProvider';
 
 interface SheetProps {
   open: boolean;
@@ -27,7 +26,7 @@ export function Sheet({
   const dragControls = useDragControls();
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
-  const { setHideDock } = useAura();
+  const accent = '#C98A3A';
 
   useEffect(() => {
     if (open) setSnap(initialSnap);
@@ -35,11 +34,9 @@ export function Sheet({
 
   useEffect(() => {
     if (!open) {
-      setHideDock(false);
       return;
     }
 
-    setHideDock(true);
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -54,7 +51,6 @@ export function Sheet({
     window.addEventListener('keydown', onKey);
 
     return () => {
-      setHideDock(false);
       cancelAnimationFrame(focusTimer);
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKey);
@@ -62,7 +58,7 @@ export function Sheet({
         previousFocusRef.current.focus();
       }
     };
-  }, [open, onClose, setHideDock]);
+  }, [open, onClose]);
 
   function handleDragEnd(_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) {
     const vy = info.velocity.y;

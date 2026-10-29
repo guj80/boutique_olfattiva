@@ -6,7 +6,6 @@ import { supabase, Profumo, Momento } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
-import { useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
 import { getLocalIsoDate } from '@/lib/home-logic';
@@ -27,14 +26,14 @@ export default function DiarioPage() {
   const [wearNote, setWearNote] = useState('');
   const [savingWear, setSavingWear] = useState(false);
 
-  const { aura, setAuraFromProfumo, setCustomAura } = useAura();
+  const accent = '#C98A3A';
   const { showToast } = useToast();
   const { triggerSpruzzo } = useSpruzzo();
 
   useEffect(() => {
-    setCustomAura(SECTION_THEMES.diario || SECTION_THEMES.atelier);
+    ;
     fetchDiarioData();
-  }, [setCustomAura]);
+  }, []);
 
   async function fetchDiarioData() {
     setLoading(true);
@@ -161,17 +160,17 @@ export default function DiarioPage() {
 
       {/* 1. FORM DI REGISTRAZIONE RAPIDA IN EVIDENZA */}
       <section
-        style={{ borderColor: `${aura.primary}50` }}
+        style={{ borderColor: '#C98A3A' }}
         className="rounded-[26px] border bg-[#0E0A16] p-6 shadow-2xl space-y-5"
       >
         <div
-          style={{ borderColor: `${aura.primary}25` }}
+          style={{ borderColor: '#C98A3A' }}
           className="flex items-center justify-between border-b pb-3"
         >
           <div className="flex items-center gap-2">
-            <CalendarHeart style={{ color: aura.primary }} className="h-4 w-4" />
+            <CalendarHeart style={{ color: '#C98A3A' }} className="h-4 w-4" />
             <span
-              style={{ color: aura.primary }}
+              style={{ color: '#C98A3A' }}
               className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
             >
               Registra Nuovo Indosso
@@ -191,7 +190,7 @@ export default function DiarioPage() {
               id="select-profumo"
               value={selectedProfumoId}
               onChange={(e) => setSelectedProfumoId(e.target.value)}
-              style={{ borderColor: `${aura.primary}40` }}
+              style={{ borderColor: '#C98A3A' }}
               className="w-full rounded-[14px] bg-[#161024] border p-3 text-sm text-[#F6EFE4] focus:outline-none"
             >
               {profumi.map((p) => (
@@ -213,7 +212,7 @@ export default function DiarioPage() {
                 value={wearData}
                 max={getLocalIsoDate()}
                 onChange={(e) => setWearData(e.target.value)}
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="w-full rounded-[14px] bg-[#161024] border p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
               />
             </div>
@@ -225,7 +224,7 @@ export default function DiarioPage() {
                 id="select-momento"
                 value={wearMomento}
                 onChange={(e) => setWearMomento(e.target.value as Momento)}
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="w-full rounded-[14px] bg-[#161024] border p-2.5 text-xs text-[#F6EFE4] focus:outline-none"
               >
                 <option value="Mattina">Mattina</option>
@@ -247,7 +246,7 @@ export default function DiarioPage() {
                 value={wearOutfit}
                 onChange={(e) => setWearOutfit(e.target.value)}
                 placeholder="Es. Ufficio, Abito formale, Casual..."
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="w-full rounded-[14px] bg-[#161024] border p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
               />
             </div>
@@ -261,7 +260,7 @@ export default function DiarioPage() {
                 value={wearNote}
                 onChange={(e) => setWearNote(e.target.value)}
                 placeholder="Durata, scia, evoluzione sulla pelle..."
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="w-full rounded-[14px] bg-[#161024] border p-3 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
               />
             </div>
@@ -271,7 +270,7 @@ export default function DiarioPage() {
             <button
               type="submit"
               disabled={savingWear}
-              style={{ backgroundColor: aura.primary }}
+              style={{ backgroundColor: '#C98A3A' }}
               className="flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50 shadow-lg"
             >
               <Check className="h-4 w-4" />
@@ -286,11 +285,11 @@ export default function DiarioPage() {
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {/* Ripartizione Famiglie Olfattive */}
           <div
-            style={{ borderColor: `${aura.primary}40` }}
+            style={{ borderColor: '#C98A3A' }}
             className="rounded-[24px] border bg-[#0E0A16] p-5 space-y-4 shadow-xl"
           >
             <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
-              <Sparkles style={{ color: aura.primary }} className="h-4 w-4" />
+              <Sparkles style={{ color: '#C98A3A' }} className="h-4 w-4" />
               <h3 className="font-mono text-xs uppercase tracking-widest font-bold text-[#F6EFE4]">
                 Famiglie Olfattive Preferite
               </h3>
@@ -307,7 +306,7 @@ export default function DiarioPage() {
                       className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${percent}%`,
-                        backgroundColor: aura.primary,
+                        backgroundColor: '#C98A3A',
                       }}
                     />
                   </div>
@@ -318,11 +317,11 @@ export default function DiarioPage() {
 
           {/* Breakdown Momenti della Giornata */}
           <div
-            style={{ borderColor: `${aura.primary}40` }}
+            style={{ borderColor: '#C98A3A' }}
             className="rounded-[24px] border bg-[#0E0A16] p-5 space-y-4 shadow-xl"
           >
             <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
-              <Calendar style={{ color: aura.primary }} className="h-4 w-4" />
+              <Calendar style={{ color: '#C98A3A' }} className="h-4 w-4" />
               <h3 className="font-mono text-xs uppercase tracking-widest font-bold text-[#F6EFE4]">
                 Indossi per Momento
               </h3>
@@ -331,7 +330,7 @@ export default function DiarioPage() {
               {Object.entries(stats.momentoCounts).map(([mom, count]) => (
                 <div
                   key={mom}
-                  style={{ borderColor: `${aura.primary}30` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="flex flex-col items-center justify-center rounded-[18px] border bg-[#161024] p-4 text-center space-y-1"
                 >
                   <div className="flex items-center gap-1.5 mb-1">
@@ -350,11 +349,11 @@ export default function DiarioPage() {
       {/* 3. CRONOLOGIA DEL DIARIO (TIMELINE STORICA) */}
       <section className="space-y-4">
         <div
-          style={{ borderColor: `${aura.primary}55` }}
+          style={{ borderColor: '#C98A3A' }}
           className="inline-block rounded-md bg-[#0E0A16] border px-3.5 py-1"
         >
           <h2
-            style={{ color: aura.primary }}
+            style={{ color: '#C98A3A' }}
             className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
           >
             Storico Indossi ({indossi.length})
@@ -364,12 +363,12 @@ export default function DiarioPage() {
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="h-24 rounded-[20px] aura-skeleton" />
+              <div key={n} className="h-24 rounded-[20px] bg-[#161024]/30" />
             ))}
           </div>
         ) : indossi.length === 0 ? (
           <div
-            style={{ borderColor: `${aura.primary}35` }}
+            style={{ borderColor: '#C98A3A' }}
             className="rounded-[24px] border bg-[#0E0A16] p-12 text-center text-xs text-[#B8A9C9]"
           >
             Nessun indosso registrato nel diario. Usa il form sopra per iniziare.
@@ -389,14 +388,14 @@ export default function DiarioPage() {
               return (
                 <div
                   key={item.id}
-                  style={{ borderColor: `${aura.primary}35` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="group flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-[22px] border bg-[#0E0A16] p-4 transition hover:border-white/30 shadow-lg gap-4"
                 >
                   <div className="flex items-center gap-4 min-w-0">
                     <div
                       onClick={() => {
                         setSelectedDetailProfumo(profumo);
-                        setAuraFromProfumo(profumo);
+                        ;
                       }}
                       className="h-14 w-14 flex items-center justify-center shrink-0 cursor-pointer transition group-hover:scale-105"
                     >
@@ -420,7 +419,7 @@ export default function DiarioPage() {
                       <h4
                         onClick={() => {
                           setSelectedDetailProfumo(profumo);
-                          setAuraFromProfumo(profumo);
+                          ;
                         }}
                         className="font-serif text-base text-[#F6EFE4] cursor-pointer hover:underline truncate"
                       >
@@ -456,7 +455,7 @@ export default function DiarioPage() {
         profumo={selectedDetailProfumo}
         onClose={() => {
           setSelectedDetailProfumo(null);
-          setCustomAura(SECTION_THEMES.diario || SECTION_THEMES.atelier);
+          ;
         }}
         onUpdated={(updated) => {
           setSelectedDetailProfumo(updated);

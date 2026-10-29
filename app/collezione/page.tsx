@@ -18,7 +18,6 @@ import { supabase, Profumo, isCollezioneProfumo, isRadarProfumo } from '@/lib/su
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
-import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 import {
   collectProposals,
@@ -68,14 +67,14 @@ export default function CollezionePage() {
 
   const [selectedProfumo, setSelectedProfumo] = useState(null as Profumo | null);
 
-  const { aura, setAuraFromProfumo, setCustomAura } = useAura();
+  const accent = '#C98A3A';
   const { showToast } = useToast();
 
   useEffect(() => {
     const isRadar = vistaParam === 'radar';
     setActiveTab(isRadar ? 'radar' : 'collezione');
-    setCustomAura(isRadar ? SECTION_THEMES.radar : SECTION_THEMES.collezione);
-  }, [vistaParam, setCustomAura]);
+    ;
+  }, [vistaParam]);
 
   useEffect(() => {
     fetchProfumi();
@@ -182,7 +181,7 @@ export default function CollezionePage() {
     } as unknown as Profumo;
 
     setSelectedProfumo(tempProfumo);
-    setAuraFromProfumo(tempProfumo);
+    ;
   }
 
   const brands = useMemo(() => {
@@ -219,19 +218,19 @@ export default function CollezionePage() {
   const headerRightActions = (
     <div className="flex items-center gap-2.5">
       <div
-        style={{ borderColor: `${aura.primary}40` }}
+        style={{ borderColor: '#C98A3A' }}
         className="flex rounded-full bg-[#0E0A16] p-1 border"
       >
         <button
           type="button"
           onClick={() => {
             setActiveTab('collezione');
-            setCustomAura(SECTION_THEMES.collezione);
+            
             router.push('/collezione');
           }}
           style={
             activeTab === 'collezione'
-              ? { backgroundColor: SECTION_THEMES.collezione.primary }
+              ? { backgroundColor: '#C98A3A' }
               : undefined
           }
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
@@ -248,12 +247,12 @@ export default function CollezionePage() {
           type="button"
           onClick={() => {
             setActiveTab('radar');
-            setCustomAura(SECTION_THEMES.radar);
+            
             router.push('/collezione?vista=radar');
           }}
           style={
             activeTab === 'radar'
-              ? { backgroundColor: SECTION_THEMES.radar.primary }
+              ? { backgroundColor: '#C98A3A' }
               : undefined
           }
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
@@ -273,7 +272,7 @@ export default function CollezionePage() {
         {
           href: '/scanner',
           title: 'Acquisisci',
-          style: { backgroundColor: aura.primary },
+          style: { backgroundColor: '#C98A3A' },
           className:
             'flex h-10 w-10 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 shadow-lg',
         },
@@ -293,23 +292,23 @@ export default function CollezionePage() {
       {/* SEZIONE SPECIALE: RICERCA OLFATTIVA AI NEL RADAR */}
       {activeTab === 'radar' && (
         <section
-          style={{ borderColor: `${aura.primary}50` }}
+          style={{ borderColor: '#C98A3A' }}
           className="rounded-[28px] border bg-[#0E0A16] p-6 sm:p-7 shadow-2xl space-y-6"
         >
           <div
-            style={{ borderColor: `${aura.primary}25` }}
+            style={{ borderColor: '#C98A3A' }}
             className="flex items-center justify-between border-b pb-3"
           >
             <div
-              style={{ borderColor: `${aura.primary}55` }}
+              style={{ borderColor: '#C98A3A' }}
               className="inline-flex items-center gap-2 rounded-md bg-[#161024] border px-3 py-1"
             >
               {React.createElement(Sparkles, {
-                style: { color: aura.primary },
+                style: { color: '#C98A3A' },
                 className: 'h-4 w-4',
               })}
               <span
-                style={{ color: aura.primary }}
+                style={{ color: '#C98A3A' }}
                 className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
               >
                 Ricerca Olfattiva AI
@@ -325,7 +324,7 @@ export default function CollezionePage() {
               <select
                 value={scoutFamily}
                 onChange={(e) => setScoutFamily(e.target.value)}
-                style={{ borderColor: `${aura.primary}40` }}
+                style={{ borderColor: '#C98A3A' }}
                 className="w-full rounded-[14px] bg-[#161024] border p-3 text-[#F6EFE4] focus:outline-none"
               >
                 <option value="Qualsiasi">Qualsiasi Famiglia</option>
@@ -353,13 +352,13 @@ export default function CollezionePage() {
                     }
                   }}
                   placeholder="Es. Iris, Cuoio..."
-                  style={{ borderColor: `${aura.primary}40` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="flex-1 rounded-[14px] bg-[#161024] border p-2.5 text-[#F6EFE4] placeholder:text-[#B8A9C9]/40 focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleAddIncludeNote}
-                  style={{ backgroundColor: aura.primary }}
+                  style={{ backgroundColor: '#C98A3A' }}
                   className="px-3.5 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
                 >
                   +
@@ -370,7 +369,7 @@ export default function CollezionePage() {
                   {includeNotes.map((note, idx) => (
                     <span
                       key={idx}
-                      style={{ borderColor: `${aura.primary}40` }}
+                      style={{ borderColor: '#C98A3A' }}
                       className="inline-flex items-center gap-1 rounded-full bg-[#161024] border px-2.5 py-0.5 font-mono text-[10px] text-emerald-300"
                     >
                       {note}
@@ -405,13 +404,13 @@ export default function CollezionePage() {
                     }
                   }}
                   placeholder="Es. Vaniglia, Muschio..."
-                  style={{ borderColor: `${aura.primary}40` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="flex-1 rounded-[14px] bg-[#161024] border p-2.5 text-[#F6EFE4] placeholder:text-[#B8A9C9]/40 focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleAddExcludeNote}
-                  style={{ backgroundColor: aura.primary }}
+                  style={{ backgroundColor: '#C98A3A' }}
                   className="px-3.5 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
                 >
                   +
@@ -422,7 +421,7 @@ export default function CollezionePage() {
                   {excludeNotes.map((note, idx) => (
                     <span
                       key={idx}
-                      style={{ borderColor: `${aura.primary}40` }}
+                      style={{ borderColor: '#C98A3A' }}
                       className="inline-flex items-center gap-1 rounded-full bg-[#161024] border px-2.5 py-0.5 font-mono text-[10px] text-red-300"
                     >
                       {note}
@@ -447,7 +446,7 @@ export default function CollezionePage() {
               type="button"
               onClick={handleRunScout}
               disabled={scoutingLoading}
-              style={{ backgroundColor: aura.primary }}
+              style={{ backgroundColor: '#C98A3A' }}
               className="flex items-center gap-2 rounded-full px-6 py-3 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50 shadow-lg"
             >
               {scoutingLoading
@@ -460,7 +459,7 @@ export default function CollezionePage() {
           {/* Risultati Scouting */}
           {scoutResults.length > 0 && (
             <div
-              style={{ borderColor: `${aura.primary}25` }}
+              style={{ borderColor: '#C98A3A' }}
               className="pt-6 border-t space-y-4"
             >
               <h4 className="font-mono text-xs uppercase tracking-widest text-[#F6EFE4] font-bold">
@@ -470,7 +469,7 @@ export default function CollezionePage() {
                 {scoutResults.map((item, idx) => (
                   <div
                     key={idx}
-                    style={{ borderColor: `${aura.primary}45` }}
+                    style={{ borderColor: '#C98A3A' }}
                     className="flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-4 shadow-xl"
                   >
                     <div
@@ -478,13 +477,13 @@ export default function CollezionePage() {
                       className="space-y-1 cursor-pointer group"
                     >
                       <span
-                        style={{ borderColor: `${aura.primary}35` }}
+                        style={{ borderColor: '#C98A3A' }}
                         className="inline-block font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E0A16] text-[#B8A9C9] border"
                       >
                         {item.categoria || 'Nicchia'}
                       </span>
                       <p
-                        style={{ color: aura.primary }}
+                        style={{ color: '#C98A3A' }}
                         className="font-mono text-[10px] uppercase tracking-wider pt-1 truncate"
                       >
                         {item.brand}
@@ -501,7 +500,7 @@ export default function CollezionePage() {
                       <button
                         type="button"
                         onClick={() => handlePreviewScoutItem(item)}
-                        style={{ borderColor: `${aura.primary}40` }}
+                        style={{ borderColor: '#C98A3A' }}
                         className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:opacity-85"
                       >
                         {React.createElement(Eye, { className: 'h-3.5 w-3.5' })}
@@ -511,8 +510,8 @@ export default function CollezionePage() {
                         type="button"
                         onClick={() => handleSaveScoutToRadar(item)}
                         style={{
-                          borderColor: `${aura.primary}60`,
-                          color: aura.primary,
+                          borderColor: '#C98A3A',
+                          color: '#C98A3A',
                         }}
                         className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-bold transition hover:opacity-85"
                       >
@@ -539,7 +538,7 @@ export default function CollezionePage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Filtra per maison, creazione o nota olfattiva..."
-            style={{ borderColor: `${aura.primary}35` }}
+            style={{ borderColor: '#C98A3A' }}
             className="w-full rounded-[18px] border bg-[#161024]/90 pl-11 pr-4 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:outline-none"
           />
           {searchQuery && (
@@ -558,8 +557,8 @@ export default function CollezionePage() {
           onClick={() => setFilterDrawerOpen(!filterDrawerOpen)}
           style={
             activeFiltersCount > 0
-              ? { borderColor: aura.primary, color: aura.primary }
-              : { borderColor: `${aura.primary}35` }
+              ? { borderColor: '#C98A3A', color: '#C98A3A' }
+              : { borderColor: '#C98A3A' }
           }
           className="flex items-center gap-2.5 rounded-[18px] border bg-[#161024]/90 px-5 py-3 text-xs font-semibold text-[#F6EFE4] transition"
         >
@@ -570,15 +569,15 @@ export default function CollezionePage() {
 
       {filterDrawerOpen && (
         <section
-          style={{ borderColor: `${aura.primary}50` }}
+          style={{ borderColor: '#C98A3A' }}
           className="rounded-[24px] border bg-[#161024] p-5 space-y-4 shadow-xl"
         >
           <div
-            style={{ borderColor: `${aura.primary}25` }}
+            style={{ borderColor: '#C98A3A' }}
             className="flex items-center justify-between pb-3 border-b"
           >
             <h3
-              style={{ color: aura.primary }}
+              style={{ color: '#C98A3A' }}
               className="text-xs font-mono uppercase tracking-widest font-bold"
             >
               Filtra per Maison e Famiglia Olfattiva
@@ -606,8 +605,8 @@ export default function CollezionePage() {
                     onClick={() => setSelectedBrand(b)}
                     style={
                       selectedBrand === b
-                        ? { backgroundColor: aura.primary }
-                        : { borderColor: `${aura.primary}35` }
+                        ? { backgroundColor: '#C98A3A' }
+                        : { borderColor: '#C98A3A' }
                     }
                     className={`rounded-full px-3 py-1 text-xs transition border ${
                       selectedBrand === b
@@ -631,8 +630,8 @@ export default function CollezionePage() {
                   onClick={() => setSelectedFamily('Tutte')}
                   style={
                     selectedFamily === 'Tutte'
-                      ? { backgroundColor: aura.primary }
-                      : { borderColor: `${aura.primary}35` }
+                      ? { backgroundColor: '#C98A3A' }
+                      : { borderColor: '#C98A3A' }
                   }
                   className={`rounded-full px-3 py-1 text-xs transition border ${
                     selectedFamily === 'Tutte'
@@ -649,8 +648,8 @@ export default function CollezionePage() {
                     onClick={() => setSelectedFamily(f)}
                     style={
                       selectedFamily === f
-                        ? { backgroundColor: aura.primary }
-                        : { borderColor: `${aura.primary}35` }
+                        ? { backgroundColor: '#C98A3A' }
+                        : { borderColor: '#C98A3A' }
                     }
                     className={`rounded-full px-3 py-1 text-xs transition border ${
                       selectedFamily === f
@@ -672,16 +671,16 @@ export default function CollezionePage() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-80 rounded-[30px] aura-skeleton" />
+              <div key={n} className="h-80 rounded-[30px] bg-[#161024]/30" />
             ))}
           </div>
         ) : filteredProfumi.length === 0 ? (
           <div
-            style={{ borderColor: `${aura.primary}35` }}
+            style={{ borderColor: '#C98A3A' }}
             className="rounded-[28px] border bg-[#161024]/90 p-16 text-center space-y-3 shadow-xl"
           >
             {React.createElement(Compass, {
-              style: { color: aura.primary },
+              style: { color: '#C98A3A' },
               className: 'h-10 w-10 mx-auto opacity-50',
             })}
             <h2 className="font-serif text-2xl text-[#F6EFE4]">
@@ -691,7 +690,7 @@ export default function CollezionePage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
             {filteredProfumi.map((p) => {
-              const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
+              const pAccent = '#C98A3A';
               const imgUrl = p.url_foto_vetrina || p.immagine_url;
 
               return (
@@ -699,16 +698,16 @@ export default function CollezionePage() {
                   key={p.id}
                   onClick={() => {
                     setSelectedProfumo(p);
-                    setAuraFromProfumo(p);
+                    ;
                   }}
-                  style={{ borderColor: `${pAura.primary}40` }}
+                  style={{ borderColor: '#C98A3A' }}
                   className="group relative flex flex-col justify-between rounded-[30px] border bg-[#161024]/95 p-5 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
                 >
                   <div className="flex justify-center py-2">
                     <div className="relative w-full">
                       <div
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
-                        style={{ backgroundColor: pAura.primary }}
+                        style={{ backgroundColor: '#C98A3A' }}
                       />
                       {React.createElement(BottlePedestal, {
                         src: imgUrl,
@@ -722,7 +721,7 @@ export default function CollezionePage() {
 
                   <div className="mt-4 space-y-1 text-center">
                     <p
-                      style={{ color: pAura.primary }}
+                      style={{ color: '#C98A3A' }}
                       className="font-mono text-[10px] uppercase tracking-wider truncate"
                     >
                       {p.brand}
@@ -754,9 +753,7 @@ export default function CollezionePage() {
         profumo: selectedProfumo,
         onClose: () => {
           setSelectedProfumo(null);
-          setCustomAura(
-            activeTab === 'radar' ? SECTION_THEMES.radar : SECTION_THEMES.collezione
-          );
+          ;
         },
         onUpdated: (updated: Profumo) => {
           setSelectedProfumo(updated);

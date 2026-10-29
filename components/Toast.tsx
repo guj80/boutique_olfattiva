@@ -60,7 +60,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{
-                    backgroundColor: isError ? '#E5484D' : 'var(--aura-1)',
+                    backgroundColor: isError ? '#E5484D' : '#C98A3A',
                   }}
                 />
                 <span>{t.message}</span>
