@@ -4,22 +4,12 @@ export interface GeminiPart {
   inline_data?: { mime_type: string; data: string };
 }
 
-export type ProviderOrder = 'groq-first' | 'gemini-first' | 'gemini-only' | 'groq-only';
-
-export interface GroundingSource {
-  title: string;
-  uri: string;
-}
-
 export interface GeminiCallOptions {
   temperature?: number;
   jsonMode?: boolean;
-  responseSchema?: Record<string, any>;
   systemInstruction?: string;
   timeoutMs?: number;
   useGoogleSearch?: boolean;
-  strictGoogleSearch?: boolean;
-  providerOrder?: ProviderOrder;
   deadline?: number;
   maxOutputTokens?: number;
 }
@@ -27,15 +17,11 @@ export interface GeminiCallOptions {
 export interface AiResult {
   text: string;
   modelUsed: string;
-  sources?: GroundingSource[];
-  grounded?: boolean;
 }
 
 export interface FallbackOptions {
   deadline?: number;
   json?: boolean;
-  temperature?: number;
-  maxOutputTokens?: number;
 }
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
@@ -46,17 +32,13 @@ let cachedGroqModels: { at: number; list: string[] } | null = null;
 let lastWorkingGemini: string | null = null;
 let lastWorkingGroq: string | null = null;
 
-export function __resetEngineState(): void {
+export function __resetEngineState() {
   cachedGeminiModels = null;
   cachedGroqModels = null;
   lastWorkingGemini = null;
   lastWorkingGroq = null;
 }
 
-/**
- * Legge la chiave Gemini esclusivamente da variabili server-side.
- * B6 FIX: Rimosso NEXT_PUBLIC_GEMINI_API_KEY per impedire l'esposizione nel bundle client.
- */
 function getGeminiKey(): string {
   const k = (
     process.env.GEMINI_API_KEY ||
@@ -68,7 +50,7 @@ function getGeminiKey(): string {
 }
 
 function getGroqKey(): string {
-  const k = (process.env.GROQ_API_KEY || '').trim();
+  const k = (process.env.GROQ_API_KEY || process.env.HERMES_CUSTOM_API_GROQ_COM_API_KEY || '').trim();
   return k && k !== 'undefined' ? k : '';
 }
 
@@ -92,20 +74,6 @@ const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
 ];
 
-/**
- * Modelli di paracadute statici nel caso la chiamata di listing /models fallisca o vada in timeout.
- */
-const DEFAULT_GEMINI_FALLBACKS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-];
-
-const DEFAULT_GROQ_FALLBACKS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-];
-
 async function discoverGeminiModels(apiKey: string): Promise<string[]> {
   if (cachedGeminiModels && Date.now() - cachedGeminiModels.at < CACHE_TTL_MS) {
     return cachedGeminiModels.list;
@@ -118,7 +86,7 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
       cache: 'no-store',
     });
     clearTimeout(timer);
-    if (!res.ok) return DEFAULT_GEMINI_FALLBACKS;
+    if (!res.ok) return [];
     const data = await res.json();
     const list: string[] = (data?.models || [])
       .filter(
@@ -136,17 +104,13 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
           !lower.includes('veo') &&
           !lower.includes('tts') &&
           !lower.includes('audio') &&
-          !lower.includes('aqa') &&
-          // Evitiamo i modelli -pro su free tier che restituiscono quota limit: 0
-          !lower.includes('3.1-pro') &&
-          !lower.includes('2.5-pro')
+          !lower.includes('aqa')
         );
       })
       .sort((a: string, b: string) => {
         const score = (s: string) => {
           const l = s.toLowerCase();
-          if (l.includes('2.5-flash') && !l.includes('lite') && !l.includes('preview')) return 6;
-          if (l.includes('flash') && !l.includes('preview') && !l.includes('exp') && !l.includes('lite')) return 5;
+          if (l.includes('flash') && !l.includes('preview') && !l.includes('exp')) return 5;
           if (l.includes('flash') && l.includes('lite')) return 4;
           if (l.includes('flash')) return 3;
           if (l.includes('pro') && !l.includes('preview')) return 2;
@@ -155,11 +119,12 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
         return score(b) - score(a);
       });
 
-    const finalList = list.length > 0 ? list : DEFAULT_GEMINI_FALLBACKS;
-    cachedGeminiModels = { at: Date.now(), list: finalList };
-    return finalList;
+    if (list.length > 0) {
+      cachedGeminiModels = { at: Date.now(), list };
+    }
+    return list;
   } catch {
-    return DEFAULT_GEMINI_FALLBACKS;
+    return [];
   }
 }
 
@@ -176,7 +141,7 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
       cache: 'no-store',
     });
     clearTimeout(timer);
-    if (!res.ok) return DEFAULT_GROQ_FALLBACKS;
+    if (!res.ok) return [];
     const data = await res.json();
     const list: string[] = (data?.data || [])
       .map((m: any) => String(m.id || ''))
@@ -204,11 +169,12 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
         return score(b) - score(a);
       });
 
-    const finalList = list.length > 0 ? list : DEFAULT_GROQ_FALLBACKS;
-    cachedGroqModels = { at: Date.now(), list: finalList };
-    return finalList;
+    if (list.length > 0) {
+      cachedGroqModels = { at: Date.now(), list };
+    }
+    return list;
   } catch {
-    return DEFAULT_GROQ_FALLBACKS;
+    return [];
   }
 }
 
@@ -218,99 +184,47 @@ async function tryGroqChat(
   prompt: string,
   systemInstruction: string | undefined,
   jsonMode: boolean,
-  timeoutMs: number,
-  temperature = 0.15,
-  maxTokens = 2500
+  timeoutMs: number
 ): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const messages: any[] = [];
     if (systemInstruction) {
-      messages.push({
-        role: 'system',
-        content: jsonMode
-          ? `${systemInstruction}\nRispondi ESCLUSIVAMENTE con un JSON valido.`
-          : systemInstruction,
-      });
+      messages.push({ role: 'system', content: systemInstruction });
     }
     messages.push({
       role: 'user',
       content: jsonMode
-        ? `${prompt}\n\nRispondi ESCLUSIVAMENTE con JSON valido, senza blocchi markdown e senza testo aggiuntivo.`
+        ? `${prompt}\n\nRispondi ESCLUSIVAMENTE con JSON valido, senza testo aggiuntivo.`
         : prompt,
     });
 
-    const basePayload: Record<string, any> = {
-      model,
-      temperature,
-      max_tokens: maxTokens,
-      messages,
-    };
-
-    // Tentativo 1: con response_format json_object nativo quando jsonMode è true
-    // Nota: il json_object di OpenAI/Groq richiede che l'output radice sia un oggetto JSON.
-    // Se il modello o il prompt restituisce un array radice e Groq rifiuta con 400, ripieghiamo senza response_format.
-    if (jsonMode) {
-      basePayload.response_format = { type: 'json_object' };
-    }
-
-    let res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(basePayload),
+      body: JSON.stringify({
+        model,
+        temperature: 0.15,
+        max_tokens: 2500,
+        messages,
+      }),
       signal: controller.signal,
       cache: 'no-store',
     });
 
-    if (!res.ok && jsonMode && res.status === 400) {
-      delete basePayload.response_format;
-      res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(basePayload),
-        signal: controller.signal,
-        cache: 'no-store',
-      });
-    }
-
     if (!res.ok) return null;
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content?.trim();
-    return content && content.length > 2 ? content : null;
+    return content && content.length > 5 ? content : null;
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
-}
-
-interface GeminiRawResponse {
-  text: string;
-  sources: GroundingSource[];
-  grounded: boolean;
-}
-
-function extractGroundingSources(candidate: any): GroundingSource[] {
-  const chunks: any[] = candidate?.groundingMetadata?.groundingChunks || [];
-  const seen = new Set<string>();
-  const out: GroundingSource[] = [];
-
-  for (const chunk of chunks) {
-    const uri = String(chunk?.web?.uri || '').trim();
-    const title = String(chunk?.web?.title || uri).trim();
-    if (uri && !seen.has(uri)) {
-      seen.add(uri);
-      out.push({ title, uri });
-    }
-  }
-  return out;
 }
 
 async function tryGeminiGenerate(
@@ -319,26 +233,17 @@ async function tryGeminiGenerate(
   parts: any[],
   options: GeminiCallOptions | undefined,
   timeoutMs: number
-): Promise<GeminiRawResponse | null> {
+): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const useSearch = Boolean(options?.useGoogleSearch);
-    const jsonMode = Boolean(options?.jsonMode);
-
     const generationConfig: Record<string, any> = {
       temperature: options?.temperature ?? 0.15,
       maxOutputTokens: options?.maxOutputTokens ?? 3072,
     };
 
-    // Nota API Gemini: google_search grounding e responseMimeType='application/json'
-    // sono incompatibili su diversi modelli v1beta (restituiscono HTTP 400).
-    // Applichiamo responseMimeType e responseSchema quando useGoogleSearch non è attivo.
-    if (jsonMode && !useSearch) {
+    if (options?.jsonMode) {
       generationConfig.responseMimeType = 'application/json';
-      if (options?.responseSchema) {
-        generationConfig.responseSchema = options.responseSchema;
-      }
     }
 
     const payload: Record<string, any> = {
@@ -348,18 +253,10 @@ async function tryGeminiGenerate(
     };
 
     if (options?.systemInstruction) {
-      const sysText =
-        jsonMode && useSearch
-          ? `${options.systemInstruction}\nRispondi ESCLUSIVAMENTE con JSON valido, senza commenti o markdown.`
-          : options.systemInstruction;
-      payload.systemInstruction = { parts: [{ text: sysText }] };
-    } else if (jsonMode && useSearch) {
-      payload.systemInstruction = {
-        parts: [{ text: 'Rispondi ESCLUSIVAMENTE con JSON valido, senza testo aggiuntivo.' }],
-      };
+      payload.systemInstruction = { parts: [{ text: options.systemInstruction }] };
     }
 
-    if (useSearch) {
+    if (options?.useGoogleSearch) {
       payload.tools = [{ google_search: {} }];
     }
 
@@ -373,26 +270,14 @@ async function tryGeminiGenerate(
 
     if (!res.ok) return null;
     const data = await res.json();
-    const candidate = data?.candidates?.[0];
-    const rawParts: any[] = candidate?.content?.parts || [];
+    const rawParts: any[] = data?.candidates?.[0]?.content?.parts || [];
     const text = rawParts
       .filter((p) => !p?.thought)
       .map((p) => p?.text || '')
       .join('')
       .trim();
 
-    if (!text || text.length < 2) return null;
-
-    const sources = extractGroundingSources(candidate);
-    const hasSearchQueries =
-      Array.isArray(candidate?.groundingMetadata?.webSearchQueries) &&
-      candidate.groundingMetadata.webSearchQueries.length > 0;
-
-    return {
-      text,
-      sources,
-      grounded: useSearch && (sources.length > 0 || hasSearchQueries),
-    };
+    return text && text.length > 5 ? text : null;
   } catch {
     return null;
   } finally {
@@ -427,9 +312,7 @@ export async function callGroqDirect(
       prompt,
       systemInstruction,
       Boolean(opts?.json),
-      Math.min(5500, left - 200),
-      opts?.temperature ?? 0.15,
-      opts?.maxOutputTokens ?? 2500
+      Math.min(5500, left - 200)
     );
     if (text) {
       lastWorkingGroq = model;
@@ -449,48 +332,6 @@ export async function callOpenRouterFree(
   return callGroqDirect(prompt, systemInstruction, opts);
 }
 
-async function runGeminiQueue(
-  normalizedParts: any[],
-  options: GeminiCallOptions | undefined,
-  deadline: number,
-  perAttemptCap: number
-): Promise<AiResult | null> {
-  const geminiKey = getGeminiKey();
-  if (!geminiKey) return null;
-
-  const left = () => deadline - Date.now();
-  if (left() <= 1500) return null;
-
-  const discovered = await discoverGeminiModels(geminiKey);
-  const queue: string[] = [];
-  if (lastWorkingGemini && discovered.includes(lastWorkingGemini)) {
-    queue.push(lastWorkingGemini);
-  }
-  for (const m of discovered) {
-    if (!queue.includes(m)) queue.push(m);
-  }
-
-  for (const model of queue.slice(0, 4)) {
-    if (left() < 1500) break;
-    const timeoutMs = Math.max(1800, Math.min(perAttemptCap, left() - 300));
-    const res = await tryGeminiGenerate(model, geminiKey, normalizedParts, options, timeoutMs);
-    if (res) {
-      if (options?.useGoogleSearch && options?.strictGoogleSearch && !res.grounded) {
-        continue;
-      }
-      lastWorkingGemini = model;
-      return {
-        text: res.text,
-        modelUsed: `gemini:${model}`,
-        sources: res.sources,
-        grounded: res.grounded,
-      };
-    }
-  }
-
-  return null;
-}
-
 export async function callGeminiWithFallback(
   parts: GeminiPart[],
   options?: GeminiCallOptions
@@ -501,82 +342,43 @@ export async function callGeminiWithFallback(
 
   const normalized = normalizeParts(parts);
   const hasImage = normalized.some((p) => p.inlineData);
-  const useSearch = Boolean(options?.useGoogleSearch);
   const promptText = normalized.map((p) => p.text || '').filter(Boolean).join('\n');
   const jsonMode = Boolean(options?.jsonMode);
 
-  // Se c'è un'immagine o è richiesto Google Search grounding, solo Gemini è compatibile
-  const effectiveOrder: ProviderOrder =
-    hasImage || useSearch
-      ? 'gemini-only'
-      : options?.providerOrder ?? 'groq-first';
-
-  if (effectiveOrder === 'gemini-only') {
-    const gemRes = await runGeminiQueue(normalized, options, deadline, perAttemptCap);
-    if (gemRes) return gemRes;
-    if (useSearch) {
-      throw new Error(
-        'Ricerca web verificata (Google Search Grounding) non disponibile in questo momento sulla chiave Gemini configurata.'
-      );
-    }
-    throw new Error('Nessun modello Gemini disponibile in questo istante.');
-  }
-
-  if (effectiveOrder === 'groq-only') {
-    const groqRes = await callGroqDirect(promptText, options?.systemInstruction, {
-      deadline,
-      json: jsonMode,
-      temperature: options?.temperature,
-      maxOutputTokens: options?.maxOutputTokens,
-    });
-    if (groqRes) return groqRes;
-    throw new Error('Nessun modello Groq disponibile in questo istante.');
-  }
-
-  if (effectiveOrder === 'gemini-first') {
-    const gemRes = await runGeminiQueue(
-      normalized,
-      options,
-      Math.min(deadline, Date.now() + 13000),
-      perAttemptCap
-    );
-    if (gemRes) return gemRes;
-
-    if (left() > 1800) {
-      const groqRes = await callGroqDirect(promptText, options?.systemInstruction, {
-        deadline,
-        json: jsonMode,
-        temperature: options?.temperature,
-        maxOutputTokens: options?.maxOutputTokens,
-      });
-      if (groqRes) return groqRes;
-    }
-
-    throw new Error('Nessun motore AI disponibile in questo istante.');
-  }
-
-  // Default: 'groq-first'
-  if (left() > 2000) {
+  // 1. Se è una richiesta solo testuale, proviamo prima Groq
+  if (!hasImage && left() > 2000) {
     const groqRes = await callGroqDirect(promptText, options?.systemInstruction, {
       deadline: Math.min(deadline, Date.now() + 9000),
       json: jsonMode,
-      temperature: options?.temperature,
-      maxOutputTokens: options?.maxOutputTokens,
     });
     if (groqRes) return groqRes;
   }
 
-  if (left() > 2000) {
-    const gemRes = await runGeminiQueue(normalized, options, deadline, perAttemptCap);
-    if (gemRes) return gemRes;
+  // 2. Auto-Discovery sui modelli Gemini realmente attivi
+  const geminiKey = getGeminiKey();
+  if (geminiKey && left() > 2000) {
+    const discovered = await discoverGeminiModels(geminiKey);
+    const queue: string[] = [];
+    if (lastWorkingGemini && discovered.includes(lastWorkingGemini)) {
+      queue.push(lastWorkingGemini);
+    }
+    for (const m of discovered) {
+      if (!queue.includes(m)) queue.push(m);
+    }
+
+    for (const model of queue.slice(0, 4)) {
+      if (left() < 1500) break;
+      const timeoutMs = Math.max(1800, Math.min(perAttemptCap, left() - 300));
+      const text = await tryGeminiGenerate(model, geminiKey, normalized, options, timeoutMs);
+      if (text) {
+        lastWorkingGemini = model;
+        return { text, modelUsed: `gemini:${model}` };
+      }
+    }
   }
 
   throw new Error('Nessun motore AI disponibile in questo istante.');
 }
-
-/* ------------------------------------------------------------------ */
-/* Estrazione JSON tollerante (oggetti e array)                        */
-/* ------------------------------------------------------------------ */
 
 function repairJson(s: string): string {
   return s
@@ -585,7 +387,7 @@ function repairJson(s: string): string {
     .replace(/,\s*([}\]])/g, '$1');
 }
 
-function balancedStructures(text: string, openChar: '{' | '[', closeChar: '}' | ']'): string[] {
+function balancedObjects(text: string): string[] {
   const out: string[] = [];
   let depth = 0;
   let start = -1;
@@ -601,10 +403,10 @@ function balancedStructures(text: string, openChar: '{' | '[', closeChar: '}' | 
     }
     if (c === '"') {
       inStr = true;
-    } else if (c === openChar) {
+    } else if (c === '{') {
       if (depth === 0) start = i;
       depth++;
-    } else if (c === closeChar && depth > 0) {
+    } else if (c === '}' && depth > 0) {
       depth--;
       if (depth === 0 && start !== -1) {
         out.push(text.slice(start, i + 1));
@@ -626,35 +428,26 @@ export function extractJsonFromAiText<T = any>(rawText: string): T {
     .replace(/```/g, '')
     .trim();
 
-  for (const attempt of [cleaned, repairJson(cleaned)]) {
-    try {
-      const direct = JSON.parse(attempt);
-      if (direct && typeof direct === 'object') return direct as T;
-    } catch {}
-  }
+  try {
+    const direct = JSON.parse(cleaned);
+    if (direct && typeof direct === 'object') return direct as T;
+  } catch {}
 
   let best: any = null;
   let bestLen = -1;
-
-  const candidates = [
-    ...balancedStructures(cleaned, '{', '}'),
-    ...balancedStructures(cleaned, '[', ']'),
-  ];
-
-  for (const candidate of candidates) {
+  for (const candidate of balancedObjects(cleaned)) {
     for (const variant of [candidate, repairJson(candidate)]) {
       try {
-        const parsed = JSON.parse(variant);
-        if (parsed && typeof parsed === 'object' && candidate.length > bestLen) {
-          best = parsed;
+        const obj = JSON.parse(variant);
+        if (obj && typeof obj === 'object' && !Array.isArray(obj) && candidate.length > bestLen) {
+          best = obj;
           bestLen = candidate.length;
         }
         break;
       } catch {}
     }
   }
-
-  if (best !== null) return best as T;
+  if (best) return best as T;
 
   throw new Error('Formato JSON non riconosciuto.');
 }
