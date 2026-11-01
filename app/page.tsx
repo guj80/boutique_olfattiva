@@ -2,13 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, CalendarHeart, Compass, Library, Sparkles } from 'lucide-react';
+import { CalendarHeart, Library } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
-import { getLocalIsoDate, computePodio } from '@/lib/home-logic';
+import { computePodio } from '@/lib/home-logic';
 import { WearSuggester } from '@/components/WearSuggester';
 
 export default function HomePage() {
@@ -17,8 +17,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   const [selectedDetailProfumo, setSelectedDetailProfumo] = useState<Profumo | null>(null);
-  const [podioModalOpen, setPodioModalOpen] = useState(false);
-  const [wearModalOpen, setWearModalOpen] = useState(false);
 
   const { showToast } = useToast();
   const { triggerSpruzzo } = useSpruzzo();
@@ -44,7 +42,6 @@ export default function HomePage() {
     }
   }
 
-  const podio = computePodio(indossi);
   const collezioneProfumi = profumi.filter(p => {
     const st = (p.stato || '').toLowerCase().trim();
     return st === 'collezione' || st === '';
@@ -97,7 +94,7 @@ export default function HomePage() {
         <ProfumoDetailModal
           profumo={selectedDetailProfumo}
           onClose={() => setSelectedDetailProfumo(null)}
-          onUpdate={fetchHomeData}
+          onUpdated={fetchHomeData}
         />
       )}
     </div>
