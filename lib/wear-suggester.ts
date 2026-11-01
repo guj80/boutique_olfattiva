@@ -127,7 +127,7 @@ export function rankCollection(
 
   let candidates = collezione.filter((p) => !ctx.excludeIds.includes(p.id));
   if (candidates.length === 0) {
-    candidates = collezione; // reset se esclusi tutti
+    candidates = collezione;
   }
 
   const scored: WearCandidate[] = candidates.map((p) => {
@@ -136,7 +136,7 @@ export function rankCollection(
 
     const occScore = matchesOccasioneScore(p, ctx.occasione);
     score += occScore;
-    if (occScore >= 15) motivi.matchesOccasione = true; // flag logico o stringa nei motivi
+    if (occScore >= 15) motivi.push(`Ottimale per ${ctx.occasione}`);
 
     const momScore = matchesMomentoScore(p, momentoRisolto);
     score += momScore;
@@ -192,7 +192,7 @@ export function pickLocal(candidates: WearCandidate[], ctx: WearContext, now: Da
     });
   }
 
-  for (let i = 1; i < candidates.length && picks.size < 3; i++) {
+  for (let i = 1; i < candidates.length && picks.length < 3; i++) {
     if (candidates[i].profumo.famiglia_olfattiva !== candidates[0].profumo.famiglia_olfattiva) {
       picks.push({
         profumoId: candidates[i].profumo.id,
