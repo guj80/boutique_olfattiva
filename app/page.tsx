@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, X } from 'lucide-react';
+import { CalendarHeart, Compass, Library, Sparkles, Check, X } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
