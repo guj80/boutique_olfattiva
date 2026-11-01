@@ -12,6 +12,16 @@ function getSupabaseAnon() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+function getSupabaseAnonWithToken(token: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+}
+
 function getSupabaseService() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -27,16 +37,16 @@ async function getUserFromAuthHeader(authHeader: string | null) {
   if (!supabase) return null;
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) return null;
-  return data.user;
+  return { user: data.user, token };
 }
 
 export async function GET(req: Request) {
-  const user = await getUserFromAuthHeader(req.headers.get('authorization'));
-  if (!user) {
+  const auth = await getUserFromAuthHeader(req.headers.get('authorization'));
+  if (!auth) {
     return NextResponse.json({ error: 'Autenticazione richiesta.' }, { status: 401 });
   }
 
-  const supabase = getSupabaseAnon();
+  const supabase = getSupabaseAnonWithToken(auth.token);
   if (!supabase) {
     return NextResponse.json(
       { error: 'Configurazione Supabase mancante.' },
@@ -69,8 +79,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const user = await getUserFromAuthHeader(req.headers.get('authorization'));
-  if (!user) {
+  const auth = await getUserFromAuthHeader(req.headers.get('authorization'));
+  if (!auth) {
     return NextResponse.json({ error: 'Autenticazione richiesta.' }, { status: 401 });
   }
 
