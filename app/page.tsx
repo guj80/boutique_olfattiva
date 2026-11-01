@@ -11,7 +11,6 @@ import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider'
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
 import { getLocalIsoDate, getAutoMomento, computePodio } from '@/lib/home-logic';
-import { collectProposals, getFamilyFromOccasione, ownedListForPrompt, ScoutFilters } from '@/lib/scout-logic';
 
 export default function HomePage() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
@@ -33,14 +32,6 @@ export default function HomePage() {
   const [consultantMomento, setConsultantMomento] = useState<string>('Tutti');
   const [generatedRecommendation, setGeneratedRecommendation] = useState<Profumo | null>(null);
 
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [suggLoading, setSuggLoading] = useState(false);
-  const [suggError, setSuggError] = useState<string | null>(null);
-
-  const [catalogSyncing, setCatalogSyncing] = useState(false);
-  const [catalogSyncError, setCatalogSyncError] = useState<string | null>(null);
-  const [catalogSynced, setCatalogSynced] = useState(false);
-
   const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
   const { triggerSpruzzo } = useSpruzzo();
@@ -53,15 +44,13 @@ export default function HomePage() {
   async function fetchHomeData() {
     setLoading(true);
     try {
-      const [profumiRes, indossiRes, catalogRes] = await Promise.all([
+      const [profumiRes, indossiRes] = await Promise.all([
         supabase.from('profumi').select('*').order('nome', { ascending: true }),
-        supabase.from('indossi').select('*').order('created_at', { ascending: false }),
-        supabase.from('perfumes').select('id').limit(1),
+        supabase.from('indossi').select('*').order('created_at', { ascending: false })
       ]);
 
       if (profumiRes.error) throw profumiRes.error;
       if (indossiRes.error) throw indossiRes.error;
-      if (catalogRes.error) throw catalogRes.error;
 
       const allProfumi = (profumiRes.data || []) as Profumo[];
       const collezioneOnly = allProfumi.filter(isCollezioneProfumo);
@@ -78,11 +67,6 @@ export default function HomePage() {
         profumi: profumiMap.get(item.profumo_id) || null,
       }));
       setIndossi(enriched);
-
-      // Catalogo persistente: se esiste, avvia la sincronizzazione automatica
-      if (pool.length > 0 && catalogRes.data && catalogRes.data.length === 0) {
-        triggerCatalogSync();
-      }
     } catch (err) {
       console.error('Errore caricamento home:', err);
     } finally {
@@ -126,54 +110,22 @@ export default function HomePage() {
     return true;
   }
 
-  async function generateSuggestions() {
+  function handleGenerateConsultant() {
     if (profumi.length === 0) return;
 
-    setSuggLoading(true);
-    setSuggError(null);
-    try {
-      // Mappa l'occasione selezionata alla famiglia olfattiva più probabile.
-      const family = getFamilyFromOccasione(consultantOccasione);
-      // Le proposte si basano sul catalogo, non solo sui possessi: passiamo
-      // la lista dei profumi gia' indossati per escluderli.
-      const ownedNames = ownedListForPrompt(profumi);
-      const filters: ScoutFilters = {
-        scoutFamily: family === 'Qualsiasi' ? 'Qualsiasi' : family,
-        includeNotes: [],
-        excludeNotes: [],
-      };
-      const result = await collectProposals(filters, ownedNames);
-      setSuggestions(result);
-      if (result.length === 0) {
-        showToast('Nessuna proposta disponibile per questa occasione.', 'error');
-      }
-    } catch (err: any) {
-      setSuggError(err?.message || 'Impossibile generare i suggerimenti.');
-      setSuggestions([]);
-      showToast(err?.message || 'Errore nella generazione AI.', 'error');
-    } finally {
-      setSuggLoading(false);
-    }
-  }
+    const filtered = profumi.filter(
+      (p) => matchesOccasione(p, consultantOccasione) && matchesMomento(p, consultantMomento)
+    );
+    const pool = filtered.length > 0 ? filtered : profumi;
+    const candidates =
+      pool.length > 1 && generatedRecommendation
+        ? pool.filter((item) => item.id !== generatedRecommendation.id)
+        : pool;
 
-  async function triggerCatalogSync() {
-    if (catalogSyncing) return;
-    setCatalogSyncing(true);
-    setCatalogSyncError(null);
-    try {
-      const res = await fetch('/api/catalog/sync', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        setCatalogSyncError(data.error || 'Impossibile sincronizzare il catalogo.');
-      } else {
-        setCatalogSynced(true);
-        showToast('Catalogo sincronizzato automaticamente.', 'success');
-      }
-    } catch (err: any) {
-      setCatalogSyncError(err?.message || 'Errore nella sincronizzazione del catalogo.');
-    } finally {
-      setCatalogSyncing(false);
-    }
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    setGeneratedRecommendation(chosen);
+    setSelectedDetailProfumo(chosen);
+    setAuraFromProfumo(chosen);
   }
 
   async function handleSaveIndosso(e: React.FormEvent) {
@@ -230,8 +182,8 @@ export default function HomePage() {
         }
       />
 
-      {/* SUGGERIMENTO AI — proposte AI suddivise in 3 categorie (Designer / Artistico / Nicchia) */}
-      <section className="mx-auto max-w-5xl space-y-4">
+      {/* SUGGERIMENTO AI COMPATTO CON BORDI IN TINTA TEMA */}
+      <section className="mx-auto max-w-2xl space-y-5">
         <div
           style={{ borderColor: `${aura.primary}50` }}
           className="rounded-[26px] border bg-[#0E0A16] p-5 shadow-2xl space-y-4"
@@ -253,7 +205,7 @@ export default function HomePage() {
               </span>
             </div>
             <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
-              3 Tipi · Designer / Artistico / Nicchia
+              Seleziona & Premi ✦
             </span>
           </div>
 
@@ -305,87 +257,71 @@ export default function HomePage() {
 
             <button
               type="button"
-              onClick={generateSuggestions}
+              onClick={handleGenerateConsultant}
               title="Genera Suggerimento AI"
               aria-label="Genera Suggerimento AI"
               style={{ backgroundColor: aura.primary }}
-              className={`flex h-[42px] sm:w-[46px] items-center justify-center rounded-[14px] text-[#08060C] transition hover:scale-105 active:scale-95 shadow-lg shrink-0 px-4 sm:px-0 ${suggLoading ? 'opacity-60 pointer-events-none' : ''}`}
+              className="flex h-[42px] sm:w-[46px] items-center justify-center rounded-[14px] text-[#08060C] transition hover:scale-105 active:scale-95 shadow-lg shrink-0 px-4 sm:px-0"
             >
-              {suggLoading ? (
-                <>
-                  <span className="h-4 w-4 border-2 border-[#F6EFE4] border-t-transparent rounded-full animate-spin" />
-                  <span className="sr-only">Generazione in corso...</span>
-                </>
-              ) : (
-                <Sparkles className="h-5 w-5 fill-current" />
-              )}
+              <Sparkles className="h-5 w-5 fill-current" />
             </button>
           </div>
         </div>
 
-        {suggError && (
-          <div className="mx-auto max-w-2xl rounded-[20px] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-            {suggError}
-          </div>
-        )}
+        {/* CARD VERTICALE IDENTICA ALLA SCHEDA IN COLLEZIONE */}
+        {generatedRecommendation && (() => {
+          const recAura = resolveAura(
+            generatedRecommendation.famiglia_olfattiva,
+            generatedRecommendation.nome
+          );
+          const recImg =
+            generatedRecommendation.url_foto_vetrina ||
+            generatedRecommendation.immagine_url;
 
-        {suggestions.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {suggestions.map((s, idx) => {
-              const catAura = resolveAura(s.famiglia_olfattiva, s.nome);
-              const sImg = s.url_foto_vetrina || s.immagine_url || undefined;
-              return (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    setSelectedDetailProfumo(s);
-                    setAuraFromProfumo(s);
-                  }}
-                  style={{ borderColor: `${catAura.primary}60` }}
-                  className="group relative flex flex-col justify-between rounded-[24px] border bg-[#161024]/95 p-4 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
-                >
-                  <div className="flex justify-center py-1">
-                    <div className="relative w-full">
-                      <div
-                        className="absolute inset-0 rounded-[20px] blur-2xl opacity-30 transition-opacity group-hover:opacity-60"
-                        style={{ backgroundColor: catAura.primary }}
-                      />
-                      <BottlePedestal
-                        src={sImg}
-                        alt={s.nome}
-                        size="md"
-                        className="relative z-10 mx-auto w-full max-w-[120px]"
-                        showSigil={false}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-3 space-y-1 text-center">
-                    <p
-                      style={{ color: catAura.primary }}
-                      className="font-mono text-[9px] uppercase tracking-wider truncate"
-                    >
-                      {s.brand}
-                    </p>
-                    <h3 className="font-serif text-[14px] leading-tight text-[#F6EFE4] line-clamp-2">
-                      {s.nome}
-                    </h3>
-                    <p className="font-mono text-[9px] text-[#B8A9C9] pt-0.5">
-                      {s.categoria} · {s.famiglia_olfattiva}
-                    </p>
-                  </div>
-                  <div className="mt-2 flex justify-center">
-                    <span
-                      style={{ color: catAura.primary }}
-                      className="font-mono text-[8px] uppercase tracking-widest"
-                    >
-                      #{idx + 1}
-                    </span>
+          return (
+            <div className="flex justify-center pt-1">
+              <div
+                onClick={() => {
+                  setSelectedDetailProfumo(generatedRecommendation);
+                  setAuraFromProfumo(generatedRecommendation);
+                }}
+                style={{ borderColor: `${recAura.primary}60` }}
+                className="group relative w-full max-w-[260px] flex flex-col justify-between rounded-[30px] border bg-[#161024]/95 p-5 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-2xl"
+              >
+                <div className="flex justify-center py-2">
+                  <div className="relative w-full">
+                    <div
+                      className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
+                      style={{ backgroundColor: recAura.primary }}
+                    />
+                    <BottlePedestal
+                      src={recImg}
+                      alt={generatedRecommendation.nome}
+                      size="lg"
+                      className="relative z-10 !h-52 w-full"
+                      showSigil={false}
+                    />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                <div className="mt-4 space-y-1 text-center">
+                  <p
+                    style={{ color: recAura.primary }}
+                    className="font-mono text-[10px] uppercase tracking-wider truncate"
+                  >
+                    {generatedRecommendation.brand}
+                  </p>
+                  <h3 className="font-serif text-[17px] leading-tight text-[#F6EFE4] line-clamp-2">
+                    {generatedRecommendation.nome}
+                  </h3>
+                  <p className="font-mono text-[10px] text-[#B8A9C9] pt-0.5">
+                    {generatedRecommendation.famiglia_olfattiva}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </section>
 
       {/* PODIO A SCATOLETTE NERE ELEGANTI CON BORDI IN TINTA TEMA */}
@@ -583,48 +519,6 @@ export default function HomePage() {
             className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
           >
             <Compass className="h-5 w-5" />
-          </div>
-        </Link>
-        <Link
-          href="/collezione"
-          style={{ borderColor: `${aura.primary}45` }}
-          className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
-        >
-          <div className="space-y-1.5">
-            <div
-              style={{ borderColor: `${aura.primary}55` }}
-              className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
-            >
-              <span
-                style={{ color: aura.primary }}
-                className="font-mono text-[10px] uppercase tracking-widest font-bold block"
-              >
-                Catalogo Profumo
-              </span>
-            </div>
-            <h3 className="font-serif text-2xl text-[#F6EFE4]">Fetch & Persisti</h3>
-            <p className="text-xs text-[#B8A9C9]">
-              {catalogSynced
-                ? 'Sincronizzato automaticamente (auto-seed).'
-                : 'Si sincronizza in auto quando il catalogo è vuoto.'}
-            </p>
-          </div>
-          <div
-            style={{
-              backgroundColor: catalogSyncing ? 'rgba(255,255,255,0.08)' : `${aura.primary}30`,
-              color: aura.primary,
-              borderColor: `${aura.primary}55`,
-            }}
-            className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
-          >
-            {catalogSyncing ? (
-              <>
-                <span className="h-4 w-4 border-2 border-[#F6EFE4] border-t-transparent rounded-full animate-spin" />
-                <span className="sr-only">Sincronizzazione in corso...</span>
-              </>
-            ) : (
-              <Sparkles className="h-5 w-5" />
-            )}
           </div>
         </Link>
       </section>
