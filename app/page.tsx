@@ -8,7 +8,6 @@ import { PageHeader } from '@/components/Logo';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
-import { computePodio } from '@/lib/home-logic';
 import { WearSuggester } from '@/components/WearSuggester';
 
 export default function HomePage() {
