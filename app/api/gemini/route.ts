@@ -1,224 +1,119 @@
 import { NextResponse } from 'next/server';
+import { callGeminiWithFallback } from '@/lib/gemini-engine';
 
 export const dynamic = 'force-dynamic';
 
-// Cache in memoria dei modelli realmente esistenti sugli account
-let cachedGroqModels: { at: number; list: string[] } | null = null;
-let cachedGeminiModels: { at: number; list: string[] } | null = null;
-const CACHE_TTL = 1000 * 60 * 60; // 1 ora
+/**
+ * Rate limiter in-memory per IP per bloccare abusi sulla rotta legacy /api/gemini (B5 FIX).
+ * Nota: in S2 e S3 i suggeritori passeranno alle rotte dedicate /api/ai/wear e /api/ai/scout
+ * con prompt costruito esclusivamente lato server.
+ */
+const RATE_WINDOW_MS = 60 * 1000; // 1 minuto
+const MAX_REQ_PER_WINDOW = 15;
+const MAX_PROMPT_CHARS = 4000;
 
-async function discoverGroqModels(apiKey: string): Promise<string[]> {
-  if (cachedGroqModels && Date.now() - cachedGroqModels.at < CACHE_TTL) {
-    return cachedGroqModels.list;
-  }
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const list: string[] = (data?.data || [])
-      .map((m: any) => String(m.id || ''))
-      .filter((id: string) => {
-        const lower = id.toLowerCase();
-        // Escludiamo modelli audio/whisper/guard/vision-only
-        return (
-          !lower.includes('whisper') &&
-          !lower.includes('guard') &&
-          !lower.includes('tts') &&
-          !lower.includes('playai') &&
-          !lower.includes('embed')
-        );
-      })
-      // Preferiamo i modelli llama / qwen / deepseek / mixtral testuali
-      .sort((a: string, b: string) => {
-        const score = (s: string) =>
-          s.includes('llama') ? 3 : s.includes('qwen') || s.includes('gemma') ? 2 : 1;
-        return score(b) - score(a);
-      });
+const ipBuckets = new Map<string, { count: number; resetAt: number }>();
 
-    if (list.length > 0) {
-      cachedGroqModels = { at: Date.now(), list };
-    }
-    return list;
-  } catch {
-    return [];
-  }
+function getClientIp(req: Request): string {
+  const xff = req.headers.get('x-forwarded-for');
+  if (xff) return xff.split(',')[0].trim();
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+  return 'local';
 }
 
-async function discoverGeminiModels(apiKey: string): Promise<string[]> {
-  if (cachedGeminiModels && Date.now() - cachedGeminiModels.at < CACHE_TTL) {
-    return cachedGeminiModels.list;
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  if (ipBuckets.size > 500) {
+    ipBuckets.forEach((val, key) => {
+      if (val.resetAt <= now) ipBuckets.delete(key);
+    });
   }
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=100&key=${apiKey}`,
-      { cache: 'no-store' }
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    const list: string[] = (data?.models || [])
-      .filter(
-        (m: any) =>
-          Array.isArray(m?.supportedGenerationMethods) &&
-          m.supportedGenerationMethods.includes('generateContent')
-      )
-      .map((m: any) => String(m.name || '').replace(/^models\//, ''))
-      .filter((name: string) => {
-        const lower = name.toLowerCase();
-        return (
-          lower.includes('gemini') &&
-          !lower.includes('embedding') &&
-          !lower.includes('imagen') &&
-          !lower.includes('veo') &&
-          !lower.includes('tts') &&
-          !lower.includes('audio')
-        );
-      })
-      // Mettiamo in cima i modelli flash (più rapidi e con più quota)
-      .sort((a: string, b: string) => {
-        const score = (s: string) =>
-          s.includes('flash') && !s.includes('preview')
-            ? 4
-            : s.includes('flash')
-            ? 3
-            : 1;
-        return score(b) - score(a);
-      });
-
-    if (list.length > 0) {
-      cachedGeminiModels = { at: Date.now(), list };
-    }
-    return list;
-  } catch {
-    return [];
+  const entry = ipBuckets.get(ip);
+  if (!entry || entry.resetAt <= now) {
+    ipBuckets.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
   }
+  if (entry.count >= MAX_REQ_PER_WINDOW) {
+    return false;
+  }
+  entry.count += 1;
+  return true;
 }
 
-async function tryGroqModel(
-  model: string,
-  prompt: string,
-  apiKey: string,
-  timeoutMs: number
-): Promise<string | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.25,
-        max_tokens: 1800,
-      }),
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.choices?.[0]?.message?.content?.trim();
-    return text && text.length > 5 ? text : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
+function isAuthorizedRequest(req: Request): boolean {
+  // 1. Se è configurato INTERNAL_API_SECRET e viene fornito nell'header, autorizza
+  const internalSecret = (process.env.INTERNAL_API_SECRET || '').trim();
+  const headerSecret = (req.headers.get('x-internal-secret') || '').trim();
+  if (internalSecret && headerSecret === internalSecret) {
+    return true;
   }
+
+  // 2. Richiede una chiamata browser same-origin (blocca curl/bot esterni privi di contesto same-origin)
+  const secFetchSite = (req.headers.get('sec-fetch-site') || '').toLowerCase();
+  if (secFetchSite && secFetchSite !== 'same-origin' && secFetchSite !== 'same-site') {
+    return false;
+  }
+
+  const host = (req.headers.get('host') || '').toLowerCase();
+  const origin = (req.headers.get('origin') || '').toLowerCase();
+  const referer = (req.headers.get('referer') || '').toLowerCase();
+
+  if (!host) return false;
+
+  const originMatches = origin ? origin.includes(host) : false;
+  const refererMatches = referer ? referer.includes(host) : false;
+
+  return originMatches || refererMatches;
 }
 
-async function tryGeminiModel(
-  model: string,
-  prompt: string,
-  apiKey: string,
-  timeoutMs: number
-): Promise<string | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const generationConfig: Record<string, any> = {
-      temperature: 0.25,
-      maxOutputTokens: 2048,
-    };
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig,
-      }),
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const parts: any[] = data?.candidates?.[0]?.content?.parts || [];
-    const text = parts
-      .filter((p) => !p?.thought)
-      .map((p) => p?.text || '')
-      .join('')
-      .trim();
-    return text && text.length > 5 ? text : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+function sanitizeLegacyPrompt(raw: string): string {
+  return raw
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .trim()
+    .slice(0, MAX_PROMPT_CHARS);
 }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const prompt = String(body?.prompt || '').trim();
-
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt mancante.' }, { status: 400 });
+    if (!isAuthorizedRequest(req)) {
+      return NextResponse.json(
+        { error: 'Accesso non autorizzato a questa risorsa API.' },
+        { status: 403 }
+      );
     }
 
-    const groqKey = (process.env.GROQ_API_KEY || '').trim();
-    const geminiKey = (
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-      ''
-    ).trim();
-
-    // 1. PRIORITÀ A GROQ CON AUTO-DISCOVERY (Risponde in < 1 secondo, zero timeout)
-    if (groqKey) {
-      const groqModels = await discoverGroqModels(groqKey);
-      for (const model of groqModels.slice(0, 3)) {
-        const text = await tryGroqModel(model, prompt, groqKey, 4500);
-        if (text) {
-          return NextResponse.json({ text, modelUsed: `groq:${model}` });
-        }
-      }
+    const ip = getClientIp(req);
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json(
+        { error: 'Troppe richieste ravvicinate. Riprova tra un minuto.' },
+        { status: 429 }
+      );
     }
 
-    // 2. AUTO-DISCOVERY SU GEMINI (Prova i primi 3 modelli realmente attivi sulla chiave)
-    if (geminiKey) {
-      const geminiModels = await discoverGeminiModels(geminiKey);
-      for (const model of geminiModels.slice(0, 3)) {
-        const text = await tryGeminiModel(model, prompt, geminiKey, 5500);
-        if (text) {
-          return NextResponse.json({ text, modelUsed: `gemini:${model}` });
-        }
-      }
+    const body = await req.json().catch(() => null);
+    const rawPrompt = typeof body?.prompt === 'string' ? body.prompt : '';
+    const prompt = sanitizeLegacyPrompt(rawPrompt);
+
+    if (!prompt || prompt.length < 5) {
+      return NextResponse.json({ error: 'Prompt mancante o non valido.' }, { status: 400 });
     }
 
-    return NextResponse.json(
-      { error: 'Tutti i provider AI esterni sono in rate-limit.' },
-      { status: 503 }
-    );
+    const result = await callGeminiWithFallback([{ text: prompt }], {
+      temperature: 0.25,
+      maxOutputTokens: 2048,
+      timeoutMs: 6000,
+      deadline: Date.now() + 15000,
+    });
+
+    return NextResponse.json({
+      text: result.text,
+      modelUsed: result.modelUsed,
+    });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err?.message || 'Errore interno API.' },
-      { status: 500 }
+      { error: err?.message || 'Tutti i provider AI esterni sono temporaneamente occupati.' },
+      { status: 503 }
     );
   }
 }
