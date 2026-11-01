@@ -90,27 +90,36 @@ export default function HomePage() {
   }
 
   async function generateSuggestions() {
-    if (profumi.length === 0) return;
+    if (profumi.length === 0) {
+      showToast('Nessun profumo registrato nella tua collezione.', 'error');
+      return;
+    }
 
     setSuggLoading(true);
     setSuggError(null);
     try {
-      const family = getFamilyFromOccasione(consultantOccasione);
-      const ownedNames = ownedListForPrompt(profumi);
-      const filters: ScoutFilters = {
-        scoutFamily: family === 'Qualsiasi' ? 'Qualsiasi' : family,
-        includeNotes: [],
-        excludeNotes: [],
-      };
-      const result = await collectProposals(filters, ownedNames);
-      setSuggestions(result);
-      if (result.length === 0) {
-        showToast('Nessuna proposta disponibile per questa occasione.', 'error');
+      // Filtra i profumi della tua collezione in base all'occasione e al momento selezionati
+      const candidati = profumi.filter((p) => {
+        const matchesOcc = matchesOccasione(p, consultantOccasione);
+        const matchesMom = matchesMomento(p, consultantMomento);
+        return matchesOcc && matchesMom;
+      });
+
+      // Se non ci sono match esatti, usa l'intera collezione come pool
+      const poolFinale = candidati.length > 0 ? candidati : profumi;
+      
+      // Estrae una o più proposte dalla tua collezione
+      const shuffled = [...poolFinale].sort(() => 0.5 - Math.random());
+      const scelti = shuffled.slice(0, 3);
+
+      setSuggestions(scelti);
+      if (scelti.length === 0) {
+        showToast('Nessuna fragranza trovata con questi filtri nella tua collezione.', 'error');
       }
     } catch (err: any) {
-      setSuggError(err?.message || 'Impossibile generare i suggerimenti.');
+      setSuggError(err?.message || 'Impossibile generare il suggerimento.');
       setSuggestions([]);
-      showToast(err?.message || 'Errore nella generazione AI.', 'error');
+      showToast('Errore nella selezione dalla collezione.', 'error');
     } finally {
       setSuggLoading(false);
     }
