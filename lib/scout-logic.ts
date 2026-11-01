@@ -14,20 +14,10 @@ export interface ScoutProposal {
   note_cuore: string;
   note_fondo: string;
   categoria: 'Designer' | 'Artistico' | 'Nicchia';
+  url_foto_vetrina?: string | null;
 }
 
 const CURATED_VAULT: ScoutProposal[] = [
-  {
-    brand: 'Dior',
-    nome: 'Ambre Nuit',
-    concentrazione: 'Eau de Parfum',
-    famiglia_olfattiva: 'Ambrata',
-    naso: 'François Demachy',
-    note_testa: 'Bergamotto, Pompelmo',
-    note_cuore: 'Rosa Turca, Pepe Rosa',
-    note_fondo: 'Ambra Grigia, Legno di Cedro, Patchouli',
-    categoria: 'Designer',
-  },
   {
     brand: 'Serge Lutens',
     nome: 'Ambre Sultan',
@@ -51,17 +41,6 @@ const CURATED_VAULT: ScoutProposal[] = [
     categoria: 'Nicchia',
   },
   {
-    brand: 'Chanel',
-    nome: 'Sycomore',
-    concentrazione: 'Eau de Parfum',
-    famiglia_olfattiva: 'Legnosa',
-    naso: 'Jacques Polge',
-    note_testa: 'Pepe Rosa, Bacche di Ginepro, Aldeidi',
-    note_cuore: 'Vetiver di Haiti, Cipresso, Violetta',
-    note_fondo: 'Sandalo, Tabacco, Incenso',
-    categoria: 'Designer',
-  },
-  {
     brand: 'Diptyque',
     nome: 'Tam Dao',
     concentrazione: 'Eau de Parfum',
@@ -73,47 +52,14 @@ const CURATED_VAULT: ScoutProposal[] = [
     categoria: 'Artistico',
   },
   {
-    brand: 'Ex Nihilo',
-    nome: 'Blue Talisman',
-    concentrazione: 'Eau de Parfum',
-    famiglia_olfattiva: 'Legnosa',
-    naso: 'Jordi Fernández',
-    note_testa: 'Pera, Bergamotto, Mandarino, Zenzero',
-    note_cuore: 'Fiore d’Arancio, Georgywood',
-    note_fondo: 'Akigalawood, Muschio, Ambrofix, Legno di Cedro',
-    categoria: 'Nicchia',
-  },
-  {
-    brand: 'Chanel',
-    nome: 'Allure Homme Edition Blanche',
-    concentrazione: 'Eau de Parfum',
-    famiglia_olfattiva: 'Agrumata',
-    naso: 'Jacques Polge',
-    note_testa: 'Limone di Sicilia, Bergamotto di Calabria, Pepe Rosa',
-    note_cuore: 'Zenzero, Legno di Cedro, Petitgrain',
-    note_fondo: 'Sandalo, Fava Tonka, Vaniglia del Madagascar, Vetiver',
-    categoria: 'Designer',
-  },
-  {
-    brand: 'Laboratorio Olfattivo',
-    nome: 'Arancia Rossa',
-    concentrazione: 'Eau de Parfum',
-    famiglia_olfattiva: 'Agrumata',
-    naso: 'Jean-Claude Ellena',
-    note_testa: 'Arancia Rossa Italiana, Mandarino',
-    note_cuore: 'Fiore d’Arancio, Frutto della Passione',
-    note_fondo: 'Muschio Bianco, Legno di Cedro',
-    categoria: 'Artistico',
-  },
-  {
-    brand: 'Xerjoff',
-    nome: 'Nio',
-    concentrazione: 'Eau de Parfum',
-    famiglia_olfattiva: 'Agrumata',
-    naso: 'Chris Maurice',
-    note_testa: 'Bergamotto di Calabria, Neroli, Note Verdi',
-    note_cuore: 'Cardamomo, Pepe Rosa, Gelsomino, Noce Moscata',
-    note_fondo: 'Vetiver di Haiti, Legno di Cedro, Legno di Guaiaco, Ambra',
+    brand: 'Orto Parisi',
+    nome: 'Megamare',
+    concentrazione: 'Extrait de Parfum',
+    famiglia_olfattiva: 'Marina',
+    naso: 'Alessandro Gualtieri',
+    note_testa: 'Bergamotto, Limone, Accordo Ozono',
+    note_cuore: 'Alghe Marine, Calone, Hedione',
+    note_fondo: 'Ambroxan, Muschio, Legno di Cedro',
     categoria: 'Nicchia',
   },
 ];
@@ -124,15 +70,14 @@ export function ownedListForPrompt(profumi: any[]): string[] {
     .filter(Boolean);
 }
 
-const OCCASION_FAMILY_MAP: Record<string, string> = {
-  ufficio: 'Agrumata',
-  formale: 'Legnosa',
-  'tempo libero': 'Agrumata',
-  cena: 'Ambrata',
-  serata: 'Ambrata',
-};
-
 export function getFamilyFromOccasione(occasione: string): string {
+  const OCCASION_FAMILY_MAP: Record<string, string> = {
+    ufficio: 'Agrumata',
+    formale: 'Legnosa',
+    'tempo libero': 'Agrumata',
+    cena: 'Ambrata',
+    serata: 'Ambrata',
+  };
   const key = occasione.toLowerCase().trim();
   return OCCASION_FAMILY_MAP[key] || 'Qualsiasi';
 }
@@ -140,14 +85,15 @@ export function getFamilyFromOccasione(occasione: string): string {
 export function buildScoutPrompt(filters: ScoutFilters, ownedNames: string[] = []): string {
   const { scoutFamily, includeNotes, excludeNotes } = filters;
 
-  return `Sei un esperto internazionale di alta profumeria e nicchia.
-REGOLE TASSATIVE:
-- Escludi rigorosamente cloni o dupe.
-- Restituisci ESATTAMENTE 3 creazioni reali e distinte: 1 Designer di alto profilo, 1 Artistico indipendente e 1 di Nicchia prestigiosa.
+  return `Sei un esperto internazionale di alta profumeria, profumeria artistica indipendente e ricerca d'autore.
+REGOLE TASSATIVE ANTIBANALE:
+- EVITA rigorosamente i profumi ultra-commerciali banali o i soliti bestseller da profumeria di massa (es. niente Dior Sauvage, Bleu de Chanel, Baccarat Rouge generico o simili).
+- Escludi categoricamente cloni, dupe e profumi arabi di massa.
+- Restituisci ESATTAMENTE 3 creazioni reali, ricercate e distinte: 1 Designer di alto profilo di ricerca, 1 Artistico indipendente e 1 di Nicchia di grande prestigio.
 - Famiglia olfattiva richiesta: ${scoutFamily}
 - Note da includere: ${includeNotes.length > 0 ? includeNotes.join(', ') : 'Qualsiasi'}
 - Note da escludere: ${excludeNotes.length > 0 ? excludeNotes.join(', ') : 'Nessuna'}
-- Profumi già posseduti dall'utente da NON proporre: ${ownedNames.join(', ') || 'Nessuno'}
+- PROHIBITION LIST (Profumi già posseduti o tracciati dall'utente da NON proporre MAI): ${ownedNames.join(', ') || 'Nessuno'}
 
 Restituisci SOLO un array JSON valido di 3 oggetti con queste chiavi esatte:
 [
@@ -187,10 +133,12 @@ export function parseScoutArray(rawText: string): any[] {
 
 export function filterNewProposals(proposals: any[], ownedNames: string[] = []): any[] {
   if (!ownedNames || ownedNames.length === 0) return proposals;
-  const owned = ownedNames.map((n) => n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const normalizedOwned = ownedNames.map((n) => n.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  
   return proposals.filter((p) => {
     const key = `${p.brand || ''} ${p.nome || ''}`.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return !owned.some((o) => key === o || key.includes(o) || o.includes(key));
+    const isDuplicate = normalizedOwned.some((o) => key === o || key.includes(o) || o.includes(key));
+    return !isDuplicate;
   });
 }
 
@@ -222,15 +170,7 @@ function selectFromCuratedVault(filters: ScoutFilters): ScoutProposal[] {
   for (const cat of categories) {
     const match = scored.find((s) => s.item.categoria === cat && !selected.includes(s.item));
     if (match) {
-      // Correzione bug B8: NON rietichettiamo la famiglia, manteniamo quella reale del vault
       selected.push(match.item);
-    }
-  }
-
-  for (const entry of scored) {
-    if (selected.length >= 3) break;
-    if (!selected.includes(entry.item)) {
-      selected.push(entry.item);
     }
   }
 
@@ -256,7 +196,7 @@ export async function collectProposals(
       }
     }
   } catch {
-    // Fallback silenzioso su Vault Curato
+    // Fallback su Vault
   }
 
   const candidates: any[] = [];
