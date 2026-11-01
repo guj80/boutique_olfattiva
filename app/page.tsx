@@ -79,6 +79,7 @@ export default function HomePage() {
       }));
       setIndossi(enriched);
 
+      // Catalogo persistente: se esiste, avvia la sincronizzazione automatica
       if (pool.length > 0 && catalogRes.data && catalogRes.data.length === 0) {
         triggerCatalogSync();
       }
@@ -89,13 +90,52 @@ export default function HomePage() {
     }
   }
 
+  function matchesOccasione(p: Profumo, occasione: string): boolean {
+    if (occasione === 'Tutti') return true;
+    const f = (p.famiglia_olfattiva || '').toLowerCase();
+    const n = `${p.note_testa || ''} ${p.note_cuore || ''} ${p.note_fondo || ''}`.toLowerCase();
+
+    if (occasione === 'Ufficio') {
+      return f.includes('agrumata') || f.includes('aromatica') || f.includes('legnosa') || f.includes('muschiata') || f.includes('verde');
+    }
+    if (occasione === 'Formale') {
+      return f.includes('legnosa') || f.includes('speziata') || f.includes('cuoiata') || f.includes('ambrata');
+    }
+    if (occasione === 'Tempo libero') {
+      return f.includes('agrumata') || f.includes('marina') || f.includes('fruttata') || f.includes('aromatica');
+    }
+    if (occasione === 'Cena' || occasione === 'Serata') {
+      return f.includes('ambrata') || f.includes('gourmand') || f.includes('speziata') || f.includes('cuoiata') || n.includes('oud') || n.includes('vaniglia') || n.includes('tabacco');
+    }
+    return true;
+  }
+
+  function matchesMomento(p: Profumo, momento: string): boolean {
+    if (momento === 'Tutti') return true;
+    const pAny = p as any;
+    if (pAny.momento_ideale && pAny.momento_ideale.toLowerCase().includes(momento.toLowerCase())) {
+      return true;
+    }
+    const f = (p.famiglia_olfattiva || '').toLowerCase();
+    if (momento === 'Mattina' || momento === 'Pomeriggio') {
+      return f.includes('agrumata') || f.includes('marina') || f.includes('verde') || f.includes('aromatica') || f.includes('floreale') || f.includes('fruttata');
+    }
+    if (momento === 'Sera' || momento === 'Notte') {
+      return f.includes('ambrata') || f.includes('gourmand') || f.includes('cuoiata') || f.includes('speziata') || f.includes('legnosa');
+    }
+    return true;
+  }
+
   async function generateSuggestions() {
     if (profumi.length === 0) return;
 
     setSuggLoading(true);
     setSuggError(null);
     try {
+      // Mappa l'occasione selezionata alla famiglia olfattiva più probabile.
       const family = getFamilyFromOccasione(consultantOccasione);
+      // Le proposte si basano sul catalogo, non solo sui possessi: passiamo
+      // la lista dei profumi gia' indossati per escluderli.
       const ownedNames = ownedListForPrompt(profumi);
       const filters: ScoutFilters = {
         scoutFamily: family === 'Qualsiasi' ? 'Qualsiasi' : family,
@@ -190,7 +230,7 @@ export default function HomePage() {
         }
       />
 
-      {/* SUGGERIMENTO AI */}
+      {/* SUGGERIMENTO AI — proposte AI suddivise in 3 categorie (Designer / Artistico / Nicchia) */}
       <section className="mx-auto max-w-5xl space-y-4">
         <div
           style={{ borderColor: `${aura.primary}50` }}
@@ -348,7 +388,7 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* PODIO */}
+      {/* PODIO A SCATOLETTE NERE ELEGANTI CON BORDI IN TINTA TEMA */}
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <div
@@ -415,7 +455,7 @@ export default function HomePage() {
               </div>
             ) : <div />}
 
-            {/* 1° Posto */}
+            {/* 1° Posto (Centro - Più alto) */}
             {podio[0] && (
               <div
                 onClick={() => {
@@ -488,7 +528,7 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ACCESSI RAPIDI */}
+      {/* ACCESSI RAPIDI (VETRINA & SCANNER) CON BOX E BORDI DEL COLORE DEL TEMA */}
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Link
           href="/collezione"
@@ -545,38 +585,49 @@ export default function HomePage() {
             <Compass className="h-5 w-5" />
           </div>
         </Link>
-      </section>
-
-      {/* BARRA DI NAVIGAZIONE INFERIORE (BOTTOM DOCK) */}
-      <nav
-        aria-label="Navigazione principale"
-        style={{ borderColor: `${aura.primary}40` }}
-        className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-[24px] border bg-[#0E0A16]/95 backdrop-blur-xl px-6 py-3.5 shadow-2xl flex items-center justify-around"
-      >
-        <Link
-          href="/"
-          className="flex flex-col items-center gap-1 transition-colors text-amber-400"
-        >
-          <Library className="h-5 w-5" />
-          <span className="font-mono text-[9px] uppercase tracking-wider">Atelier</span>
-        </Link>
-
         <Link
           href="/collezione"
-          className="flex flex-col items-center gap-1 transition-colors text-[#B8A9C9] hover:text-[#F6EFE4]"
+          style={{ borderColor: `${aura.primary}45` }}
+          className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
         >
-          <Compass className="h-5 w-5" />
-          <span className="font-mono text-[9px] uppercase tracking-wider">Collezione</span>
+          <div className="space-y-1.5">
+            <div
+              style={{ borderColor: `${aura.primary}55` }}
+              className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
+            >
+              <span
+                style={{ color: aura.primary }}
+                className="font-mono text-[10px] uppercase tracking-widest font-bold block"
+              >
+                Catalogo Profumo
+              </span>
+            </div>
+            <h3 className="font-serif text-2xl text-[#F6EFE4]">Fetch & Persisti</h3>
+            <p className="text-xs text-[#B8A9C9]">
+              {catalogSynced
+                ? 'Sincronizzato automaticamente (auto-seed).'
+                : 'Si sincronizza in auto quando il catalogo è vuoto.'}
+            </p>
+          </div>
+          <div
+            style={{
+              backgroundColor: catalogSyncing ? 'rgba(255,255,255,0.08)' : `${aura.primary}30`,
+              color: aura.primary,
+              borderColor: `${aura.primary}55`,
+            }}
+            className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
+          >
+            {catalogSyncing ? (
+              <>
+                <span className="h-4 w-4 border-2 border-[#F6EFE4] border-t-transparent rounded-full animate-spin" />
+                <span className="sr-only">Sincronizzazione in corso...</span>
+              </>
+            ) : (
+              <Sparkles className="h-5 w-5" />
+            )}
+          </div>
         </Link>
-
-        <Link
-          href="/scanner"
-          className="flex flex-col items-center gap-1 transition-colors text-[#B8A9C9] hover:text-[#F6EFE4]"
-        >
-          <Sparkles className="h-5 w-5" />
-          <span className="font-mono text-[9px] uppercase tracking-wider">Scanner</span>
-        </Link>
-      </nav>
+      </section>
 
       {/* MODALE CLASSIFICA COMPLETA */}
       {podioModalOpen && (
