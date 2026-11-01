@@ -12,6 +12,7 @@ export interface GeminiCallOptions {
   useGoogleSearch?: boolean;
   deadline?: number;
   maxOutputTokens?: number;
+  responseSchema?: object;
 }
 
 export interface AiResult {
@@ -87,7 +88,15 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
       cache: 'no-store',
     });
     clearTimeout(timer);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error(
+        '[gemini-engine] discovery models HTTP',
+        res.status,
+        errText.slice(0, 200)
+      );
+      return [];
+    }
     const data = await res.json();
     const list: string[] = (data?.models || [])
       .filter(
@@ -122,9 +131,12 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
 
     if (list.length > 0) {
       cachedGeminiModels = { at: Date.now(), list };
+    } else {
+      console.error('[gemini-engine] discovery: nessun modello Gemini utilizzabile per questa chiave.');
     }
     return list;
-  } catch {
+  } catch (e: any) {
+    console.error('[gemini-engine] discovery error:', e?.message || String(e));
     return [];
   }
 }
@@ -142,7 +154,10 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
       cache: 'no-store',
     });
     clearTimeout(timer);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error('[gemini-engine] Groq discovery HTTP', res.status);
+      return [];
+    }
     const data = await res.json();
     const list: string[] = (data?.data || [])
       .map((m: any) => String(m.id || ''))
@@ -174,7 +189,8 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
       cachedGroqModels = { at: Date.now(), list };
     }
     return list;
-  } catch {
+  } catch (e: any) {
+    console.error('[gemini-engine] Groq discovery error:', e?.message || String(e));
     return [];
   }
 }
@@ -217,11 +233,19 @@ async function tryGroqChat(
       cache: 'no-store',
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error(
+        `[gemini-engine] Groq ${model} HTTP ${res.status}:`,
+        errText.slice(0, 200)
+      );
+      return null;
+    }
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content?.trim();
     return content && content.length > 5 ? content : null;
-  } catch {
+  } catch (e: any) {
+    console.error(`[gemini-engine] Groq ${model} exception:`, e?.message || String(e));
     return null;
   } finally {
     clearTimeout(timer);
@@ -243,6 +267,11 @@ async function tryGeminiGenerate(
       maxOutputTokens: options?.maxOutputTokens ?? 3072,
     };
 
+    if (options?.responseSchema) {
+      generationConfig.responseMimeType = 'application/json';
+      generationConfig.responseSchema = options.responseSchema;
+    }
+
     const payload: Record<string, any> = {
       contents: [{ role: 'user', parts }],
       generationConfig,
@@ -261,7 +290,14 @@ async function tryGeminiGenerate(
       cache: 'no-store',
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error(
+        `[gemini-engine] Gemini ${model} HTTP ${res.status}:`,
+        errText.slice(0, 240)
+      );
+      return null;
+    }
     const data = await res.json();
     const rawParts: any[] = data?.candidates?.[0]?.content?.parts || [];
     const text = rawParts
@@ -271,7 +307,8 @@ async function tryGeminiGenerate(
       .trim();
 
     return text && text.length > 5 ? text : null;
-  } catch {
+  } catch (e: any) {
+    console.error(`[gemini-engine] Gemini ${model} exception:`, e?.message || String(e));
     return null;
   } finally {
     clearTimeout(timer);
@@ -338,17 +375,10 @@ export async function callGeminiWithFallback(
   const promptText = normalized.map((p) => p.text || '').filter(Boolean).join('\n');
   const jsonMode = Boolean(options?.jsonMode);
 
-  // 1. Se è una richiesta solo testuale, proviamo prima Groq (ultra-veloce, zero 429 di Google)
-  if (!hasImage && left() > 2000) {
-    const groqRes = await callGroqDirect(promptText, options?.systemInstruction, {
-      deadline: Math.min(deadline, Date.now() + 9000),
-      json: jsonMode,
-    });
-    if (groqRes) return groqRes;
-  }
-
-  // 2. Auto-Discovery sui modelli Gemini realmente attivi sull'account
+  // 1. GEMINI PRIMO (come da brief F0)
   const geminiKey = getGeminiKey();
+  let geminiTried = 0;
+  let geminiSuccess = false;
   if (geminiKey && left() > 2000) {
     const discovered = await discoverGeminiModels(geminiKey);
     const queue: string[] = [];
@@ -361,6 +391,7 @@ export async function callGeminiWithFallback(
 
     for (const model of queue.slice(0, 4)) {
       if (left() < 1500) break;
+      geminiTried += 1;
       const timeoutMs = Math.max(1800, Math.min(perAttemptCap, left() - 300));
       const text = await tryGeminiGenerate(model, geminiKey, normalized, options, timeoutMs);
       if (text) {
@@ -368,9 +399,30 @@ export async function callGeminiWithFallback(
         return { text, modelUsed: `gemini:${model}` };
       }
     }
+    geminiSuccess = false;
   }
 
-  throw new Error('Nessun motore AI disponibile in questo istante.');
+  // 2. GROQ DI RISERVA (solo se Gemini non ha risposto)
+  if (!hasImage && left() > 1500) {
+    console.error(
+      `[gemini-engine] Gemini non disponibile (tentativi: ${geminiTried}). Fallback su Groq.`
+    );
+    const groqRes = await callGroqDirect(promptText, options?.systemInstruction, {
+      deadline: Math.min(deadline, Date.now() + 9000),
+      json: jsonMode,
+    });
+    if (groqRes) return groqRes;
+  }
+
+  // 3. Errore ESPLICITO con dettaglio del perché
+  const parts_: string[] = [];
+  if (!geminiKey) parts_.push('GEMINI_API_KEY assente');
+  else if (geminiTried === 0) parts_.push('nessun modello Gemini scoperto per la chiave');
+  else if (!geminiSuccess) parts_.push(`${geminiTried} modelli Gemini provati, tutti falliti`);
+  if (hasImage) parts_.push('input con immagine: Groq non supportato');
+  else parts_.push('fallback Groq non ha prodotto risposta');
+
+  throw new Error(`Nessun motore AI disponibile. Dettagli: ${parts_.join(' | ')}`);
 }
 
 /* ------------------------------------------------------------------ */
