@@ -2,7 +2,15 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X } from 'lucide-react';
+import {
+  CalendarHeart,
+  Compass,
+  Library,
+  Sparkles,
+  Check,
+  X,
+  FlaskConical,
+} from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
@@ -519,6 +527,37 @@ export default function HomePage() {
             className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
           >
             <Compass className="h-5 w-5" />
+          </div>
+        </Link>
+      </section>
+
+      {/* LABORATORIO — link alla coda di approvazione scoperte */}
+      <section>
+        <Link
+          href="/laboratorio"
+          style={{ borderColor: `${aura.primary}50` }}
+          className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
+        >
+          <div className="space-y-1.5">
+            <div
+              style={{ borderColor: `${aura.primary}55` }}
+              className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
+            >
+              <span
+                style={{ color: aura.primary }}
+                className="font-mono text-[10px] uppercase tracking-widest font-bold block"
+              >
+                Scouting
+              </span>
+            </div>
+            <h3 className="font-serif text-2xl text-[#F6EFE4]">Laboratorio</h3>
+            <p className="text-xs text-[#B8A9C9]">Coda di approvazione nuove scoperte</p>
+          </div>
+          <div
+            style={{ backgroundColor: `${aura.primary}20`, color: aura.primary, borderColor: `${aura.primary}45` }}
+            className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
+          >
+            <FlaskConical className="h-5 w-5" />
           </div>
         </Link>
       </section>
