@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X } from 'lucide-react';
+import { CalendarHeart, Compass, Library, Sparkles, X } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
@@ -749,7 +749,7 @@ export default function HomePage() {
         onClose={() => setSelectedDetailProfumo(null)}
         onUpdated={(updated) => {
           setSelectedDetailProfumo(updated);
-          setProfumi((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+          setProfumi((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
           fetchHomeData();
         }}
         onDeleted={(deletedId) => {
