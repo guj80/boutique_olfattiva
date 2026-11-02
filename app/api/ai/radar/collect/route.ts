@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 const LIMITE_DEFAULT = 5;
 const LIMITE_MAX = 8;
-const TIMEOUT_FETCH = 8000;
+const TIMEOUT_FETCH = 12000; // alzato: alcuni siti WooCommerce sono lenti
 const MAX_HTML_CHARS = 400_000;
 const MAX_TESTO_AI = 5000;
 
@@ -129,32 +129,50 @@ function parseSitemapIndex(xml: string): string[] {
 }
 
 function isProductUrl(url: string): boolean {
-  return /\/(products?|prodotti|p|perfumes?|fragranze)\//i.test(url);
+  return /\/(products?|prodotti|negozio|p|perfumes?|fragranze|shop)\//i.test(url);
+}
+
+// Legge il robots.txt e restituisce la prima sitemap dichiarata (o null).
+async function getDeclaredSitemap(baseUrl: string): Promise<string | null> {
+  const robotsUrl = new URL('/robots.txt', baseUrl).toString();
+  const txt = await fetchWithTimeout(robotsUrl, 6000);
+  if (!txt) return null;
+  const lines = txt.split(/\r?\n/);
+  for (const line of lines) {
+    const m = line.match(/^\s*sitemap:\s*(.+)\s*$/i);
+    if (m && m[1]) return m[1].trim();
+  }
+  return null;
 }
 
 async function findProductUrls(baseUrl: string, limite: number): Promise<string[]> {
   const base = baseUrl.replace(/\/+$/, '');
-
-  // Tentativi in ordine: Shopify products sitemap, sitemap index, WooCommerce
-  const candidates = [
-    `${base}/sitemap_products_1.xml`,
-    `${base}/sitemap.xml`,
-    `${base}/sitemap_index.xml`,
-    `${base}/product-sitemap.xml`,
-  ];
-
   const allProducts: SitemapEntry[] = [];
+
+  // 1) Sitemap dichiarata nel robots.txt (funziona per WooCommerce e molti altri)
+  const declared = await getDeclaredSitemap(base);
+
+  // 2) Fallback: candidati noti (Shopify prima, poi WooCommerce, poi generici)
+  const candidates: string[] = [];
+  if (declared) candidates.push(declared);
+  candidates.push(
+    `${base}/sitemap_products_1.xml`, // Shopify
+    `${base}/sitemap.xml`,            // generico
+    `${base}/sitemap_index.xml`,      // WooCommerce/Yoast
+    `${base}/wp-sitemap.xml`,         // WordPress nativo
+    `${base}/product-sitemap.xml`     // WooCommerce alternativo
+  );
 
   for (const candidate of candidates) {
     const xml = await fetchWithTimeout(candidate, TIMEOUT_FETCH);
     if (!xml) continue;
 
-    // Sitemap index?
+    // È un indice di sitemap?
     const childSitemaps = parseSitemapIndex(xml);
     if (childSitemaps.length > 0) {
-      // Cerco figli con "product" nel nome
+      // Cerco figli con "product" o "prodott" o "shop" nel nome
       const productSitemaps = childSitemaps.filter((u) =>
-        /product/i.test(u) || /shop/i.test(u) || /prodott/i.test(u)
+        /product|prodott|shop|negozio/i.test(u)
       );
       for (const ps of productSitemaps.slice(0, 3)) {
         const childXml = await fetchWithTimeout(ps, TIMEOUT_FETCH);
@@ -169,7 +187,7 @@ async function findProductUrls(baseUrl: string, limite: number): Promise<string[
       continue;
     }
 
-    // Sitemap normale
+    // È una sitemap normale?
     const entries = parseSitemapEntries(xml);
     const products = entries.filter((e) => isProductUrl(e.loc));
     if (products.length > 0) {
@@ -245,7 +263,7 @@ async function estraiConGemini(testoPagina: string, url: string): Promise<any | 
         temperature: 0.05,
         jsonMode: true,
         responseSchema: RESPONSE_SCHEMA,
-        timeoutMs: 10000,
+        timeoutMs: 12000,
         maxOutputTokens: 1024,
         systemInstruction: SYSTEM_PROMPT,
       }
