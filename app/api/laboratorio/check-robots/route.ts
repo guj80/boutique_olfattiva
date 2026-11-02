@@ -8,8 +8,7 @@ export const maxDuration = 60;
 const USER_AGENT = 'AtelierLG-Radar/1.0 (+https://atelierlg.app; contact@atelierlg.app)';
 const TIMEOUT_MS = 10000;
 
-// Path transazionali che NON riguardano le pagine prodotto.
-// Se un Disallow cade solo qui, il sito resta leggibile per i prodotti.
+// Path transazionali: se un Disallow cade solo qui, i prodotti restano leggibili.
 const TRANSACTIONAL_PREFIXES = [
   '/admin',
   '/cart',
@@ -25,36 +24,64 @@ const TRANSACTIONAL_PREFIXES = [
   '/wp-content/uploads/wc-logs',
   '/wp-content/uploads/woocommerce_transient_files',
   '/wp-content/uploads/woocommerce_uploads',
-  '/*/cart',
-  '/*/checkout',
-  '/*/checkouts',
-  '/*/account',
-  '/*/orders',
+  '/.well-known',
 ];
 
-// Path che, se bloccati, mettono a rischio la lettura dei prodotti.
-const PRODUCT_PATH_HINTS = [
-  '/products',
-  '/collections',
-  '/pages',
-  '/shop',
-  '/p/',
-  '/profumi',
-  '/fragranze',
-  '/perfumes',
+// Sottostringhe che indicano una "trappola per crawler" (filtri, sort, preview),
+// non un blocco sui prodotti.
+const CRAWL_TRAP_PATTERNS = [
+  'sort_by',
+  'filter',
+  'preview_theme_id',
+  'preview_script_id',
+  'oseid=',
+  'ls=',
+  'ls%3',
+  '%2b',
+  '%2B',
+  'cart.js',
+  'sf_',
+  'monorail',
+  '+', // i pattern Shopify tipo /collections/*+* sono filtri, non prodotti
 ];
+
+// Normalizza un Disallow rimuovendo il prefisso locale wildcard "/*/".
+// Es: "/*/cart/" → "/cart/", "/*/checkout" → "/checkout".
+function normalizePath(raw: string): string {
+  let s = raw.toLowerCase().trim();
+  if (s.startsWith('/*/')) s = '/' + s.slice(3);
+  return s;
+}
 
 function isTransactional(disallow: string): boolean {
-  const d = disallow.toLowerCase();
+  const d = normalizePath(disallow);
   if (d.includes('add-to-cart')) return true;
-  if (d.includes('sort_by') || d.includes('filter')) return true;
-  if (d.includes('preview_theme_id') || d.includes('oseid')) return true;
-  return TRANSACTIONAL_PREFIXES.some((p) => d.startsWith(p.toLowerCase()));
+  if (d.startsWith('/sf_')) return true;
+  if (d.includes('cart.js')) return true;
+  if (d.includes('/recommendations/products')) return true;
+  if (/^\/\d+\/?$/.test(d)) return true; // ID collezione Shopify tipo /63203278938
+  return TRANSACTIONAL_PREFIXES.some((p) => d.startsWith(p));
+}
+
+function isCrawlTrap(disallow: string): boolean {
+  const d = normalizePath(disallow);
+  return CRAWL_TRAP_PATTERNS.some((p) => d.includes(p));
 }
 
 function blocksProductPath(disallow: string): boolean {
-  const d = disallow.toLowerCase();
-  return PRODUCT_PATH_HINTS.some((p) => d.includes(p));
+  const d = normalizePath(disallow);
+  if (isCrawlTrap(d)) return false;
+  const productHints = [
+    '/products',
+    '/collections',
+    '/pages',
+    '/shop',
+    '/p/',
+    '/profumi',
+    '/fragranze',
+    '/perfumes',
+  ];
+  return productHints.some((p) => d.includes(p));
 }
 
 function getSupabaseAnon() {
@@ -108,7 +135,9 @@ async function checkRobotsForHost(baseUrl: string): Promise<RobotsVerdict> {
   } catch (e: any) {
     return {
       permission: 'da_verificare',
-      reason: `fetch robots.txt fallito (${e?.name === 'AbortError' ? 'timeout' : e?.message || String(e)}). Il sito potrebbe bloccare la lettura automatica: verificare a mano.`,
+      reason: `fetch robots.txt fallito (${
+        e?.name === 'AbortError' ? 'timeout' : e?.message || String(e)
+      }). Il sito potrebbe bloccare la lettura automatica: verificare a mano.`,
     };
   } finally {
     clearTimeout(timer);
@@ -161,7 +190,6 @@ async function checkRobotsForHost(baseUrl: string): Promise<RobotsVerdict> {
     }
   }
 
-  // Caso 1: blocco totale
   if (disallowAll) {
     if (allowPaths.length === 0) {
       return {
@@ -175,10 +203,9 @@ async function checkRobotsForHost(baseUrl: string): Promise<RobotsVerdict> {
     };
   }
 
-  // Caso 2: nessun Disallow: / — guardiamo cosa bloccano i Disallow specifici
   const productBlockers = disallowPaths.filter(blocksProductPath);
   const nonTransactional = disallowPaths.filter(
-    (d) => !blocksProductPath(d) && !isTransactional(d)
+    (d) => !blocksProductPath(d) && !isTransactional(d) && !isCrawlTrap(d)
   );
 
   if (productBlockers.length > 0) {
@@ -191,14 +218,10 @@ async function checkRobotsForHost(baseUrl: string): Promise<RobotsVerdict> {
   }
 
   if (nonTransactional.length === 0) {
-    const detail = allowAll
-      ? 'Allow: / esplicito'
-      : 'nessun Disallow: /';
+    const detail = allowAll ? 'Allow: / esplicito' : 'nessun Disallow: /';
     return {
       permission: 'si',
-      reason: `robots.txt: ${detail}, Disallow solo su path transazionali (${disallowPaths
-        .slice(0, 3)
-        .join(', ') || 'nessuno'}). I prodotti restano leggibili.`,
+      reason: `robots.txt: ${detail}; Disallow solo su path transazionali o filtri di ricerca. I prodotti restano leggibili.`,
     };
   }
 
