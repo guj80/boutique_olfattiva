@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   ShieldCheck,
   ShieldQuestion,
+  ShieldX,
+  Bot,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
@@ -22,6 +24,7 @@ export default function LaboratorioPage() {
   const [fonti, setFonti] = useState<FonteUfficiale[]>([]);
   const [candidati, setCandidati] = useState<Candidato[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkingRobots, setCheckingRobots] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
@@ -60,6 +63,30 @@ export default function LaboratorioPage() {
     setCustomAura(SECTION_THEMES.radar);
     loadData();
   }, [setCustomAura, loadData]);
+
+  async function checkRobots() {
+    if (checkingRobots) return;
+    setCheckingRobots(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessione scaduta, rifai il login.');
+      const res = await fetch('/api/laboratorio/check-robots', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Errore verifica robots.txt.');
+      const r = data.riepilogo || { si: 0, no: 0, da_verificare: 0 };
+      showToast(`robots.txt: ${r.si} sì, ${r.no} no, ${r.da_verificare} da verificare.`);
+      await loadData();
+    } catch (err: any) {
+      showToast(err?.message || 'Errore imprevisto.', 'error');
+    } finally {
+      setCheckingRobots(false);
+    }
+  }
 
   async function azione(
     candidato: Candidato,
@@ -113,16 +140,28 @@ export default function LaboratorioPage() {
         title="Laboratorio"
         subtitle="SCOUTING"
         rightSlot={
-          <button
-            type="button"
-            onClick={loadData}
-            disabled={loading}
-            style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
-            className="flex items-center gap-2 rounded-full border bg-[#0E0A16] px-4 py-2 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Aggiorna</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={checkRobots}
+              disabled={checkingRobots || loading}
+              style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
+              className="flex items-center gap-2 rounded-full border bg-[#0E0A16] px-4 py-2 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+            >
+              <Bot className={`h-3.5 w-3.5 ${checkingRobots ? 'animate-pulse' : ''}`} />
+              <span>{checkingRobots ? 'Verifica...' : 'Verifica robots.txt'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={loadData}
+              disabled={loading}
+              style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
+              className="flex items-center gap-2 rounded-full border bg-[#0E0A16] px-4 py-2 text-xs font-semibold transition hover:opacity-85 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Aggiorna</span>
+            </button>
+          </div>
         }
       />
 
@@ -166,7 +205,7 @@ export default function LaboratorioPage() {
                 f.permission_scraping === 'si'
                   ? ShieldCheck
                   : f.permission_scraping === 'no'
-                  ? AlertTriangle
+                  ? ShieldX
                   : ShieldQuestion;
               return (
                 <div
@@ -202,6 +241,12 @@ export default function LaboratorioPage() {
                     <PermissionIcon className="h-3 w-3" />
                     <span>permesso: {f.permission_scraping}</span>
                   </div>
+                  {f.ultima_visita && (
+                    <p className="font-mono text-[10px] text-[#B8A9C9]">
+                      ultima visita:{' '}
+                      {new Date(f.ultima_visita).toLocaleString('it-IT')}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -244,7 +289,7 @@ export default function LaboratorioPage() {
             </p>
             <p className="text-xs text-[#B8A9C9]">
               La coda è vuota. I candidati arriveranno dalla raccolta
-              settimanale dalle fonti ufficiali (PASSO 2).
+              settimanale dalle fonti ufficiali (PASSO 2B.2).
             </p>
           </div>
         ) : (
@@ -435,7 +480,8 @@ export default function LaboratorioPage() {
       )}
 
       <p className="text-center text-[11px] text-[#B8A9C9] pt-4">
-        Nel PASSO 2 aggiungeremo la raccolta automatica dalle fonti ufficiali.
+        Prossimo passo (2B.2): estrazione AI vincolata a schema JSON dalle fonti
+        con permesso &quot;si&quot;.
       </p>
     </main>
   );
