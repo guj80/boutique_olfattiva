@@ -283,7 +283,7 @@ export default function CollezionePage() {
   );
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-8">
+    <main className="mx-auto w-full max-w-6xl px-4 sm:px-8 py-8 pb-36 space-y-8">
       {React.createElement(PageHeader, {
         title: pageTitle,
         subtitle: 'VETRINA',
