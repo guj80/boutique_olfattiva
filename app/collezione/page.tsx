@@ -720,19 +720,19 @@ export default function CollezionePage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-1 text-center">
-                    <p
-                      style={{ color: pAura.primary }}
-                      className="font-mono text-[10px] uppercase tracking-wider truncate"
-                    >
-                      {p.brand}
-                    </p>
-                    <h3 className="font-serif text-[17px] leading-tight text-[#F6EFE4] line-clamp-2">
-                      {p.nome}
-                    </h3>
-                    <p className="font-mono text-[10px] text-[#B8A9C9] pt-0.5">
-                      {p.famiglia_olfattiva}
-                    </p>
+                  <div className="mt-5 space-y-2 text-center">
+  <p
+    style={{ color: pAura.primary }}
+    className="font-mono text-[11px] uppercase tracking-[0.14em] truncate"
+  >
+    {p.brand}
+  </p>
+  <h3 className="font-serif text-[22px] leading-[1.15] text-[#F6EFE4] line-clamp-2">
+    {p.nome}
+  </h3>
+  <p className="font-mono text-[11px] text-[#B8A9C9] pt-0.5">
+    {p.famiglia_olfattiva}
+  </p>
 
                     {activeTab === 'radar' && p.prezzo_stimato_euro && (
                       <div className="pt-2">
