@@ -667,18 +667,18 @@ export default function CollezionePage() {
         </section>
       )}
 
-      {/* GRIGLIA FLACONI */}
+            {/* GRIGLIA FLACONI */}
       <section>
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="h-80 rounded-[30px] aura-skeleton" />
+              <div key={n} className="h-80 rounded-[24px] aura-skeleton" />
             ))}
           </div>
         ) : filteredProfumi.length === 0 ? (
           <div
             style={{ borderColor: `${aura.primary}35` }}
-            className="rounded-[28px] border bg-[#161024]/90 p-16 text-center space-y-3 shadow-xl"
+            className="rounded-[24px] border bg-[#161024]/90 p-16 text-center space-y-3 shadow-xl"
           >
             {React.createElement(Compass, {
               style: { color: aura.primary },
@@ -689,7 +689,7 @@ export default function CollezionePage() {
             </h2>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {filteredProfumi.map((p) => {
               const pAura = resolveAura(p.famiglia_olfattiva, p.nome);
               const imgUrl = p.url_foto_vetrina || p.immagine_url;
@@ -702,7 +702,7 @@ export default function CollezionePage() {
                     setAuraFromProfumo(p);
                   }}
                   style={{ borderColor: `${pAura.primary}40` }}
-                  className="group relative flex flex-col justify-between rounded-[30px] border bg-[#161024]/95 p-5 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
+                  className="group relative flex flex-col justify-between rounded-[24px] border bg-[#161024]/95 p-6 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
                 >
                   <div className="flex justify-center py-2">
                     <div className="relative w-full">
