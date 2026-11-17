@@ -702,10 +702,10 @@ export default function CollezionePage() {
                     setAuraFromProfumo(p);
                   }}
                   style={{ borderColor: `${pAura.primary}40` }}
-                  className="group relative flex flex-col justify-between rounded-[24px] border bg-[#161024]/95 p-6 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
+                  className="group relative flex flex-col h-full rounded-[24px] border bg-[#161024]/95 p-6 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-xl"
                 >
-                  <div className="flex justify-center py-2">
-                    <div className="relative w-full">
+                  <div className="flex flex-1 items-center justify-center py-2 w-full">
+  <div className="relative w-full">
                       <div
                         className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
                         style={{ backgroundColor: pAura.primary }}
@@ -720,17 +720,17 @@ export default function CollezionePage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 space-y-2 text-center">
+                  <div className="mt-4 w-full grid grid-rows-[20px_52px_20px] items-center text-center gap-1.5">
   <p
     style={{ color: pAura.primary }}
-    className="font-mono text-[11px] uppercase tracking-[0.14em] truncate"
+    className="font-mono text-[13px] font-medium uppercase tracking-[0.12em] truncate"
   >
     {p.brand}
   </p>
-  <h3 className="font-serif text-[22px] leading-[1.15] text-[#F6EFE4] line-clamp-2">
+  <h3 className="font-serif text-[22px] leading-[1.15] text-[#F6EFE4] line-clamp-2 flex items-center justify-center">
     {p.nome}
   </h3>
-  <p className="font-mono text-[11px] text-[#B8A9C9] pt-0.5">
+  <p className="font-mono text-[11px] text-[#B8A9C9] truncate">
     {p.famiglia_olfattiva}
   </p>
 
