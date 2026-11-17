@@ -20,7 +20,7 @@ import {
 import { supabase, Profumo, Momento, isRadarProfumo } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
 import { BottlePedestal } from './BottleImage';
-import { resolveAura } from './AuraProvider';
+import { resolveAura, useAura } from './AuraProvider';
 import { useToast } from './Toast';
 import { useSpruzzo } from './Spruzzo';
 
@@ -67,6 +67,7 @@ export function ProfumoDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const { setHideDock } = useAura();
 
   // Stato per aggiornamento tramite Link ufficiale
   const [enrichUrl, setEnrichUrl] = useState('');
@@ -81,16 +82,22 @@ export function ProfumoDetailModal({
   const { showToast } = useToast();
   const { triggerSpruzzo } = useSpruzzo();
 
-  useEffect(() => {
+    useEffect(() => {
     setCurrentProfumo(profumo);
     if (profumo) {
+      setHideDock(true);
       setEditForm(profumo);
       setIsEditing(false);
       setWearOpen(false);
       setDeleteConfirmId(null);
       setEnrichUrl('');
+    } else {
+      setHideDock(false);
     }
-  }, [profumo]);
+    
+    // Cleanup: se l'utente chiude il modale in modo strano, ripristiniamo la dock
+    return () => setHideDock(false);
+  }, [profumo, setHideDock]);
 
   if (!currentProfumo) return null;
 
@@ -228,7 +235,7 @@ export function ProfumoDetailModal({
         <div
           onClick={(e) => e.stopPropagation()}
           style={{ borderColor: `${modalAura.primary}55` }}
-          className="relative w-full max-w-lg max-h-[88dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar mb-16"
+          className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar"
         >
           <div className="absolute right-5 top-5 flex items-center gap-2 z-20">
             <button
