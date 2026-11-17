@@ -235,7 +235,7 @@ export function ProfumoDetailModal({
         <div
           onClick={(e) => e.stopPropagation()}
           style={{ borderColor: `${modalAura.primary}55` }}
-          className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl no-scrollbar"
+          className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto custom-scrollbar rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl"
         >
           <div className="absolute right-5 top-5 flex items-center gap-2 z-20">
             <button
