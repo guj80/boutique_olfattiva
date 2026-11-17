@@ -237,7 +237,7 @@ export function ProfumoDetailModal({
           style={{ borderColor: `${modalAura.primary}55` }}
           className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto custom-scrollbar rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl"
         >
-          <div className="absolute right-5 top-5 flex items-center gap-2 z-20">
+          <div className="absolute right-4 top-4 flex items-center gap-1.5 z-30 p-1.5 bg-[#0E0A16]/80 backdrop-blur-md rounded-full border border-white/10 shadow-lg">
             <button
               onClick={() => setIsEditing(!isEditing)}
               style={{ color: modalAura.primary }}
@@ -394,20 +394,20 @@ export function ProfumoDetailModal({
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="rounded-full px-4 py-2 text-xs font-semibold text-[#B8A9C9]"
-                >
-                  Annulla
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  style={{ backgroundColor: modalAura.primary }}
-                  className="flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#08060C]"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  <span>Salva</span>
-                </button>
+                            <button
+              onClick={() => setIsEditing(!isEditing)}
+              style={{ color: modalAura.primary }}
+              className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10 transition"
+              title="Modifica scheda"
+            >
+              <Edit3 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[#B8A9C9] hover:bg-white/10 hover:text-white transition"
+            >
+              <X className="h-4 w-4" />
+            </button>
               </div>
             </div>
           ) : (
