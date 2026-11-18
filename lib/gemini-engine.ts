@@ -91,7 +91,7 @@ interface ProviderTarget {
   model: string;
 }
 
-cconst FALLBACK_CHAIN: ProviderTarget[] = [
+const FALLBACK_CHAIN: ProviderTarget[] = [
   // 1. GEMINI (Provider principale)
   { provider: 'gemini', model: 'gemini-2.0-flash' },
   { provider: 'gemini', model: 'gemini-2.0-flash-lite' },
