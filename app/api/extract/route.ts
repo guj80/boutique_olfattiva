@@ -818,7 +818,6 @@ Traduci in italiano le note del database senza alterarle e completa solo ciò ch
       aiText = res.text;
       modelUsed = res.modelUsed;
     } catch (aiErr) {
-      // Se l'AI fallisce ma abbiamo il record reale nel database Supabase, restituiamo i dati VERI del DB senza inventare nulla
       if (dbRecord && dbRecord.brand && dbRecord.name) {
         if (!foundImage && imageJob) {
           foundImage = await withTimeout(imageJob, 1500).catch(() => null);
@@ -866,19 +865,30 @@ Traduci in italiano le note del database senza alterarle e completa solo ciò ch
 
     const noNotes =
       !toText(parsed.note_testa) && !toText(parsed.note_cuore) && !toText(parsed.note_fondo);
-    if (noNotes && process.env.GROQ_API_KEY && remaining() > 6000) {
+    if (
+      noNotes &&
+      (process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY) &&
+      remaining() > 6000
+    ) {
       try {
         const enrich = await withTimeout(
           callOpenRouterFree(
-            `Scheda da completare per "${toText(parsed.brand) || brandIn} ${
-              toText(parsed.nome) || nomeIn || searchTarget
-            }".
+            [
+              {
+                text: `Scheda da completare per "${toText(parsed.brand) || brandIn} ${
+                  toText(parsed.nome) || nomeIn || searchTarget
+                }".
 Compila note_testa, note_cuore, note_fondo (italiano, separate da virgola) solo se conosci la piramide ufficiale; altrimenti lasciale vuote.
 ${webSnippet ? `Fonte web:\n${webSnippet.slice(0, 2500)}\n` : ''}
 JSON attuale:
 ${JSON.stringify(parsed)}`,
-            ENRICH_SYSTEM_PROMPT,
-            { deadline: t0 + BUDGET_MS - 1500, json: true }
+              },
+            ],
+            {
+              systemInstruction: ENRICH_SYSTEM_PROMPT,
+              deadline: t0 + BUDGET_MS - 1500,
+              jsonMode: true,
+            }
           ),
           Math.min(6000, remaining() - 1200)
         );
