@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   X,
   Trash2,
@@ -16,8 +17,14 @@ import {
   Link2,
   Sparkles,
   RefreshCw,
+  Tag,
+  Wind,
+  Heart,
+  Anchor,
+  ChevronDown,
+  Wrench,
 } from 'lucide-react';
-import { supabase, Profumo, Momento, isRadarProfumo } from '@/lib/supabase';
+import { supabase, Profumo, Momento } from '@/lib/supabase';
 import { formatPerfumeNote } from '@/lib/dictionary';
 import { BottlePedestal } from './BottleImage';
 import { resolveAura, useAura } from './AuraProvider';
@@ -68,8 +75,10 @@ export function ProfumoDetailModal({
   const [editForm, setEditForm] = useState<any>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { setHideDock } = useAura();
+  const prefersReducedMotion = useReducedMotion();
 
   // Stato per aggiornamento tramite Link ufficiale
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [enrichUrl, setEnrichUrl] = useState('');
   const [enriching, setEnriching] = useState(false);
 
@@ -82,7 +91,7 @@ export function ProfumoDetailModal({
   const { showToast } = useToast();
   const { triggerSpruzzo } = useSpruzzo();
 
-    useEffect(() => {
+  useEffect(() => {
     setCurrentProfumo(profumo);
     if (profumo) {
       setHideDock(true);
@@ -90,12 +99,13 @@ export function ProfumoDetailModal({
       setIsEditing(false);
       setWearOpen(false);
       setDeleteConfirmId(null);
+      setToolsOpen(false);
       setEnrichUrl('');
     } else {
       setHideDock(false);
     }
-    
-    // Cleanup: se l'utente chiude il modale in modo strano, ripristiniamo la dock
+
+    // Cleanup: se il modale si chiude in modo anomalo, la dock torna visibile
     return () => setHideDock(false);
   }, [profumo, setHideDock]);
 
@@ -104,7 +114,16 @@ export function ProfumoDetailModal({
   const modalAura = resolveAura(currentProfumo.famiglia_olfattiva, currentProfumo.nome);
   const seasons = getSeasonsForFamily(currentProfumo.famiglia_olfattiva);
   const pAny = currentProfumo as any;
-  const isRadarItem = isRadarProfumo(currentProfumo);
+  // Le proposte dello scouting hanno un id temporaneo: non esistono ancora nel DB
+  const isPreview = String(currentProfumo.id).startsWith('preview-');
+
+  const pyramid = [
+    { key: 'testa', label: 'Testa', icon: Wind, value: currentProfumo.note_testa, width: 'w-[90%]' },
+    { key: 'cuore', label: 'Cuore', icon: Heart, value: currentProfumo.note_cuore, width: 'w-[95%]' },
+    { key: 'fondo', label: 'Fondo', icon: Anchor, value: currentProfumo.note_fondo, width: 'w-full' },
+  ].filter((layer) => (layer.value || '').trim().length > 0);
+
+  const fallbackNotes = (currentProfumo.note_olfattive || '').trim();
 
   async function handleEnrichViaLink(e: React.FormEvent) {
     e.preventDefault();
@@ -226,29 +245,54 @@ export function ProfumoDetailModal({
     }
   }
 
+  const fieldClass =
+    'w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4] focus:outline-none focus:border-white/30';
+
   return (
     <>
+      {/* Barra di scorrimento visibile, colorata con l'aura del profumo */}
+      <style>{`
+        .aura-modal-scroll { scrollbar-width: thin; scrollbar-color: var(--modal-aura) rgba(255,255,255,0.06); }
+        .aura-modal-scroll::-webkit-scrollbar { width: 9px; }
+        .aura-modal-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 999px; margin: 22px 0; }
+        .aura-modal-scroll::-webkit-scrollbar-thumb { background: var(--modal-aura); border-radius: 999px; border: 2px solid #161024; }
+        .aura-modal-scroll::-webkit-scrollbar-thumb:hover { filter: brightness(1.2); }
+      `}</style>
+
       <div
         onClick={onClose}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08060C]/85 backdrop-blur-md animate-in fade-in duration-200"
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          style={{ borderColor: `${modalAura.primary}55` }}
-          className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto custom-scrollbar rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-6 shadow-2xl"
+          style={
+            {
+              borderColor: `${modalAura.primary}55`,
+              '--modal-aura': modalAura.primary,
+              '--aura-1': modalAura.primary,
+            } as React.CSSProperties
+          }
+          className="aura-modal-scroll relative w-full max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain rounded-[32px] border bg-[#161024] p-6 sm:p-8 text-[#F6EFE4] space-y-7 shadow-2xl"
         >
-          <div className="absolute right-4 top-4 flex items-center gap-1.5 z-30 p-1.5 bg-[#0E0A16]/80 backdrop-blur-md rounded-full border border-white/10 shadow-lg">
+          <div className="absolute right-4 top-4 z-30 flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0E0A16]/80 p-1.5 shadow-lg backdrop-blur-md">
+            {!isPreview && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(!isEditing)}
+                style={{ color: modalAura.primary }}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#0E0A16] transition hover:text-white"
+                title="Modifica scheda"
+                aria-label="Modifica scheda"
+              >
+                <Edit3 className="h-4 w-4" />
+              </button>
+            )}
             <button
-              onClick={() => setIsEditing(!isEditing)}
-              style={{ color: modalAura.primary }}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] hover:text-white border border-white/10 transition"
-              title="Modifica scheda"
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
-            <button
+              type="button"
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0E0A16] text-[#B8A9C9] hover:text-white border border-white/10 transition"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#0E0A16] text-[#B8A9C9] transition hover:text-white"
+              title="Chiudi"
+              aria-label="Chiudi"
             >
               <X className="h-4 w-4" />
             </button>
@@ -256,63 +300,53 @@ export function ProfumoDetailModal({
 
           {isEditing ? (
             <div className="space-y-4 pt-2">
-              <h3 className="font-serif text-xl text-[#F6EFE4]">
-                Modifica Scheda Tecnica
-              </h3>
+              <h3 className="font-serif text-xl text-[#F6EFE4]">Modifica Scheda Tecnica</h3>
               <div className="space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                    <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                       Maison
                     </label>
                     <input
                       type="text"
                       value={editForm.brand || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, brand: e.target.value })
-                      }
-                      className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                      onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+                      className={fieldClass}
                     />
                   </div>
                   <div>
-                    <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                    <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                       Creazione
                     </label>
                     <input
                       type="text"
                       value={editForm.nome || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, nome: e.target.value })
-                      }
-                      className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                      onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })}
+                      className={fieldClass}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                    <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                       Naso
                     </label>
                     <input
                       type="text"
                       value={editForm.naso || ''}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, naso: e.target.value })
-                      }
-                      className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                      onChange={(e) => setEditForm({ ...editForm, naso: e.target.value })}
+                      className={fieldClass}
                     />
                   </div>
                   <div>
-                    <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                    <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                       Sezione
                     </label>
                     <select
                       value={editForm.stato || 'collezione'}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, stato: e.target.value })
-                      }
-                      className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                      onChange={(e) => setEditForm({ ...editForm, stato: e.target.value })}
+                      className={fieldClass}
                     >
                       <option value="collezione">Collezione</option>
                       <option value="radar">Radar</option>
@@ -321,25 +355,22 @@ export function ProfumoDetailModal({
                 </div>
 
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                  <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                     Prezzi per Formato (≥ 30ml)
                   </label>
                   <input
                     type="text"
                     value={editForm.prezzo_stimato_euro || ''}
                     onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        prezzo_stimato_euro: e.target.value,
-                      })
+                      setEditForm({ ...editForm, prezzo_stimato_euro: e.target.value })
                     }
                     placeholder="Es. 50ml: €190 • 100ml: €260"
-                    className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                    className={fieldClass}
                   />
                 </div>
 
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                  <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                     URL Immagine Flacone
                   </label>
                   <input
@@ -348,81 +379,78 @@ export function ProfumoDetailModal({
                     onChange={(e) =>
                       setEditForm({ ...editForm, url_foto_vetrina: e.target.value })
                     }
-                    className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                    className={fieldClass}
                   />
                 </div>
 
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                  <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                     Note di Testa
                   </label>
                   <input
                     type="text"
                     value={editForm.note_testa || ''}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, note_testa: e.target.value })
-                    }
-                    className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                    onChange={(e) => setEditForm({ ...editForm, note_testa: e.target.value })}
+                    className={fieldClass}
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                  <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                     Note di Cuore
                   </label>
                   <input
                     type="text"
                     value={editForm.note_cuore || ''}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, note_cuore: e.target.value })
-                    }
-                    className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                    onChange={(e) => setEditForm({ ...editForm, note_cuore: e.target.value })}
+                    className={fieldClass}
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
+                  <label className="mb-1 block font-mono text-[10px] uppercase text-[#B8A9C9]">
                     Note di Fondo
                   </label>
                   <input
                     type="text"
                     value={editForm.note_fondo || ''}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, note_fondo: e.target.value })
-                    }
-                    className="w-full rounded-[14px] bg-[#0E0A16] border border-white/10 p-2.5 text-[#F6EFE4]"
+                    onChange={(e) => setEditForm({ ...editForm, note_fondo: e.target.value })}
+                    className={fieldClass}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                            <button
-              onClick={() => setIsEditing(!isEditing)}
-              style={{ color: modalAura.primary }}
-              className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10 transition"
-              title="Modifica scheda"
-            >
-              <Edit3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[#B8A9C9] hover:bg-white/10 hover:text-white transition"
-            >
-              <X className="h-4 w-4" />
-            </button>
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditForm(currentProfumo);
+                    setIsEditing(false);
+                  }}
+                  className="rounded-full border border-white/10 px-5 py-2.5 text-xs font-semibold text-[#B8A9C9] transition hover:text-white"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  style={{ backgroundColor: modalAura.primary }}
+                  className="inline-flex items-center gap-1.5 rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  <span>Salva</span>
+                </button>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex flex-col items-center text-center pt-2">
-                <div className="relative mb-4">
+              {/* ───────── 1. IDENTITÀ: boccetta, brand, nome, naso, prezzo ───────── */}
+              <section className="flex flex-col items-center pt-2 text-center">
+                <div className="relative mb-5">
                   <div
-                    className="absolute inset-0 rounded-[36px] blur-2xl opacity-55"
+                    className="absolute inset-0 rounded-[36px] opacity-55 blur-2xl"
                     style={{ backgroundColor: modalAura.primary }}
                   />
                   <BottlePedestal
-                    src={
-                      currentProfumo.url_foto_vetrina ||
-                      currentProfumo.immagine_url
-                    }
+                    src={currentProfumo.url_foto_vetrina || currentProfumo.immagine_url}
                     alt={currentProfumo.nome}
                     size="xl"
                     className="relative z-10"
@@ -436,318 +464,371 @@ export function ProfumoDetailModal({
                 >
                   {currentProfumo.brand}
                 </span>
-                <h2 className="font-serif text-3xl text-[#F6EFE4] mt-1">
+                <h2 className="mt-1 font-serif text-3xl text-[#F6EFE4]">
                   {currentProfumo.nome}
                 </h2>
-                <p className="font-mono text-[11px] text-[#B8A9C9] mt-1">
-                  {currentProfumo.concentrazione || 'Extrait de Parfum'} •{' '}
-                  {currentProfumo.famiglia_olfattiva}
+                <p className="mt-1 font-mono text-[11px] text-[#B8A9C9]">
+                  {currentProfumo.concentrazione || 'Extrait de Parfum'}
+                  {currentProfumo.famiglia_olfattiva
+                    ? ` • ${currentProfumo.famiglia_olfattiva}`
+                    : ''}
                 </p>
 
-                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                   {currentProfumo.naso && (
                     <div
                       style={{ borderColor: `${modalAura.primary}40` }}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-[#0E0A16] px-3.5 py-1.5 border font-mono text-[11px] text-[#F6EFE4]"
+                      className="inline-flex items-center gap-1.5 rounded-full border bg-[#0E0A16] px-3.5 py-1.5 font-mono text-[11px] text-[#F6EFE4]"
                     >
-                      <UserCheck
-                        style={{ color: modalAura.primary }}
-                        className="h-3.5 w-3.5"
-                      />
+                      <UserCheck style={{ color: modalAura.primary }} className="h-3.5 w-3.5" />
                       <span>Naso: {currentProfumo.naso}</span>
                     </div>
                   )}
                   {pAny.anno_lancio && (
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-[#0E0A16] px-3.5 py-1.5 border border-white/10 font-mono text-[11px] text-[#B8A9C9]">
-                      <Calendar
-                        style={{ color: modalAura.primary }}
-                        className="h-3.5 w-3.5"
-                      />
-                      <span>Anno: {pAny.anno_lancio}</span>
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0E0A16] px-3.5 py-1.5 font-mono text-[11px] text-[#B8A9C9]">
+                      <Calendar style={{ color: modalAura.primary }} className="h-3.5 w-3.5" />
+                      <span>{pAny.anno_lancio}</span>
+                    </div>
+                  )}
+                  {currentProfumo.prezzo_stimato_euro && (
+                    <div
+                      title="Listino ufficiale (≥ 30ml)"
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-[#0E0A16] px-3.5 py-1.5 font-mono text-[11px] text-[#B8A9C9]"
+                    >
+                      <Tag style={{ color: modalAura.primary }} className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-left">{currentProfumo.prezzo_stimato_euro}</span>
                     </div>
                   )}
                 </div>
+              </section>
 
-                {/* Sezione Aggiornamento tramite Link Ufficiale */}
-                <div className="mt-5 w-full rounded-2xl bg-[#0E0A16] p-4 border border-white/10 space-y-3 text-left">
-                  <div className="flex items-center justify-between">
-                    <span
-                      style={{ color: modalAura.primary }}
-                      className="font-mono text-[10px] uppercase tracking-wider font-bold"
-                    >
-                      Aggiorna da Link Ufficiale
-                    </span>
-                    <span className="font-mono text-[9px] text-[#B8A9C9]">
-                      Estrae note, prezzi (≥30ml) e foto
-                    </span>
-                  </div>
-                  <form onSubmit={handleEnrichViaLink} className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#B8A9C9]" />
-                      <input
-                        type="url"
-                        value={enrichUrl}
-                        onChange={(e) => setEnrichUrl(e.target.value)}
-                        placeholder="Incolla URL pagina ufficiale..."
-                        className="w-full rounded-[12px] bg-[#161024] border border-white/10 pl-9 pr-3 py-2 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={enriching || !enrichUrl.trim()}
-                      style={{ backgroundColor: modalAura.primary }}
-                      className="inline-flex items-center gap-1.5 rounded-[12px] px-4 py-2 font-mono text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-40"
-                    >
-                      {enriching ? (
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" />
-                      )}
-                      <span>{enriching ? 'Lettura...' : 'Aggiorna'}</span>
-                    </button>
-                  </form>
-                </div>
-
-                {/* Mostra Prezzo se presente */}
-                {currentProfumo.prezzo_stimato_euro && (
-                  <div className="mt-4 w-full rounded-2xl bg-[#0E0A16] p-3.5 border border-white/10 text-center">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9] block mb-1">
-                      Listino Ufficiale (≥ 30ml)
-                    </span>
-                    <span className="font-mono text-xs text-[#F6EFE4] font-bold">
-                      {currentProfumo.prezzo_stimato_euro}
-                    </span>
-                  </div>
-                )}
-
-                <div className="mt-5 w-full space-y-2.5 text-left">
+              {/* ───────── 2. PIRAMIDE OLFATTIVA: protagonista ───────── */}
+              <section className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    style={{ backgroundColor: `${modalAura.primary}55` }}
+                    className="h-px flex-1"
+                  />
                   <h3
                     style={{ color: modalAura.primary }}
-                    className="font-mono text-[10px] uppercase tracking-[0.2em]"
+                    className="font-mono text-[11px] font-bold uppercase tracking-[0.28em]"
                   >
                     Piramide Olfattiva
                   </h3>
-                  <div className="space-y-2 text-xs">
-                    {currentProfumo.note_testa && (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
-                        <span
-                          style={{ color: modalAura.primary }}
-                          className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
-                        >
-                          Testa
-                        </span>
-                        <span className="text-left sm:text-right text-[#F6EFE4]">
-                          {formatPerfumeNote(currentProfumo.note_testa)}
-                        </span>
-                      </div>
-                    )}
-                    {currentProfumo.note_cuore && (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
-                        <span
-                          style={{ color: modalAura.primary }}
-                          className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
-                        >
-                          Cuore
-                        </span>
-                        <span className="text-left sm:text-right text-[#F6EFE4]">
-                          {formatPerfumeNote(currentProfumo.note_cuore)}
-                        </span>
-                      </div>
-                    )}
-                    {currentProfumo.note_fondo && (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-[16px] bg-[#0E0A16] px-4 py-2.5 border border-white/10">
-                        <span
-                          style={{ color: modalAura.primary }}
-                          className="font-mono text-[10px] uppercase tracking-wider font-bold shrink-0"
-                        >
-                          Fondo
-                        </span>
-                        <span className="text-left sm:text-right text-[#F6EFE4]">
-                          {formatPerfumeNote(currentProfumo.note_fondo)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <span
+                    style={{ backgroundColor: `${modalAura.primary}55` }}
+                    className="h-px flex-1"
+                  />
                 </div>
 
-                <div className="mt-4 w-full grid grid-cols-4 gap-2 rounded-2xl bg-[#0E0A16]/90 p-2.5 border border-white/10">
-                  <div
-                    className={`flex flex-col items-center gap-1 rounded-xl py-2 transition ${
-                      seasons.primavera
-                        ? 'bg-gradient-to-b from-emerald-500/20 to-transparent text-emerald-300 border border-emerald-400/30'
-                        : 'opacity-25 text-[#B8A9C9]'
-                    }`}
-                  >
-                    <Flower2 className="h-4 w-4" />
-                    <span className="font-mono text-[9px] uppercase tracking-wider">
-                      Primavera
-                    </span>
+                {pyramid.length > 0 ? (
+                  <div className="flex flex-col items-center gap-2.5">
+                    {pyramid.map((layer, index) => {
+                      const Icon = layer.icon;
+                      return (
+                        <motion.div
+                          key={layer.key}
+                          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{
+                            duration: prefersReducedMotion ? 0 : 0.4,
+                            delay: prefersReducedMotion ? 0 : index * 0.08,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                          style={{
+                            borderColor: `${modalAura.primary}55`,
+                            background: `linear-gradient(135deg, ${modalAura.primary}26 0%, #0E0A16 62%)`,
+                            boxShadow: `0 12px 32px -18px ${modalAura.primary}`,
+                          }}
+                          className={`${layer.width} rounded-[22px] border p-4`}
+                        >
+                          <div className="mb-1.5 flex items-center gap-2">
+                            <span
+                              style={{
+                                backgroundColor: `${modalAura.primary}22`,
+                                color: modalAura.primary,
+                              }}
+                              className="flex h-7 w-7 items-center justify-center rounded-full"
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                            </span>
+                            <span
+                              style={{ color: modalAura.primary }}
+                              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+                            >
+                              {layer.label}
+                            </span>
+                          </div>
+                          <p className="text-sm leading-relaxed text-[#F6EFE4]">
+                            {formatPerfumeNote(layer.value as string)}
+                          </p>
+                        </motion.div>
+                      );
+                    })}
                   </div>
-
+                ) : fallbackNotes ? (
                   <div
-                    className={`flex flex-col items-center gap-1 rounded-xl py-2 transition ${
-                      seasons.estate
-                        ? 'bg-gradient-to-b from-sky-500/20 to-transparent text-sky-300 border border-sky-400/30'
-                        : 'opacity-25 text-[#B8A9C9]'
-                    }`}
+                    style={{
+                      borderColor: `${modalAura.primary}55`,
+                      background: `linear-gradient(135deg, ${modalAura.primary}26 0%, #0E0A16 62%)`,
+                    }}
+                    className="rounded-[22px] border p-4"
                   >
-                    <Sun className="h-4 w-4" />
-                    <span className="font-mono text-[9px] uppercase tracking-wider">
-                      Estate
-                    </span>
-                  </div>
-
-                  <div
-                    className={`flex flex-col items-center gap-1 rounded-xl py-2 transition ${
-                      seasons.autunno
-                        ? 'bg-gradient-to-b from-amber-500/20 to-transparent text-amber-300 border border-amber-400/30'
-                        : 'opacity-25 text-[#B8A9C9]'
-                    }`}
-                  >
-                    <Leaf className="h-4 w-4" />
-                    <span className="font-mono text-[9px] uppercase tracking-wider">
-                      Autunno
-                    </span>
-                  </div>
-
-                  <div
-                    className={`flex flex-col items-center gap-1 rounded-xl py-2 transition ${
-                      seasons.inverno
-                        ? 'bg-gradient-to-b from-indigo-500/25 to-transparent text-indigo-300 border border-indigo-400/30'
-                        : 'opacity-25 text-[#B8A9C9]'
-                    }`}
-                  >
-                    <Snowflake className="h-4 w-4" />
-                    <span className="font-mono text-[9px] uppercase tracking-wider">
-                      Inverno
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {wearOpen && (
-                <form
-                  onSubmit={handleSaveIndosso}
-                  style={{ borderColor: `${modalAura.primary}45` }}
-                  className="w-full rounded-2xl bg-[#0E0A16] p-4 border space-y-3 text-left"
-                >
-                  <div className="flex items-center justify-between">
                     <span
                       style={{ color: modalAura.primary }}
-                      className="font-mono text-[10px] uppercase tracking-wider font-bold"
+                      className="mb-1.5 block font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                     >
-                      Registra nel Diario Olfattivo
+                      Note
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setWearOpen(false)}
-                      className="text-xs text-[#B8A9C9] hover:text-white"
-                    >
-                      Annulla
-                    </button>
+                    <p className="text-sm leading-relaxed text-[#F6EFE4]">
+                      {formatPerfumeNote(fallbackNotes)}
+                    </p>
                   </div>
+                ) : (
+                  <p className="rounded-[22px] border border-white/10 bg-[#0E0A16] p-4 text-center text-xs text-[#B8A9C9]">
+                    Piramide non ancora disponibile per questa creazione.
+                  </p>
+                )}
 
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as Momento[]).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setWearMomento(m)}
-                        style={
-                          wearMomento === m
-                            ? { backgroundColor: modalAura.primary }
-                            : undefined
-                        }
-                        className={`rounded-xl py-2 text-[11px] font-semibold transition ${
-                          wearMomento === m
-                            ? 'text-[#08060C] font-bold'
-                            : 'bg-[#161024] text-[#B8A9C9] border border-white/10 hover:text-white'
+                {/* Stagioni: dato secondario, volutamente discreto */}
+                <div className="grid grid-cols-4 gap-2 pt-1">
+                  {[
+                    {
+                      key: 'primavera',
+                      label: 'Primavera',
+                      icon: Flower2,
+                      on: seasons.primavera,
+                      tone: 'text-emerald-300 border-emerald-400/30 bg-emerald-500/10',
+                    },
+                    {
+                      key: 'estate',
+                      label: 'Estate',
+                      icon: Sun,
+                      on: seasons.estate,
+                      tone: 'text-sky-300 border-sky-400/30 bg-sky-500/10',
+                    },
+                    {
+                      key: 'autunno',
+                      label: 'Autunno',
+                      icon: Leaf,
+                      on: seasons.autunno,
+                      tone: 'text-amber-300 border-amber-400/30 bg-amber-500/10',
+                    },
+                    {
+                      key: 'inverno',
+                      label: 'Inverno',
+                      icon: Snowflake,
+                      on: seasons.inverno,
+                      tone: 'text-indigo-300 border-indigo-400/30 bg-indigo-500/10',
+                    },
+                  ].map((s) => {
+                    const SeasonIcon = s.icon;
+                    return (
+                      <div
+                        key={s.key}
+                        className={`flex flex-col items-center gap-1 rounded-xl border py-2 ${
+                          s.on ? s.tone : 'border-transparent text-[#B8A9C9] opacity-25'
                         }`}
                       >
-                        {m}
-                      </button>
-                    ))}
-                  </div>
+                        <SeasonIcon className="h-3.5 w-3.5" />
+                        <span className="font-mono text-[9px] uppercase tracking-wider">
+                          {s.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                    <input
-                      type="text"
-                      value={wearOutfit}
-                      onChange={(e) => setWearOutfit(e.target.value)}
-                      placeholder="Contesto o outfit (facoltativo)"
-                      className="w-full rounded-[12px] bg-[#161024] border border-white/10 px-3 py-2 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+              {/* ───────── 3. STRUMENTI TECNICI: zona separata e discreta ───────── */}
+              {!isPreview && (
+                <section className="border-t border-dashed border-white/10 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setToolsOpen(!toolsOpen)}
+                    aria-expanded={toolsOpen}
+                    className="flex w-full items-center justify-between rounded-xl px-1 py-1.5 text-left text-[#B8A9C9] transition hover:text-[#F6EFE4]"
+                  >
+                    <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em]">
+                      <Wrench className="h-3.5 w-3.5" />
+                      Strumenti tecnici
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform motion-reduce:transition-none ${
+                        toolsOpen ? 'rotate-180' : ''
+                      }`}
                     />
-                    <input
-                      type="text"
-                      value={wearNote}
-                      onChange={(e) => setWearNote(e.target.value)}
-                      placeholder="Sensazioni o note (facoltativo)"
-                      className="w-full rounded-[12px] bg-[#161024] border border-white/10 px-3 py-2 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
-                    />
-                  </div>
+                  </button>
 
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={savingWear}
-                      style={{ backgroundColor: modalAura.primary }}
-                      className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      <span>{savingWear ? 'Salvataggio...' : 'Conferma Indosso'}</span>
-                    </button>
-                  </div>
-                </form>
+                  {toolsOpen && (
+                    <div className="mt-3 space-y-2.5 rounded-2xl border border-white/10 bg-[#0E0A16]/70 p-3.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
+                          Aggiorna da link ufficiale
+                        </span>
+                        <span className="text-right font-mono text-[9px] text-[#B8A9C9]/70">
+                          Note, prezzi (≥30ml) e foto
+                        </span>
+                      </div>
+                      <form onSubmit={handleEnrichViaLink} className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Link2 className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#B8A9C9]" />
+                          <input
+                            type="url"
+                            value={enrichUrl}
+                            onChange={(e) => setEnrichUrl(e.target.value)}
+                            placeholder="Incolla URL pagina ufficiale..."
+                            className="w-full rounded-[12px] border border-white/10 bg-[#161024] py-2 pl-9 pr-3 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none focus:border-white/30"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={enriching || !enrichUrl.trim()}
+                          style={{ borderColor: `${modalAura.primary}60`, color: modalAura.primary }}
+                          className="inline-flex items-center gap-1.5 rounded-[12px] border bg-transparent px-3.5 py-2 font-mono text-xs font-bold transition hover:bg-white/5 disabled:opacity-40"
+                        >
+                          {enriching ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5" />
+                          )}
+                          <span>{enriching ? 'Lettura...' : 'Aggiorna'}</span>
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </section>
               )}
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-white/10">
-                <button
-                  onClick={() => setDeleteConfirmId(currentProfumo.id)}
-                  className="flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-500/10 transition"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Rimuovi</span>
-                </button>
+              {/* ───────── 4. AZIONI ───────── */}
+              <section className="space-y-4">
+                {wearOpen && (
+                  <form
+                    onSubmit={handleSaveIndosso}
+                    style={{ borderColor: `${modalAura.primary}45` }}
+                    className="w-full space-y-3 rounded-2xl border bg-[#0E0A16] p-4 text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        style={{ color: modalAura.primary }}
+                        className="font-mono text-[10px] font-bold uppercase tracking-wider"
+                      >
+                        Registra nel Diario Olfattivo
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setWearOpen(false)}
+                        className="text-xs text-[#B8A9C9] hover:text-white"
+                      >
+                        Annulla
+                      </button>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  {!wearOpen && (
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(['Mattina', 'Pomeriggio', 'Sera', 'Notte'] as Momento[]).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setWearMomento(m)}
+                          style={
+                            wearMomento === m ? { backgroundColor: modalAura.primary } : undefined
+                          }
+                          className={`rounded-xl py-2 text-[11px] font-semibold transition ${
+                            wearMomento === m
+                              ? 'font-bold text-[#08060C]'
+                              : 'border border-white/10 bg-[#161024] text-[#B8A9C9] hover:text-white'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2.5 text-xs sm:grid-cols-2">
+                      <input
+                        type="text"
+                        value={wearOutfit}
+                        onChange={(e) => setWearOutfit(e.target.value)}
+                        placeholder="Contesto o outfit (facoltativo)"
+                        className="w-full rounded-[12px] border border-white/10 bg-[#161024] px-3 py-2 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={wearNote}
+                        onChange={(e) => setWearNote(e.target.value)}
+                        placeholder="Sensazioni o note (facoltativo)"
+                        className="w-full rounded-[12px] border border-white/10 bg-[#161024] px-3 py-2 text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={savingWear}
+                        style={{ backgroundColor: modalAura.primary }}
+                        className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        <span>{savingWear ? 'Salvataggio...' : 'Conferma Indosso'}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-4">
+                  {!isPreview ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setWearMomento(getDefaultMomento());
-                        setWearOpen(true);
-                      }}
-                      style={{ borderColor: `${modalAura.primary}60`, color: modalAura.primary }}
-                      className="flex items-center gap-1.5 rounded-full border bg-[#0E0A16] px-4 py-2.5 text-xs font-bold transition hover:bg-white/5"
+                      onClick={() => setDeleteConfirmId(currentProfumo.id)}
+                      className="flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold text-red-400 transition hover:bg-red-500/10"
                     >
-                      <CalendarHeart className="h-3.5 w-3.5" />
-                      <span>Indossato oggi</span>
+                      <Trash2 className="h-4 w-4" />
+                      <span>Elimina</span>
                     </button>
+                  ) : (
+                    <span />
                   )}
 
-                  <button
-                    onClick={onClose}
-                    style={{ backgroundColor: modalAura.primary }}
-                    className="rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90"
-                  >
-                    Chiudi
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {!isPreview && !wearOpen && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWearMomento(getDefaultMomento());
+                          setWearOpen(true);
+                        }}
+                        style={{ borderColor: `${modalAura.primary}60`, color: modalAura.primary }}
+                        className="flex items-center gap-1.5 rounded-full border bg-[#0E0A16] px-4 py-2.5 text-xs font-bold transition hover:bg-white/5"
+                      >
+                        <CalendarHeart className="h-3.5 w-3.5" />
+                        <span>Indosso</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      style={{ backgroundColor: modalAura.primary }}
+                      className="rounded-full px-6 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90"
+                    >
+                      Chiudi
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </section>
             </>
           )}
         </div>
       </div>
 
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[#08060C]/90 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[28px] border border-red-500/30 bg-[#161024] p-6 text-[#F6EFE4] space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#08060C]/90 p-4 backdrop-blur-md">
+          <div className="w-full max-w-md space-y-4 rounded-[28px] border border-red-500/30 bg-[#161024] p-6 text-[#F6EFE4] shadow-2xl">
             <div className="space-y-1.5">
-              <h3 className="font-serif text-xl text-[#F6EFE4]">
-                Rimuovere questa creazione?
-              </h3>
+              <h3 className="font-serif text-xl text-[#F6EFE4]">Rimuovere questa creazione?</h3>
               <p className="text-xs text-[#B8A9C9]">
-                Verranno eliminati anche tutti gli indossi registrati nel Diario per questo profumo.
+                Verranno eliminati anche tutti gli indossi registrati nel Diario per questo
+                profumo.
               </p>
             </div>
             <div className="flex justify-end gap-3 pt-2">
