@@ -7,6 +7,7 @@ import { BottomDock } from '@/components/BottomDock';
 import { ToastProvider } from '@/components/Toast';
 import { SpruzzoProvider } from '@/components/Spruzzo';
 import { SplashIntro } from '@/components/SplashIntro';
+import { Oracolo } from '@/components/Oracolo';
 
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {children}
               </div>
               <BottomDock />
+              <Oracolo />
             </SpruzzoProvider>
           </ToastProvider>
         </AuraProvider>
