@@ -3,7 +3,22 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * Sessione persistente.
+ * NB: il token vive nel localStorage, che il browser isola per origine
+ * (dominio + sottodominio). Cambiando dominio in pre-produzione (es. un altro
+ * URL di anteprima Vercel) la sessione NON viene condivisa: serve un accesso
+ * per ogni dominio. Usando un dominio stabile, l'accesso resta valido e il
+ * token si rinnova da solo.
+ */
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  },
+});
 
 export type Momento = 'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte';
 export type StatoProfumo = 'collezione' | 'radar';
