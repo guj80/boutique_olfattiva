@@ -93,8 +93,7 @@ interface ProviderTarget {
 
 const FALLBACK_CHAIN: ProviderTarget[] = [
   // 1. GEMINI (Provider principale)
-  { provider: 'gemini', model: 'gemini-2.0-flash' },
-  { provider: 'gemini', model: 'gemini-2.0-flash-lite' },
+  { provider: 'gemini', model: 'gemini-3.8-flash' },
   // 2. GROQ (Seconda linea - Velocità)
   { provider: 'groq', model: 'llama-3.3-70b-versatile' },
   { provider: 'groq', model: 'llama-3.1-8b-instant' },
@@ -506,6 +505,7 @@ export function extractJsonFromAiText<T = unknown>(text: string): T {
     throw new Error('Formato JSON non riconosciuto nella risposta AI.');
   }
 }
+
 export type GeminiPart = AIPart;
 
 export async function callOpenRouterFree(
@@ -514,7 +514,7 @@ export async function callOpenRouterFree(
 ): Promise<{ text: string; modelUsed: string }> {
   const parts: AIPart[] =
     typeof partsOrPrompt === 'string' ? [{ text: partsOrPrompt }] : partsOrPrompt;
-  const model = 'google/gemma-4-31b-it:free';
+  const model = 'meta-llama/llama-3.3-70b-instruct:free'; // Modello reale
   const text = await callOpenRouterDirect(model, parts, options, options.timeoutMs ?? 8000);
   return { text, modelUsed: model };
 }
