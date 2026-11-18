@@ -1,450 +1,508 @@
-export interface GeminiPart {
+// lib/gemini-engine.ts
+// Motore AI multi-provider a cascata (Gemini -> Groq -> OpenRouter -> HuggingFace)
+// con structured output, timeout 8s, retry selettivo, type guard e logging [AtelierLG:AI].
+
+export type ProviderName = 'gemini' | 'groq' | 'openrouter' | 'huggingface';
+
+export interface AIPart {
   text?: string;
-  inlineData?: { mimeType: string; data: string };
-  inline_data?: { mime_type: string; data: string };
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
 }
 
-export interface GeminiCallOptions {
+export interface AICallOptions<T = unknown> {
   temperature?: number;
-  jsonMode?: boolean;
-  systemInstruction?: string;
   timeoutMs?: number;
-  useGoogleSearch?: boolean;
+  maxRetries?: number;
   deadline?: number;
-  maxOutputTokens?: number;
+  jsonMode?: boolean;
+  responseSchema?: Record<string, unknown>;
+  validator?: (data: unknown) => data is T;
+  systemInstruction?: string;
 }
 
-export interface AiResult {
+export interface AIResult<T = unknown> {
   text: string;
+  data?: T;
+  providerUsed: ProviderName;
   modelUsed: string;
+  latencyMs: number;
 }
 
-export interface FallbackOptions {
-  deadline?: number;
-  json?: boolean;
+// ==========================================
+// SCHEMI STRUCTURED OUTPUT & TYPE GUARDS
+// ==========================================
+
+export interface ScentDNAResponse {
+  archetipo: string;
+  descrizione: string;
+  consiglio: string;
 }
 
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 ora
+export const SCENT_DNA_SCHEMA: Record<string, unknown> = {
+  type: 'OBJECT',
+  properties: {
+    archetipo: { type: 'STRING' },
+    descrizione: { type: 'STRING' },
+    consiglio: { type: 'STRING' },
+  },
+  required: ['archetipo', 'descrizione', 'consiglio'],
+};
 
-let cachedGeminiModels: { at: number; list: string[] } | null = null;
-let cachedGroqModels: { at: number; list: string[] } | null = null;
-let lastWorkingGemini: string | null = null;
-let lastWorkingGroq: string | null = null;
-
-export function __resetEngineState() {
-  cachedGeminiModels = null;
-  cachedGroqModels = null;
-  lastWorkingGemini = null;
-  lastWorkingGroq = null;
+export function isScentDNAResponse(data: unknown): data is ScentDNAResponse {
+  if (typeof data !== 'object' || data === null) return false;
+  const obj = data as Record<string, unknown>;
+  return (
+    typeof obj.archetipo === 'string' &&
+    obj.archetipo.trim().length > 0 &&
+    typeof obj.descrizione === 'string' &&
+    obj.descrizione.trim().length > 0 &&
+    typeof obj.consiglio === 'string' &&
+    obj.consiglio.trim().length > 0
+  );
 }
 
-function getGeminiKey(): string {
-  const k = (
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-    ''
-  ).trim();
-  return k && k !== 'undefined' ? k : '';
+export interface OracoloResponse {
+  reply: string;
 }
 
-function getGroqKey(): string {
-  const k = (process.env.GROQ_API_KEY || '').trim();
-  return k && k !== 'undefined' ? k : '';
+export const ORACOLO_SCHEMA: Record<string, unknown> = {
+  type: 'OBJECT',
+  properties: {
+    reply: { type: 'STRING' },
+  },
+  required: ['reply'],
+};
+
+export function isOracoloResponse(data: unknown): data is OracoloResponse {
+  if (typeof data !== 'object' || data === null) return false;
+  const obj = data as Record<string, unknown>;
+  return typeof obj.reply === 'string' && obj.reply.trim().length > 0;
 }
 
-function normalizeParts(parts: GeminiPart[]): any[] {
-  return parts.map((p) => {
-    if (p.text !== undefined) return { text: p.text };
-    const imgData = p.inlineData?.data || p.inline_data?.data;
-    const imgMime = p.inlineData?.mimeType || p.inline_data?.mime_type;
-    if (imgData && imgMime) {
-      const cleanBase64 = imgData.indexOf(',') !== -1 ? imgData.split(',')[1] : imgData;
-      return { inlineData: { mimeType: imgMime, data: cleanBase64 } };
-    }
-    return p;
-  });
+// ==========================================
+// CONFIGURAZIONE CATENA DI FALLBACK
+// ==========================================
+
+interface ProviderTarget {
+  provider: ProviderName;
+  model: string;
 }
 
-const SAFETY_SETTINGS = [
-  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+const FALLBACK_CHAIN: ProviderTarget[] = [
+  // 1. GEMINI (Provider principale)
+  { provider: 'gemini', model: 'gemini-3.8-flash' },
+  { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
+  // 2. GROQ (Seconda linea - Velocità)
+  { provider: 'groq', model: 'openai/gpt-oss-120b' },
+  { provider: 'groq', model: 'qwen/qwen3.8-27b' },
+  // 3. OPENROUTER (Terza linea - Varietà)
+  { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
+  { provider: 'openrouter', model: 'nvidia/nemotron-3-ultra:free' },
+  // 4. HUGGING FACE (Rete di sicurezza finale)
+  { provider: 'huggingface', model: 'Qwen/Qwen2.5-72B-Instruct' },
 ];
 
-async function discoverGeminiModels(apiKey: string): Promise<string[]> {
-  if (cachedGeminiModels && Date.now() - cachedGeminiModels.at < CACHE_TTL_MS) {
-    return cachedGeminiModels.list;
-  }
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(`${GEMINI_BASE}/models?pageSize=100&key=${apiKey}`, {
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    clearTimeout(timer);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const list: string[] = (data?.models || [])
-      .filter(
-        (m: any) =>
-          Array.isArray(m?.supportedGenerationMethods) &&
-          m.supportedGenerationMethods.includes('generateContent')
-      )
-      .map((m: any) => String(m.name || '').replace(/^models\//, ''))
-      .filter((name: string) => {
-        const lower = name.toLowerCase();
-        return (
-          lower.includes('gemini') &&
-          !lower.includes('embedding') &&
-          !lower.includes('imagen') &&
-          !lower.includes('veo') &&
-          !lower.includes('tts') &&
-          !lower.includes('audio') &&
-          !lower.includes('aqa')
-        );
-      })
-      .sort((a: string, b: string) => {
-        const score = (s: string) => {
-          const l = s.toLowerCase();
-          if (l.includes('flash') && !l.includes('preview') && !l.includes('exp')) return 5;
-          if (l.includes('flash') && l.includes('lite')) return 4;
-          if (l.includes('flash')) return 3;
-          if (l.includes('pro') && !l.includes('preview')) return 2;
-          return 1;
-        };
-        return score(b) - score(a);
-      });
-
-    if (list.length > 0) {
-      cachedGeminiModels = { at: Date.now(), list };
-    }
-    return list;
-  } catch {
-    return [];
+class ProviderError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly retryable: boolean = true
+  ) {
+    super(message);
+    this.name = 'ProviderError';
   }
 }
 
-async function discoverGroqModels(apiKey: string): Promise<string[]> {
-  if (cachedGroqModels && Date.now() - cachedGroqModels.at < CACHE_TTL_MS) {
-    return cachedGroqModels.list;
-  }
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    clearTimeout(timer);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const list: string[] = (data?.data || [])
-      .map((m: any) => String(m.id || ''))
-      .filter((id: string) => {
-        const lower = id.toLowerCase();
-        return (
-          Boolean(id) &&
-          !lower.includes('whisper') &&
-          !lower.includes('guard') &&
-          !lower.includes('tts') &&
-          !lower.includes('playai') &&
-          !lower.includes('embed') &&
-          !lower.includes('allam')
-        );
-      })
-      .sort((a: string, b: string) => {
-        const score = (s: string) => {
-          const l = s.toLowerCase();
-          if (l.includes('llama') && (l.includes('70b') || l.includes('versatile'))) return 5;
-          if (l.includes('llama')) return 4;
-          if (l.includes('qwen') || l.includes('deepseek')) return 3;
-          if (l.includes('gemma') || l.includes('mixtral')) return 2;
-          return 1;
-        };
-        return score(b) - score(a);
-      });
+// ==========================================
+// UTILITY: TIMEOUT, SANITIZZAZIONE, LOGGING
+// ==========================================
 
-    if (list.length > 0) {
-      cachedGroqModels = { at: Date.now(), list };
-    }
-    return list;
-  } catch {
-    return [];
-  }
+function extractTextFromParts(parts: AIPart[]): string {
+  return parts
+    .map((p) => p.text ?? '')
+    .filter((t) => t.length > 0)
+    .join('\n\n');
 }
 
-async function tryGroqChat(
-  model: string,
-  apiKey: string,
-  prompt: string,
-  systemInstruction: string | undefined,
-  jsonMode: boolean,
+function sanitizeJsonString(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
   timeoutMs: number
-): Promise<string | null> {
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const messages: any[] = [];
-    if (systemInstruction) {
-      messages.push({ role: 'system', content: systemInstruction });
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ProviderError(`Timeout dopo ${timeoutMs}ms`, 408, true);
     }
-    messages.push({
-      role: 'user',
-      content: jsonMode
-        ? `${prompt}\n\nRispondi ESCLUSIVAMENTE con JSON valido, senza testo aggiuntivo.`
-        : prompt,
-    });
-
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.15,
-        max_tokens: 2500,
-        messages,
-      }),
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-
-    if (!res.ok) return null;
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content?.trim();
-    return content && content.length > 5 ? content : null;
-  } catch {
-    return null;
+    throw new ProviderError(
+      err instanceof Error ? err.message : 'Errore di rete sconosciuto',
+      undefined,
+      true
+    );
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function tryGeminiGenerate(
+function logAttempt(params: {
+  provider: ProviderName;
+  model: string;
+  latencyMs: number;
+  status: 'SUCCESS' | 'ERROR';
+  attempt: number;
+  error?: string;
+}): void {
+  const payload = {
+    tag: '[AtelierLG:AI]',
+    timestamp: new Date().toISOString(),
+    ...params,
+  };
+  if (params.status === 'ERROR') {
+    console.warn(`[AtelierLG:AI] ${JSON.stringify(payload)}`);
+  } else {
+    console.info(`[AtelierLG:AI] ${JSON.stringify(payload)}`);
+  }
+}
+
+function isNonRetryableStatus(status: number): boolean {
+  return status === 400 || status === 401 || status === 403 || status === 404 || status === 429;
+}
+
+// ==========================================
+// CONNETTORI DIRETTI AI PROVIDER
+// ==========================================
+
+export async function callGeminiDirect(
   model: string,
-  apiKey: string,
-  parts: any[],
-  options: GeminiCallOptions | undefined,
+  parts: AIPart[],
+  options: AICallOptions,
   timeoutMs: number
-): Promise<string | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const generationConfig: Record<string, any> = {
-      temperature: options?.temperature ?? 0.15,
-      maxOutputTokens: options?.maxOutputTokens ?? 3072,
-    };
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new ProviderError('GEMINI_API_KEY mancante', 401, false);
+  }
 
-    const payload: Record<string, any> = {
-      contents: [{ role: 'user', parts }],
-      generationConfig,
-      safetySettings: SAFETY_SETTINGS,
-    };
+  const generationConfig: Record<string, unknown> = {
+    temperature: options.temperature ?? 0.6,
+  };
 
-    if (options?.systemInstruction) {
-      payload.systemInstruction = { parts: [{ text: options.systemInstruction }] };
+  if (options.jsonMode) {
+    generationConfig.responseMimeType = 'application/json';
+    if (options.responseSchema) {
+      generationConfig.responseSchema = options.responseSchema;
     }
+  }
 
-    const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
+  const body: Record<string, unknown> = {
+    contents: [{ role: 'user', parts }],
+    generationConfig,
+  };
+
+  if (options.systemInstruction) {
+    body.system_instruction = { parts: [{ text: options.systemInstruction }] };
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    model
+  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetchWithTimeout(
+    url,
+    {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-      cache: 'no-store',
-    });
+      body: JSON.stringify(body),
+    },
+    timeoutMs
+  );
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    const rawParts: any[] = data?.candidates?.[0]?.content?.parts || [];
-    const text = rawParts
-      .filter((p) => !p?.thought)
-      .map((p) => p?.text || '')
-      .join('')
-      .trim();
-
-    return text && text.length > 5 ? text : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new ProviderError(
+      `Gemini HTTP ${res.status}: ${errText.slice(0, 200)}`,
+      res.status,
+      !isNonRetryableStatus(res.status)
+    );
   }
+
+  const json = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new ProviderError('Gemini ha restituito una risposta vuota', 502, true);
+  }
+  return text;
+}
+
+async function callOpenAICompatible(
+  endpoint: string,
+  apiKey: string | undefined,
+  keyName: string,
+  model: string,
+  parts: AIPart[],
+  options: AICallOptions,
+  timeoutMs: number,
+  extraHeaders?: Record<string, string>
+): Promise<string> {
+  if (!apiKey) {
+    throw new ProviderError(`${keyName} mancante`, 401, false);
+  }
+
+  const promptText = extractTextFromParts(parts);
+  const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+
+  if (options.systemInstruction) {
+    messages.push({ role: 'system', content: options.systemInstruction });
+  }
+  if (options.jsonMode) {
+    messages.push({
+      role: 'system',
+      content:
+        'Rispondi ESCLUSIVAMENTE con un oggetto JSON valido, senza testo aggiuntivo o blocchi markdown.',
+    });
+  }
+  messages.push({ role: 'user', content: promptText });
+
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    temperature: options.temperature ?? 0.6,
+  };
+
+  if (options.jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const res = await fetchWithTimeout(
+    endpoint,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        ...extraHeaders,
+      },
+      body: JSON.stringify(body),
+    },
+    timeoutMs
+  );
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new ProviderError(
+      `HTTP ${res.status}: ${errText.slice(0, 200)}`,
+      res.status,
+      !isNonRetryableStatus(res.status)
+    );
+  }
+
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const text = json.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new ProviderError('Risposta vuota dal provider', 502, true);
+  }
+  return text;
 }
 
 export async function callGroqDirect(
-  prompt: string,
-  systemInstruction?: string,
-  opts?: FallbackOptions
-): Promise<AiResult | null> {
-  const groqKey = getGroqKey();
-  if (!groqKey) return null;
-
-  const deadline = opts?.deadline ?? Date.now() + 14000;
-  const discovered = await discoverGroqModels(groqKey);
-  const queue: string[] = [];
-  if (lastWorkingGroq && discovered.includes(lastWorkingGroq)) {
-    queue.push(lastWorkingGroq);
-  }
-  for (const m of discovered) {
-    if (!queue.includes(m)) queue.push(m);
-  }
-
-  for (const model of queue.slice(0, 4)) {
-    const left = deadline - Date.now();
-    if (left < 1500) break;
-    const text = await tryGroqChat(
-      model,
-      groqKey,
-      prompt,
-      systemInstruction,
-      Boolean(opts?.json),
-      Math.min(5500, left - 200)
-    );
-    if (text) {
-      lastWorkingGroq = model;
-      return { text, modelUsed: `groq:${model}` };
-    }
-  }
-  return null;
+  model: string,
+  parts: AIPart[],
+  options: AICallOptions,
+  timeoutMs: number
+): Promise<string> {
+  return callOpenAICompatible(
+    'https://api.groq.com/openai/v1/chat/completions',
+    process.env.GROQ_API_KEY,
+    'GROQ_API_KEY',
+    model,
+    parts,
+    options,
+    timeoutMs
+  );
 }
 
-export const callGroqFallback = callGroqDirect;
-
-export async function callOpenRouterFree(
-  prompt: string,
-  systemInstruction?: string,
-  opts?: FallbackOptions
-): Promise<AiResult | null> {
-  return callGroqDirect(prompt, systemInstruction, opts);
+export async function callOpenRouterDirect(
+  model: string,
+  parts: AIPart[],
+  options: AICallOptions,
+  timeoutMs: number
+): Promise<string> {
+  return callOpenAICompatible(
+    'https://openrouter.ai/api/v1/chat/completions',
+    process.env.OPENROUTER_API_KEY,
+    'OPENROUTER_API_KEY',
+    model,
+    parts,
+    options,
+    timeoutMs,
+    {
+      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
+      'X-Title': 'Atelier LG',
+    }
+  );
 }
 
-export async function callGeminiWithFallback(
-  parts: GeminiPart[],
-  options?: GeminiCallOptions
-): Promise<AiResult> {
-  const deadline = options?.deadline ?? Date.now() + 22000;
-  const left = () => deadline - Date.now();
-  const perAttemptCap = options?.timeoutMs ?? 6500;
+export async function callHuggingFaceDirect(
+  model: string,
+  parts: AIPart[],
+  options: AICallOptions,
+  timeoutMs: number
+): Promise<string> {
+  return callOpenAICompatible(
+    'https://router.huggingface.co/v1/chat/completions',
+    process.env.HUGGINGFACE_API_KEY,
+    'HUGGINGFACE_API_KEY',
+    model,
+    parts,
+    options,
+    timeoutMs
+  );
+}
 
-  const normalized = normalizeParts(parts);
-  const hasImage = normalized.some((p) => p.inlineData);
-  const promptText = normalized.map((p) => p.text || '').filter(Boolean).join('\n');
-  const jsonMode = Boolean(options?.jsonMode);
+// ==========================================
+// ORCHESTRATORE FALLBACK CHAIN
+// ==========================================
 
-  // 1. Se è una richiesta solo testuale, proviamo prima Groq (ultra-veloce, zero 429 di Google)
-  if (!hasImage && left() > 2000) {
-    const groqRes = await callGroqDirect(promptText, options?.systemInstruction, {
-      deadline: Math.min(deadline, Date.now() + 9000),
-      json: jsonMode,
-    });
-    if (groqRes) return groqRes;
-  }
+export async function callAIWithFallback<T = unknown>(
+  parts: AIPart[],
+  options: AICallOptions<T> = {}
+): Promise<AIResult<T>> {
+  const defaultTimeout = options.timeoutMs ?? 8000;
+  const maxRetries = options.maxRetries ?? 2;
+  const errors: string[] = [];
 
-  // 2. Auto-Discovery sui modelli Gemini realmente attivi sull'account
-  const geminiKey = getGeminiKey();
-  if (geminiKey && left() > 2000) {
-    const discovered = await discoverGeminiModels(geminiKey);
-    const queue: string[] = [];
-    if (lastWorkingGemini && discovered.includes(lastWorkingGemini)) {
-      queue.push(lastWorkingGemini);
-    }
-    for (const m of discovered) {
-      if (!queue.includes(m)) queue.push(m);
-    }
-
-    for (const model of queue.slice(0, 4)) {
-      if (left() < 1500) break;
-      const timeoutMs = Math.max(1800, Math.min(perAttemptCap, left() - 300));
-      const text = await tryGeminiGenerate(model, geminiKey, normalized, options, timeoutMs);
-      if (text) {
-        lastWorkingGemini = model;
-        return { text, modelUsed: `gemini:${model}` };
+  for (const target of FALLBACK_CHAIN) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const remaining = options.deadline ? options.deadline - Date.now() : defaultTimeout;
+      if (remaining <= 500) {
+        throw new Error(`Deadline globale superata. Errori precedenti: ${errors.join(' | ')}`);
       }
-    }
-  }
+      const effectiveTimeout = Math.min(defaultTimeout, remaining);
+      const start = Date.now();
 
-  throw new Error('Nessun motore AI disponibile in questo istante.');
-}
-
-/* ------------------------------------------------------------------ */
-/* Estrazione JSON tollerante                                          */
-/* ------------------------------------------------------------------ */
-
-function repairJson(s: string): string {
-  return s
-    .replace(/[\u201C\u201D]/g, '"')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/,\s*([}\]])/g, '$1');
-}
-
-function balancedObjects(text: string): string[] {
-  const out: string[] = [];
-  let depth = 0;
-  let start = -1;
-  let inStr = false;
-  let esc = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (c === '\\') esc = true;
-      else if (c === '"') inStr = false;
-      continue;
-    }
-    if (c === '"') {
-      inStr = true;
-    } else if (c === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (c === '}' && depth > 0) {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        out.push(text.slice(start, i + 1));
-        start = -1;
-      }
-    }
-  }
-  return out;
-}
-
-export function extractJsonFromAiText<T = any>(rawText: string): T {
-  if (!rawText || typeof rawText !== 'string') {
-    throw new Error('Risposta AI vuota.');
-  }
-
-  const cleaned = rawText
-    .replace(/^\uFEFF/, '')
-    .replace(/```json/gi, '')
-    .replace(/```/g, '')
-    .trim();
-
-  try {
-    const direct = JSON.parse(cleaned);
-    if (direct && typeof direct === 'object') return direct as T;
-  } catch {}
-
-  let best: any = null;
-  let bestLen = -1;
-  for (const candidate of balancedObjects(cleaned)) {
-    for (const variant of [candidate, repairJson(candidate)]) {
       try {
-        const obj = JSON.parse(variant);
-        if (obj && typeof obj === 'object' && !Array.isArray(obj) && candidate.length > bestLen) {
-          best = obj;
-          bestLen = candidate.length;
+        let rawText: string;
+
+        switch (target.provider) {
+          case 'gemini':
+            rawText = await callGeminiDirect(target.model, parts, options, effectiveTimeout);
+            break;
+          case 'groq':
+            rawText = await callGroqDirect(target.model, parts, options, effectiveTimeout);
+            break;
+          case 'openrouter':
+            rawText = await callOpenRouterDirect(target.model, parts, options, effectiveTimeout);
+            break;
+          case 'huggingface':
+            rawText = await callHuggingFaceDirect(target.model, parts, options, effectiveTimeout);
+            break;
         }
-        break;
-      } catch {}
+
+        let validatedData: T | undefined;
+        let finalText = rawText;
+
+        if (options.jsonMode || options.validator) {
+          const cleaned = sanitizeJsonString(rawText);
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(cleaned);
+          } catch {
+            throw new ProviderError('JSON malformato restituito dal modello', 422, true);
+          }
+
+          if (options.validator && !options.validator(parsed)) {
+            throw new ProviderError(
+              'Validazione schema (type guard) fallita: risposta scartata',
+              422,
+              true
+            );
+          }
+
+          validatedData = parsed as T;
+          finalText = cleaned;
+        }
+
+        const latencyMs = Date.now() - start;
+        logAttempt({
+          provider: target.provider,
+          model: target.model,
+          latencyMs,
+          status: 'SUCCESS',
+          attempt,
+        });
+
+        return {
+          text: finalText,
+          data: validatedData,
+          providerUsed: target.provider,
+          modelUsed: target.model,
+          latencyMs,
+        };
+      } catch (err) {
+        const latencyMs = Date.now() - start;
+        const message = err instanceof Error ? err.message : String(err);
+        const retryable = err instanceof ProviderError ? err.retryable : true;
+
+        logAttempt({
+          provider: target.provider,
+          model: target.model,
+          latencyMs,
+          status: 'ERROR',
+          attempt,
+          error: message,
+        });
+
+        errors.push(`${target.provider}/${target.model}: ${message}`);
+
+        if (!retryable || attempt === maxRetries) {
+          break;
+        }
+
+        await new Promise((r) => setTimeout(r, 350 * attempt));
+      }
     }
   }
-  if (best) return best as T;
 
-  throw new Error('Formato JSON non riconosciuto.');
+  throw new Error(
+    `Tutti i provider AI hanno fallito. Dettagli: ${errors.slice(-4).join(' | ')}`
+  );
+}
+
+// ==========================================
+// EXPORT RETROCOMPATIBILI
+// ==========================================
+
+export const callGeminiWithFallback = callAIWithFallback;
+
+export function extractJsonFromAiText<T = unknown>(text: string): T {
+  const cleaned = sanitizeJsonString(text);
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]) as T;
+    }
+    throw new Error('Formato JSON non riconosciuto nella risposta AI.');
+  }
 }
