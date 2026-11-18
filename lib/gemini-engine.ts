@@ -91,16 +91,16 @@ interface ProviderTarget {
   model: string;
 }
 
-const FALLBACK_CHAIN: ProviderTarget[] = [
+cconst FALLBACK_CHAIN: ProviderTarget[] = [
   // 1. GEMINI (Provider principale)
-  { provider: 'gemini', model: 'gemini-3.8-flash' },
-  { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
+  { provider: 'gemini', model: 'gemini-2.0-flash' },
+  { provider: 'gemini', model: 'gemini-2.0-flash-lite' },
   // 2. GROQ (Seconda linea - Velocità)
-  { provider: 'groq', model: 'openai/gpt-oss-120b' },
-  { provider: 'groq', model: 'qwen/qwen3.8-27b' },
+  { provider: 'groq', model: 'llama-3.3-70b-versatile' },
+  { provider: 'groq', model: 'llama-3.1-8b-instant' },
   // 3. OPENROUTER (Terza linea - Varietà)
-  { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
-  { provider: 'openrouter', model: 'nvidia/nemotron-3-ultra:free' },
+  { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free' },
+  { provider: 'openrouter', model: 'google/gemma-2-9b-it:free' },
   // 4. HUGGING FACE (Rete di sicurezza finale)
   { provider: 'huggingface', model: 'Qwen/Qwen2.5-72B-Instruct' },
 ];
