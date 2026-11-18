@@ -2,15 +2,16 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Sparkles, Check, X } from 'lucide-react';
+import { CalendarHeart, Compass, Library, Check, X } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
-import { resolveAura, useAura, SECTION_THEMES } from '@/components/AuraProvider';
+import { useAura, SECTION_THEMES } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
 import { getLocalIsoDate, getAutoMomento, computePodio } from '@/lib/home-logic';
+import { ScentDNA } from '@/components/ScentDNA';
 
 export default function HomePage() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
@@ -28,10 +29,6 @@ export default function HomePage() {
   const [wearNote, setWearNote] = useState('');
   const [savingWear, setSavingWear] = useState(false);
 
-  const [consultantOccasione, setConsultantOccasione] = useState<string>('Tutti');
-  const [consultantMomento, setConsultantMomento] = useState<string>('Tutti');
-  const [generatedRecommendation, setGeneratedRecommendation] = useState<Profumo | null>(null);
-
   const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
   const { triggerSpruzzo } = useSpruzzo();
@@ -46,7 +43,7 @@ export default function HomePage() {
     try {
       const [profumiRes, indossiRes] = await Promise.all([
         supabase.from('profumi').select('*').order('nome', { ascending: true }),
-        supabase.from('indossi').select('*').order('created_at', { ascending: false })
+        supabase.from('indossi').select('*').order('created_at', { ascending: false }),
       ]);
 
       if (profumiRes.error) throw profumiRes.error;
@@ -72,60 +69,6 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function matchesOccasione(p: Profumo, occasione: string): boolean {
-    if (occasione === 'Tutti') return true;
-    const f = (p.famiglia_olfattiva || '').toLowerCase();
-    const n = `${p.note_testa || ''} ${p.note_cuore || ''} ${p.note_fondo || ''}`.toLowerCase();
-
-    if (occasione === 'Ufficio') {
-      return f.includes('agrumata') || f.includes('aromatica') || f.includes('legnosa') || f.includes('muschiata') || f.includes('verde');
-    }
-    if (occasione === 'Formale') {
-      return f.includes('legnosa') || f.includes('speziata') || f.includes('cuoiata') || f.includes('ambrata');
-    }
-    if (occasione === 'Tempo libero') {
-      return f.includes('agrumata') || f.includes('marina') || f.includes('fruttata') || f.includes('aromatica');
-    }
-    if (occasione === 'Cena' || occasione === 'Serata') {
-      return f.includes('ambrata') || f.includes('gourmand') || f.includes('speziata') || f.includes('cuoiata') || n.includes('oud') || n.includes('vaniglia') || n.includes('tabacco');
-    }
-    return true;
-  }
-
-  function matchesMomento(p: Profumo, momento: string): boolean {
-    if (momento === 'Tutti') return true;
-    const pAny = p as any;
-    if (pAny.momento_ideale && pAny.momento_ideale.toLowerCase().includes(momento.toLowerCase())) {
-      return true;
-    }
-    const f = (p.famiglia_olfattiva || '').toLowerCase();
-    if (momento === 'Mattina' || momento === 'Pomeriggio') {
-      return f.includes('agrumata') || f.includes('marina') || f.includes('verde') || f.includes('aromatica') || f.includes('floreale') || f.includes('fruttata');
-    }
-    if (momento === 'Sera' || momento === 'Notte') {
-      return f.includes('ambrata') || f.includes('gourmand') || f.includes('cuoiata') || f.includes('speziata') || f.includes('legnosa');
-    }
-    return true;
-  }
-
-  function handleGenerateConsultant() {
-    if (profumi.length === 0) return;
-
-    const filtered = profumi.filter(
-      (p) => matchesOccasione(p, consultantOccasione) && matchesMomento(p, consultantMomento)
-    );
-    const pool = filtered.length > 0 ? filtered : profumi;
-    const candidates =
-      pool.length > 1 && generatedRecommendation
-        ? pool.filter((item) => item.id !== generatedRecommendation.id)
-        : pool;
-
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-    setGeneratedRecommendation(chosen);
-    setSelectedDetailProfumo(chosen);
-    setAuraFromProfumo(chosen);
   }
 
   async function handleSaveIndosso(e: React.FormEvent) {
@@ -182,147 +125,7 @@ export default function HomePage() {
         }
       />
 
-      {/* SUGGERIMENTO AI COMPATTO CON BORDI IN TINTA TEMA */}
-      <section className="mx-auto max-w-2xl space-y-5">
-        <div
-          style={{ borderColor: `${aura.primary}50` }}
-          className="rounded-[26px] border bg-[#0E0A16] p-5 shadow-2xl space-y-4"
-        >
-          <div
-            style={{ borderColor: `${aura.primary}25` }}
-            className="flex items-center justify-between border-b pb-3"
-          >
-            <div
-              style={{ borderColor: `${aura.primary}55` }}
-              className="inline-flex items-center gap-2 rounded-md bg-[#161024] border px-2.5 py-1"
-            >
-              <Sparkles style={{ color: aura.primary }} className="h-3.5 w-3.5" />
-              <span
-                style={{ color: aura.primary }}
-                className="font-mono text-[10px] uppercase tracking-[0.2em] font-bold"
-              >
-                Suggerimento AI
-              </span>
-            </div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
-              Seleziona & Premi ✦
-            </span>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
-            <div className="flex-1">
-              <label
-                htmlFor="consultant-occasione"
-                className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1"
-              >
-                Occasione / Contesto
-              </label>
-              <select
-                id="consultant-occasione"
-                value={consultantOccasione}
-                onChange={(e) => setConsultantOccasione(e.target.value)}
-                style={{ borderColor: `${aura.primary}40` }}
-                className="w-full rounded-[14px] bg-[#161024] border px-3.5 py-2.5 text-xs text-[#F6EFE4] focus:outline-none"
-              >
-                <option value="Tutti">Qualsiasi Occasione</option>
-                <option value="Ufficio">Ufficio / Lavoro</option>
-                <option value="Formale">Riunione formale</option>
-                <option value="Tempo libero">Tempo libero</option>
-                <option value="Cena">Aperitivo / Cena elegante</option>
-                <option value="Serata">Serata speciale</option>
-              </select>
-            </div>
-
-            <div className="flex-1">
-              <label
-                htmlFor="consultant-momento"
-                className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1"
-              >
-                Momento della giornata
-              </label>
-              <select
-                id="consultant-momento"
-                value={consultantMomento}
-                onChange={(e) => setConsultantMomento(e.target.value)}
-                style={{ borderColor: `${aura.primary}40` }}
-                className="w-full rounded-[14px] bg-[#161024] border px-3.5 py-2.5 text-xs text-[#F6EFE4] focus:outline-none"
-              >
-                <option value="Tutti">Automatico / Tutti</option>
-                <option value="Mattina">Mattina</option>
-                <option value="Pomeriggio">Pomeriggio</option>
-                <option value="Sera">Sera</option>
-                <option value="Notte">Notte</option>
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleGenerateConsultant}
-              title="Genera Suggerimento AI"
-              aria-label="Genera Suggerimento AI"
-              style={{ backgroundColor: aura.primary }}
-              className="flex h-[42px] sm:w-[46px] items-center justify-center rounded-[14px] text-[#08060C] transition hover:scale-105 active:scale-95 shadow-lg shrink-0 px-4 sm:px-0"
-            >
-              <Sparkles className="h-5 w-5 fill-current" />
-            </button>
-          </div>
-        </div>
-
-        {/* CARD VERTICALE IDENTICA ALLA SCHEDA IN COLLEZIONE */}
-        {generatedRecommendation && (() => {
-          const recAura = resolveAura(
-            generatedRecommendation.famiglia_olfattiva,
-            generatedRecommendation.nome
-          );
-          const recImg =
-            generatedRecommendation.url_foto_vetrina ||
-            generatedRecommendation.immagine_url;
-
-          return (
-            <div className="flex justify-center pt-1">
-              <div
-                onClick={() => {
-                  setSelectedDetailProfumo(generatedRecommendation);
-                  setAuraFromProfumo(generatedRecommendation);
-                }}
-                style={{ borderColor: `${recAura.primary}60` }}
-                className="group relative w-full max-w-[260px] flex flex-col justify-between rounded-[30px] border bg-[#161024]/95 p-5 transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-2xl"
-              >
-                <div className="flex justify-center py-2">
-                  <div className="relative w-full">
-                    <div
-                      className="absolute inset-0 rounded-[26px] blur-2xl opacity-35 transition-opacity group-hover:opacity-75"
-                      style={{ backgroundColor: recAura.primary }}
-                    />
-                    <BottlePedestal
-                      src={recImg}
-                      alt={generatedRecommendation.nome}
-                      size="lg"
-                      className="relative z-10 !h-52 w-full"
-                      showSigil={false}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-1 text-center">
-                  <p
-                    style={{ color: recAura.primary }}
-                    className="font-mono text-[10px] uppercase tracking-wider truncate"
-                  >
-                    {generatedRecommendation.brand}
-                  </p>
-                  <h3 className="font-serif text-[17px] leading-tight text-[#F6EFE4] line-clamp-2">
-                    {generatedRecommendation.nome}
-                  </h3>
-                  <p className="font-mono text-[10px] text-[#B8A9C9] pt-0.5">
-                    {generatedRecommendation.famiglia_olfattiva}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </section>
+      <ScentDNA profumi={profumi} indossi={indossi} loading={loading} />
 
       {/* PODIO A SCATOLETTE NERE ELEGANTI CON BORDI IN TINTA TEMA */}
       <section className="space-y-4">
@@ -359,7 +162,6 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="mx-auto max-w-2xl grid grid-cols-3 gap-2.5 sm:gap-4 items-end pt-4 pb-2 text-center">
-            {/* 2° Posto */}
             {podio[1] ? (
               <div
                 onClick={() => {
@@ -389,9 +191,10 @@ export default function HomePage() {
                   </h3>
                 </div>
               </div>
-            ) : <div />}
+            ) : (
+              <div />
+            )}
 
-            {/* 1° Posto (Centro - Più alto) */}
             {podio[0] && (
               <div
                 onClick={() => {
@@ -429,7 +232,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* 3° Posto */}
             {podio[2] ? (
               <div
                 onClick={() => {
@@ -459,7 +261,9 @@ export default function HomePage() {
                   </h3>
                 </div>
               </div>
-            ) : <div />}
+            ) : (
+              <div />
+            )}
           </div>
         )}
       </section>
@@ -748,16 +552,10 @@ export default function HomePage() {
         onUpdated={(updated) => {
           setSelectedDetailProfumo(updated);
           setProfumi((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-          if (generatedRecommendation?.id === updated.id) {
-            setGeneratedRecommendation(updated);
-          }
           fetchHomeData();
         }}
         onDeleted={(deletedId) => {
           setProfumi((prev) => prev.filter((p) => p.id !== deletedId));
-          if (generatedRecommendation?.id === deletedId) {
-            setGeneratedRecommendation(null);
-          }
           setSelectedDetailProfumo(null);
           fetchHomeData();
         }}
