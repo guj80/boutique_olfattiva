@@ -2,29 +2,43 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion, type MotionStyle } from 'framer-motion';
+
+const SPLASH_DURATION_MS = 1800;
+const EMERALD = '#10B981';
 
 export function SplashIntro() {
   const [visible, setVisible] = useState(true);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    const seen = sessionStorage.getItem('lg_splash_seen');
+    let seen: string | null = null;
+    try {
+      seen = sessionStorage.getItem('lg_splash_seen');
+    } catch {
+      seen = null;
+    }
+
     if (seen) {
       setVisible(false);
       return;
     }
+
     const timer = setTimeout(() => {
       setVisible(false);
-      sessionStorage.setItem('lg_splash_seen', '1');
-    }, 1750);
+      try {
+        sessionStorage.setItem('lg_splash_seen', '1');
+      } catch {
+        /* storage non disponibile: nessun problema */
+      }
+    }, SPLASH_DURATION_MS);
+
     return () => clearTimeout(timer);
   }, []);
 
-  const featherMask = {
-    WebkitMaskImage:
-      'radial-gradient(circle at center, black 62%, transparent 96%)',
-    maskImage:
-      'radial-gradient(circle at center, black 62%, transparent 96%)',
+  const featherMask: MotionStyle = {
+    WebkitMaskImage: 'radial-gradient(circle at center, black 58%, transparent 94%)',
+    maskImage: 'radial-gradient(circle at center, black 58%, transparent 94%)',
   };
 
   return (
@@ -32,109 +46,79 @@ export function SplashIntro() {
       {visible && (
         <motion.div
           key="splash-intro"
-          initial={{ opacity: 1 }}
-          exit={{
-            opacity: 0,
-            transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
-          }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000000] overflow-hidden select-none"
+          role="presentation"
+          initial={{ opacity: 1, y: 0 }}
+          exit={
+            prefersReducedMotion
+              ? { opacity: 0, transition: { duration: 0.25 } }
+              : {
+                  opacity: 0,
+                  y: '-14%',
+                  transition: { duration: 0.7, ease: [0.76, 0, 0.24, 1] },
+                }
+          }
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-[#050308] select-none"
         >
-          {/* Bagliore atmosferico sinistro (Magenta) */}
+          {/* Alone smeraldo che pulsa dietro il logo */}
           <motion.div
-            initial={{ opacity: 0, x: -70, scale: 0.7 }}
-            animate={{
-              opacity: [0, 0.45, 0.28],
-              x: [-70, -18, -10],
-              scale: [0.7, 1.08, 1],
-            }}
-            transition={{ duration: 1.25, ease: 'easeOut' }}
-            className="pointer-events-none absolute h-64 w-64 rounded-full bg-[#D946EF] blur-[95px]"
-          />
-
-          {/* Bagliore atmosferico destro (Smeraldo) */}
-          <motion.div
-            initial={{ opacity: 0, x: 70, scale: 0.7 }}
-            animate={{
-              opacity: [0, 0, 0.45, 0.28],
-              x: [70, 70, 18, 10],
-              scale: [0.7, 0.7, 1.08, 1],
-            }}
+            aria-hidden="true"
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={
+              prefersReducedMotion
+                ? { opacity: 0.35, scale: 1 }
+                : {
+                    opacity: [0, 0.55, 0.3, 0.6, 0.35],
+                    scale: [0.7, 1.05, 0.95, 1.12, 1],
+                  }
+            }
             transition={{
-              duration: 1.35,
-              times: [0, 0.22, 0.72, 1],
-              ease: 'easeOut',
-            }}
-            className="pointer-events-none absolute h-64 w-64 rounded-full bg-[#10B981] blur-[95px]"
-          />
-
-          {/* Contenitore centrale che vibra in risonanza una volta unito */}
-          <motion.div
-            animate={{
-              scale: [1, 1, 1.045, 0.99, 1.015, 1],
-              filter: [
-                'brightness(1)',
-                'brightness(1)',
-                'brightness(1.35)',
-                'brightness(1.05)',
-                'brightness(1.2)',
-                'brightness(1)',
-              ],
-            }}
-            transition={{
-              duration: 1.6,
-              times: [0, 0.52, 0.66, 0.78, 0.9, 1],
+              duration: prefersReducedMotion ? 0.4 : 1.6,
+              times: prefersReducedMotion ? undefined : [0, 0.3, 0.52, 0.76, 1],
               ease: 'easeInOut',
             }}
-            className="relative h-52 w-52 sm:h-64 sm:w-64"
-          >
-            {/* 1. LATO SINISTRO (MAGENTA) — Entra per primo da sinistra */}
-            <motion.div
-              initial={{ x: -48, opacity: 0, scale: 0.92 }}
-              animate={{ x: 0, opacity: 1, scale: 1 }}
-              transition={{
-                duration: 0.52,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              style={{
-                ...featherMask,
-                clipPath: 'inset(0 50% 0 0)',
-              }}
-              className="absolute inset-0 mix-blend-screen"
-            >
-              <Image
-                src="/LOGO_LG.jpg"
-                alt="Atelier LG"
-                fill
-                sizes="256px"
-                className="object-contain mix-blend-screen brightness-110 contrast-125"
-                priority
-              />
-            </motion.div>
+            style={{ backgroundColor: EMERALD }}
+            className="pointer-events-none absolute h-64 w-64 rounded-full blur-[100px] sm:h-80 sm:w-80"
+          />
 
-            {/* 2. LATO DESTRO (SMERALDO) — Entra subito dopo da destra e si fonde */}
-            <motion.div
-              initial={{ x: 48, opacity: 0, scale: 0.92 }}
-              animate={{ x: 0, opacity: 1, scale: 1 }}
-              transition={{
-                delay: 0.24,
-                duration: 0.54,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              style={{
-                ...featherMask,
-                clipPath: 'inset(0 0 0 50%)',
-              }}
-              className="absolute inset-0 mix-blend-screen"
-            >
-              <Image
-                src="/LOGO_LG.jpg"
-                alt="Atelier LG"
-                fill
-                sizes="256px"
-                className="object-contain mix-blend-screen brightness-110 contrast-125"
-                priority
-              />
-            </motion.div>
+          {/*
+            Il blend `screen` sta sull'elemento animato stesso (non sull'<img>):
+            un wrapper con transform/opacity crea un proprio stacking context
+            e il blend interno non vedrebbe lo sfondo. Cosi' il nero del JPG
+            si fonde con #050308 e resta solo la luce del logo.
+          */}
+          <motion.div
+            initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.9 }}
+            animate={
+              prefersReducedMotion
+                ? { opacity: 1, scale: 1 }
+                : {
+                    opacity: [0, 1, 1, 1, 1],
+                    scale: [0.9, 1, 1.03, 1.05, 1.06],
+                    filter: [
+                      'brightness(1)',
+                      'brightness(1)',
+                      'brightness(1.45)',
+                      'brightness(1.05)',
+                      'brightness(1.3)',
+                    ],
+                  }
+            }
+            transition={{
+              duration: prefersReducedMotion ? 0.4 : 1.7,
+              times: prefersReducedMotion ? undefined : [0, 0.28, 0.5, 0.72, 1],
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            style={featherMask}
+            className="relative h-52 w-52 mix-blend-screen sm:h-64 sm:w-64"
+          >
+            <Image
+              src="/LOGO_LG.jpg"
+              alt="Atelier LG"
+              fill
+              sizes="256px"
+              className="object-contain brightness-110 contrast-125"
+              priority
+            />
           </motion.div>
         </motion.div>
       )}
