@@ -506,3 +506,15 @@ export function extractJsonFromAiText<T = unknown>(text: string): T {
     throw new Error('Formato JSON non riconosciuto nella risposta AI.');
   }
 }
+export type GeminiPart = AIPart;
+
+export async function callOpenRouterFree(
+  partsOrPrompt: AIPart[] | string,
+  options: AICallOptions = {}
+): Promise<{ text: string; modelUsed: string }> {
+  const parts: AIPart[] =
+    typeof partsOrPrompt === 'string' ? [{ text: partsOrPrompt }] : partsOrPrompt;
+  const model = 'google/gemma-4-31b-it:free';
+  const text = await callOpenRouterDirect(model, parts, options, options.timeoutMs ?? 8000);
+  return { text, modelUsed: model };
+}
