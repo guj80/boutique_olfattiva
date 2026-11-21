@@ -1,6 +1,3 @@
-// app/api/scent-dna/route.ts
-// Genera l'archetipo Scent DNA tramite fallback chain AI con salvagente locale deterministico.
-
 import { NextResponse } from 'next/server';
 import {
   callAIWithFallback,
@@ -83,10 +80,8 @@ function buildLocalScentDNA(axes: Record<string, number>): ScentDNAResponse {
 }
 
 export async function POST(req: Request) {
-  // --- PROTEZIONE API ---
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
-  // ----------------------
 
   let body: Record<string, unknown> = {};
   try {
@@ -134,7 +129,6 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON con:
     console.warn('[scent-dna] AI non disponibile, attivo salvagente locale:', err);
   }
 
-  // Salvagente locale: non fallisce mai
   const fallback = buildLocalScentDNA(axes);
   return NextResponse.json({ ...fallback, _fallback: 'local' });
 }
