@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, BookmarkPlus, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, BookmarkPlus, RefreshCw, Send, Wand2, X } from 'lucide-react';
 import {
   supabase,
   isCollezioneProfumo,
@@ -292,12 +292,12 @@ export function Oracolo() {
         const data: unknown = await res.json().catch(() => null);
 
         if (!res.ok) {
-          throw new Error(readErrorMessage(data) ?? "L'Oracolo non è raggiungibile. Riprova.");
+          throw new Error(readErrorMessage(data) ?? 'CAMILLA non è raggiungibile. Riprova.');
         }
         const reply =
           data && typeof data === 'object' ? (data as Record<string, unknown>).reply : null;
         if (typeof reply !== 'string' || !reply.trim()) {
-          throw new Error("L'Oracolo non ha prodotto una risposta. Riprova.");
+          throw new Error('CAMILLA non ha prodotto una risposta. Riprova.');
         }
         if (rid !== requestId.current) return;
 
@@ -311,7 +311,7 @@ export function Oracolo() {
         const aborted = err instanceof DOMException && err.name === 'AbortError';
         setError(
           aborted
-            ? "L'Oracolo sta impiegando troppo tempo. Riprova."
+            ? 'CAMILLA sta impiegando troppo tempo. Riprova.'
             : err instanceof Error
             ? err.message
             : 'Errore imprevisto. Riprova.'
@@ -381,11 +381,11 @@ export function Oracolo() {
       <AnimatePresence>
         {!open && !hideDock && (
           <motion.button
-            key="oracolo-fab"
+            key="camilla-fab"
             type="button"
             onClick={openSheet}
-            aria-label="Apri L'Oracolo, consulente olfattivo"
-            title="L'Oracolo"
+            aria-label="Apri CAMILLA, consulente olfattiva"
+            title="CAMILLA"
             initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.6 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.6 }}
@@ -409,7 +409,7 @@ export function Oracolo() {
                 transition={{ duration: 2.6, repeat: Infinity, ease: 'easeOut' }}
               />
             )}
-            <Sparkles className="relative h-6 w-6" />
+            <Wand2 className="relative h-6 w-6" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -418,10 +418,10 @@ export function Oracolo() {
       <AnimatePresence>
         {open && (
           <motion.div
-            key="oracolo-sheet"
+            key="camilla-sheet"
             role="dialog"
             aria-modal="true"
-            aria-label="L'Oracolo, consulente olfattivo"
+            aria-label="CAMILLA, consulente olfattiva"
             {...sheetMotion}
             style={{
               background:
@@ -438,19 +438,21 @@ export function Oracolo() {
               className="flex items-center justify-between border-b px-5 pb-3"
             >
               <div>
-                <h2 className="font-serif text-2xl leading-none text-[#F6EFE4]">L&apos;Oracolo</h2>
+                <h2 className="font-serif text-2xl leading-none tracking-wide text-[#F6EFE4]">
+                  CAMILLA
+                </h2>
                 <p
                   style={{ color: aura.primary }}
                   className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.24em]"
                 >
-                  Consulente olfattivo
+                  Consulente olfattiva
                 </p>
               </div>
               <button
                 ref={closeButtonRef}
                 type="button"
                 onClick={closeSheet}
-                aria-label="Chiudi L'Oracolo"
+                aria-label="Chiudi CAMILLA"
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#0E0A16] text-[#B8A9C9] transition hover:text-white"
               >
                 <X className="h-4 w-4" />
@@ -462,9 +464,9 @@ export function Oracolo() {
               <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
                 {messages.length === 0 && !thinking && (
                   <div className="space-y-5 py-8 text-center">
-                    <p className="font-serif text-3xl text-[#F6EFE4]">Chiedi all&apos;Oracolo</p>
+                    <p className="font-serif text-3xl text-[#F6EFE4]">Chiedi a CAMILLA</p>
                     <p className="mx-auto max-w-sm text-sm leading-relaxed text-[#B8A9C9]">
-                      Conosce la tua collezione, il tuo diario e il tuo DNA olfattivo. Chiedigli
+                      Conosce la tua collezione, il tuo diario e il tuo DNA olfattivo. Chiedile
                       cosa indossare, come abbinare i tuoi profumi o cosa manca.
                     </p>
                     <div className="flex flex-col items-center gap-2">
@@ -507,7 +509,7 @@ export function Oracolo() {
                         style={{ borderColor: `${aura.primary}66`, color: aura.primary }}
                         className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-[#0E0A16] font-mono text-[10px] font-bold"
                       >
-                        OR
+                        CM
                       </span>
                       <div className="min-w-0 space-y-1.5">
                         <div
@@ -531,13 +533,13 @@ export function Oracolo() {
                 )}
 
                 {thinking && (
-                  <div className="flex items-start gap-3" role="status" aria-label="L'Oracolo sta pensando">
+                  <div className="flex items-start gap-3" role="status" aria-label="CAMILLA sta pensando">
                     <span
                       aria-hidden="true"
                       style={{ borderColor: `${aura.primary}66`, color: aura.primary }}
                       className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-[#0E0A16] font-mono text-[10px] font-bold"
                     >
-                      OR
+                      CM
                     </span>
                     <div
                       style={{ borderColor: `${aura.primary}25` }}
@@ -607,8 +609,8 @@ export function Oracolo() {
                       sendMessage(draft);
                     }
                   }}
-                  placeholder="Chiedi qualcosa ai tuoi profumi…"
-                  aria-label="Scrivi un messaggio all'Oracolo"
+                  placeholder="Chiedi qualcosa a CAMILLA…"
+                  aria-label="Scrivi un messaggio a CAMILLA"
                   style={{ borderColor: `${aura.primary}40` }}
                   className="min-w-0 flex-1 rounded-full border bg-[#161024] px-5 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:outline-none"
                 />
