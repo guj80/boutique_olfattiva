@@ -1,12 +1,13 @@
 import { apiFetch } from '@/lib/api-fetch';
 
-export type ScoutMode = 'triad' | 'ultranicchia';
-export type ScoutCategory = 'Designer' | 'Artistico' | 'Ultra-Nicchia';
+export type ScoutMode = 'trittico' | 'ultranicchia';
+export type ScoutCategory = 'Designer' | 'Nicchia' | 'Artistico' | 'Ultra-Nicchia';
 
 export interface ScoutFilters {
   mode: ScoutMode;
   scoutFamily: string;
   lastFamily?: string | null;
+  freeQuery?: string;
   includeNotes: string[];
   excludeNotes: string[];
 }
@@ -32,32 +33,6 @@ export interface ScoutResponse {
   totalMatches: number;
 }
 
-/**
- * Note rare e d'avanguardia realmente presenti nella tabella ultranicchia_import (385 referenze).
- */
-export const STRANGE_NOTES_PRESETS: ReadonlyArray<{
-  label: string;
-  query: string;
-  group: string;
-}> = [
-  { label: 'Inchiostro', query: 'Inchiostro', group: 'Concettuali' },
-  { label: 'Catrame di betulla', query: 'Catrame di betulla', group: 'Fumose' },
-  { label: 'Polvere da sparo', query: 'Polvere da sparo', group: 'Concettuali' },
-  { label: 'Note metalliche', query: 'Note metalliche', group: 'Concettuali' },
-  { label: 'Sangue / Ferro', query: 'Sangue', group: 'Concettuali' },
-  { label: 'Castoreo', query: 'Castoreo', group: 'Animaliche' },
-  { label: 'Zibetto', query: 'Zibetto', group: 'Animaliche' },
-  { label: 'Iraceo (Hyraceum)', query: 'Iraceo', group: 'Animaliche' },
-  { label: 'Ambra grigia', query: 'Ambra grigia', group: 'Animaliche' },
-  { label: 'Oud selvatico', query: 'Oud', group: 'Animaliche' },
-  { label: 'Geosmina / Petrichor', query: 'Geosmina', group: 'Terrose' },
-  { label: 'Tartufo / Fungo', query: 'Tartufo', group: 'Terrose' },
-  { label: 'Assenzio', query: 'Assenzio', group: 'Boozy' },
-  { label: 'Whisky / Rum', query: 'Whisky', group: 'Boozy' },
-  { label: "Cera d'api", query: "Cera d'api", group: 'Resinose' },
-  { label: 'Cannabis', query: 'Cannabis', group: 'Botaniche' },
-];
-
 export function normalizeScoutKey(value?: string | null): string {
   return (value || '')
     .normalize('NFD')
@@ -71,10 +46,6 @@ export function makeScoutPairKey(brand?: string | null, nome?: string | null): s
   return `${normalizeScoutKey(brand)}::${normalizeScoutKey(nome)}`;
 }
 
-/**
- * Estrae le chiavi normalizzate (brand::nome) di tutti i profumi in Collezione e nel Radar
- * affinché il motore di scouting li escluda tassativamente.
- */
 export function ownedListForPrompt(
   profumi: Array<{ brand?: string | null; nome?: string | null }>
 ): string[] {
@@ -86,10 +57,6 @@ export function ownedListForPrompt(
   return Array.from(keys);
 }
 
-/**
- * Filtro di sicurezza lato client: scarta qualsiasi proposta già presente
- * nella collezione/radar dell'utente o duplicata nella risposta.
- */
 export function filterNewProposals(
   proposals: ScoutProposal[],
   ownedKeys: string[] = []
@@ -121,6 +88,7 @@ export async function collectProposals(
       mode: filters.mode,
       scoutFamily: filters.scoutFamily,
       lastFamily: filters.lastFamily ?? null,
+      freeQuery: filters.freeQuery ?? '',
       includeNotes: filters.includeNotes,
       excludeNotes: filters.excludeNotes,
       ownedKeys,
@@ -133,7 +101,7 @@ export async function collectProposals(
     | null;
 
   if (!res.ok) {
-    throw new Error(data?.error || 'Errore durante la ricerca nel catalogo olfattivo.');
+    throw new Error(data?.error || 'Errore durante la ricerca.');
   }
 
   const rawProposals = Array.isArray(data?.proposals) ? data!.proposals : [];
