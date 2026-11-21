@@ -3,6 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import { callAIWithFallback } from '@/lib/gemini-engine';
+import { requireUser } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,14 @@ function buildLocalNasoReply(userQuestion: string, ctx: NasoContext): string {
 }
 
 export async function POST(req: Request) {
+  export async function POST(req: Request) {
+  // --- PROTEZIONE API ---
+  const auth = await requireUser(req);
+  if (auth.error) return auth.error;
+  // ----------------------
+
+  let body: unknown;
+  // ... resto del codice ...
   let body: { messages?: ChatMessage[]; context?: NasoContext };
   try {
     body = (await req.json()) as { messages?: ChatMessage[]; context?: NasoContext };
