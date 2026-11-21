@@ -174,10 +174,6 @@ function pickFamily(aiValue: unknown, dbAccords?: string | null): string {
   return normalizeFamilyServer(dbAccords || s);
 }
 
-/* ------------------------------------------------------------------ */
-/* Sicurezza URL e Contesto Web                                        */
-/* ------------------------------------------------------------------ */
-
 function isPrivateIPv4(ip: string): boolean {
   const p = ip.split('.').map(Number);
   if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
@@ -462,10 +458,6 @@ async function searchWebByPerfumeName(
   return { snippet: clean.slice(0, 4800), pageUrl: m ? m[0] : null };
 }
 
-/* ------------------------------------------------------------------ */
-/* Database                                                            */
-/* ------------------------------------------------------------------ */
-
 function getSupabaseServer() {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -582,10 +574,6 @@ function dbText(v: unknown): string {
   return !s || s.toLowerCase() === 'non specificato' ? '' : s;
 }
 
-/* ------------------------------------------------------------------ */
-/* Normalizzazione Output e Prezzo                                     */
-/* ------------------------------------------------------------------ */
-
 function parseAmount(raw: string): number | null {
   let s = raw.trim();
   if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
@@ -676,10 +664,8 @@ function fail(message: string, status: number) {
 }
 
 export async function POST(req: Request) {
-  // --- PROTEZIONE API ---
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
-  // ----------------------
 
   const t0 = Date.now();
   const remaining = () => BUDGET_MS - (Date.now() - t0);
