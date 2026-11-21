@@ -1,14 +1,24 @@
-node_modules/
+# dipendenze
+node_modules
+.pnp
+.pnp.js
+
+# build
+.next
+out
+build
+next-env.d.ts
+
+# segreti: mai su GitHub
 .env
-vite.config.js.timestamp-*.mjs
-vite.config.mjs.timestamp-*.mjs
-vite.config.cjs.timestamp-*.mjs
-vite.config.ts.timestamp-*.mjs
-vite.config.mts.timestamp-*.mjs
-vite.config.cts.timestamp-*.mjs
-vitest.config.js.timestamp-*.mjs
-vitest.config.mjs.timestamp-*.mjs
-vitest.config.cjs.timestamp-*.mjs
-vitest.config.ts.timestamp-*.mjs
-vitest.config.mts.timestamp-*.mjs
-vitest.config.cts.timestamp-*.mjs
+.env.*
+!.env.example
+app/.env.local
+
+# vari
+.DS_Store
+*.log
+npm-debug.log*
+.vercel
+.netlify
+*.tsbuildinfo
