@@ -14,10 +14,8 @@ import {
   UserCheck,
   Library,
   Compass,
-  AlertTriangle,
-  ShieldCheck,
 } from 'lucide-react';
-import { supabase, Profumo, PURE_FAMILIES, PureFamily } from '@/lib/supabase';
+import { supabase, Profumo } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api-fetch';
 import { PageHeader } from '@/components/Logo';
 import { useAura, resolveAura } from '@/components/AuraProvider';
@@ -31,43 +29,20 @@ type CatalogHit = {
   concentration?: string | null;
 };
 
-type ReliabilityLevel = 'alta' | 'media' | 'bassa';
-
-function normalizeKey(value?: string | null): string {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function parseOptionalVote(raw: unknown): number | null {
-  if (raw === null || raw === undefined || raw === '') return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 1 || n > 10) return null;
-  return Math.round(n);
-}
-
-function parseOptionalMl(raw: unknown): number | null {
-  if (raw === null || raw === undefined || raw === '') return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0 || n > 2000) return null;
-  return Math.round(n);
-}
-
-function parseOptionalFamily(raw: unknown): PureFamily | null {
-  if (typeof raw !== 'string' || !raw.trim()) return null;
-  const clean = raw.trim().toLowerCase();
-  const match = PURE_FAMILIES.find((f) => f.toLowerCase() === clean);
-  return match ?? null;
-}
-
-function cleanOptionalText(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const trimmed = raw.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
+const PURE_FAMILIES = [
+  'Agrumata',
+  'Aromatica',
+  'Marina',
+  'Floreale',
+  'Fruttata',
+  'Verde',
+  'Speziata',
+  'Legnosa',
+  'Ambrata',
+  'Gourmand',
+  'Cuoiata',
+  'Muschiata',
+] as const;
 
 export default function ScannerPage() {
   const router = useRouter();
@@ -86,8 +61,6 @@ export default function ScannerPage() {
 
   const [draft, setDraft] = useState<Partial<Profumo> | null>(null);
   const [modelSource, setModelSource] = useState<string>('');
-  const [reliability, setReliability] = useState<ReliabilityLevel | null>(null);
-  const [extractionWarning, setExtractionWarning] = useState<string | null>(null);
 
   const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
@@ -108,7 +81,7 @@ export default function ScannerPage() {
           signal: ctrl.signal,
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { results?: CatalogHit[] };
+        const data = await res.json();
         setSuggestions(Array.isArray(data.results) ? data.results : []);
       } catch {
         // richiesta annullata o rete assente
@@ -177,11 +150,9 @@ export default function ScannerPage() {
 
     setExtracting(true);
     setDraft(null);
-    setReliability(null);
-    setExtractionWarning(null);
 
     try {
-      const payload: Record<string, string> = {};
+      const payload: Record<string, any> = {};
       if (mode === 'url') {
         payload.url = inputUrl.trim();
       } else if (mode === 'name') {
@@ -197,69 +168,53 @@ export default function ScannerPage() {
         body: JSON.stringify(payload),
       });
 
-      const data = (await res.json()) as Record<string, unknown>;
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error(
-          typeof data.error === 'string' && data.error
-            ? data.error
-            : "Errore durante l'estrazione dei dati."
-        );
+        throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
       // MAI salvare la foto scattata al momento come url_foto_vetrina:
       // usiamo solo l'immagine ufficiale trovata sul web oppure null (silhouette vettoriale).
       const officialPhoto =
         typeof data.url_foto_vetrina === 'string' &&
-        /^https?:\/\//i.test(data.url_foto_vetrina.trim())
-          ? data.url_foto_vetrina.trim()
+        data.url_foto_vetrina.startsWith('http')
+          ? data.url_foto_vetrina
           : null;
 
-      const parsedFamily = parseOptionalFamily(data.famiglia_olfattiva);
-
       const extractedDraft: Partial<Profumo> = {
-        nome: cleanOptionalText(data.nome) ?? '',
-        brand: cleanOptionalText(data.brand) ?? '',
-        concentrazione: cleanOptionalText(data.concentrazione),
-        famiglia_olfattiva: parsedFamily,
-        naso: cleanOptionalText(data.naso),
-        note_testa: cleanOptionalText(data.note_testa),
-        note_cuore: cleanOptionalText(data.note_cuore),
-        note_fondo: cleanOptionalText(data.note_fondo),
-        note_olfattive: cleanOptionalText(data.note_olfattive),
-        descrizione_ai: cleanOptionalText(data.descrizione_ai),
-        prezzo_stimato_euro: cleanOptionalText(data.prezzo_stimato_euro),
-        formato_ml: parseOptionalMl(data.formato_ml),
-        stagione_ideale: cleanOptionalText(data.stagione_ideale),
-        occasione_ideale: cleanOptionalText(data.occasione_ideale),
-        voto_longevita: parseOptionalVote(data.voto_longevita),
-        voto_scia: parseOptionalVote(data.voto_scia),
-        voto_proiezione: parseOptionalVote(data.voto_proiezione),
-        voto_complessita: parseOptionalVote(data.voto_complessita),
+        nome: data.nome || '',
+        brand: data.brand || '',
+        concentrazione: data.concentrazione || 'Eau de Parfum',
+        famiglia_olfattiva: data.famiglia_olfattiva || 'Legnosa',
+        naso: data.naso || '',
+        note_testa: data.note_testa || '',
+        note_cuore: data.note_cuore || '',
+        note_fondo: data.note_fondo || '',
+        note_olfattive: data.note_olfattive || '',
+        descrizione_ai: '',
+        prezzo_stimato_euro: data.prezzo_stimato_euro || '',
+        formato_ml: Number(data.formato_ml) || 100,
+        stagione_ideale: data.stagione_ideale || 'Tutte le stagioni',
+        occasione_ideale: data.occasione_ideale || 'Versatile',
+        voto_longevita: Number(data.voto_longevita) || 8,
+        voto_scia: Number(data.voto_scia) || 8,
+        voto_proiezione: Number(data.voto_proiezione) || 8,
+        voto_complessita: Number(data.voto_complessita) || 8,
         url_foto_vetrina: officialPhoto,
-        note_mouche: null,
-        note_pelle: null,
+        note_mouche: '',
+        note_pelle: '',
       };
 
-      const rawRel =
-        typeof data._affidabilita === 'string' ? data._affidabilita.toLowerCase() : null;
-      const validRel: ReliabilityLevel | null =
-        rawRel === 'alta' || rawRel === 'media' || rawRel === 'bassa' ? rawRel : null;
-
-      setModelSource(typeof data._modelUsed === 'string' ? data._modelUsed : 'verified-engine');
-      setReliability(validRel);
-      setExtractionWarning(cleanOptionalText(data._avvertenze));
+      setModelSource(data._modelUsed || 'verified-engine');
       setDraft(extractedDraft);
       setCustomAura(resolveAura(extractedDraft.famiglia_olfattiva, extractedDraft.nome));
-
       showToast(
-        validRel === 'bassa'
+        data._affidabilita === 'bassa'
           ? 'Scheda acquisita con dati parziali: verifica i campi prima di salvare.'
           : 'Scheda tecnica acquisita.'
       );
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Impossibile completare l'estrazione.";
-      showToast(message, 'error');
+    } catch (err: any) {
+      showToast(err?.message || "Impossibile completare l'estrazione.", 'error');
     } finally {
       setExtracting(false);
     }
@@ -271,84 +226,63 @@ export default function ScannerPage() {
       return;
     }
 
-    const cleanBrand = draft.brand.trim();
-    const cleanNome = draft.nome.trim();
-
     setSavingTarget(destination);
     try {
-      // Controllo duplicati normalizzato prima dell'inserimento
-      const { data: existingRows, error: dupCheckError } = await supabase
-        .from('profumi')
-        .select('id, brand, nome, stato');
-
-      if (dupCheckError) throw dupCheckError;
-
-      const targetBrandKey = normalizeKey(cleanBrand);
-      const targetNomeKey = normalizeKey(cleanNome);
-
-      const duplicate = (existingRows || []).find(
-        (row) =>
-          normalizeKey(row.brand) === targetBrandKey &&
-          normalizeKey(row.nome) === targetNomeKey
-      );
-
-      if (duplicate) {
-        const where =
-          (duplicate.stato || '').toLowerCase() === 'radar'
-            ? 'nel Testing Radar'
-            : 'nella Collezione';
-        showToast(
-          `Creazione già presente ${where}: ${duplicate.brand} — ${duplicate.nome}.`,
-          'error'
-        );
-        return;
-      }
-
       const unifiedNotes =
-        cleanOptionalText(draft.note_olfattive) ||
+        draft.note_olfattive ||
         [draft.note_testa, draft.note_cuore, draft.note_fondo]
-          .map((n) => (n || '').trim())
           .filter(Boolean)
-          .join(', ') ||
-        null;
+          .join(', ');
 
-      const fullPayload: Omit<Profumo, 'id' | 'created_at' | 'immagine_url'> = {
-        nome: cleanNome,
-        brand: cleanBrand,
-        concentrazione: cleanOptionalText(draft.concentrazione),
-        famiglia_olfattiva: parseOptionalFamily(draft.famiglia_olfattiva),
-        naso: cleanOptionalText(draft.naso),
-        note_testa: cleanOptionalText(draft.note_testa),
-        note_cuore: cleanOptionalText(draft.note_cuore),
-        note_fondo: cleanOptionalText(draft.note_fondo),
+      const fullPayload: Record<string, any> = {
+        nome: draft.nome.trim(),
+        brand: draft.brand.trim(),
+        concentrazione: (draft.concentrazione || '').trim(),
+        famiglia_olfattiva: draft.famiglia_olfattiva || 'Legnosa',
+        naso: draft.naso && draft.naso.trim() ? draft.naso.trim() : null,
+        note_testa: (draft.note_testa || '').trim(),
+        note_cuore: (draft.note_cuore || '').trim(),
+        note_fondo: (draft.note_fondo || '').trim(),
         note_olfattive: unifiedNotes,
-        descrizione_ai: cleanOptionalText(draft.descrizione_ai),
-        prezzo_stimato_euro: cleanOptionalText(draft.prezzo_stimato_euro),
-        formato_ml: parseOptionalMl(draft.formato_ml),
-        stagione_ideale: cleanOptionalText(draft.stagione_ideale),
-        occasione_ideale: cleanOptionalText(draft.occasione_ideale),
-        voto_longevita: parseOptionalVote(draft.voto_longevita),
-        voto_scia: parseOptionalVote(draft.voto_scia),
-        voto_proiezione: parseOptionalVote(draft.voto_proiezione),
-        voto_complessita: parseOptionalVote(draft.voto_complessita),
-        url_foto_vetrina: cleanOptionalText(draft.url_foto_vetrina),
+        descrizione_ai: '',
+        prezzo_stimato_euro: (draft.prezzo_stimato_euro || '').trim(),
+        formato_ml: Number(draft.formato_ml) || 100,
+        stagione_ideale: draft.stagione_ideale || 'Tutte le stagioni',
+        occasione_ideale: draft.occasione_ideale || 'Versatile',
+        voto_longevita: Number(draft.voto_longevita) || 8,
+        voto_scia: Number(draft.voto_scia) || 8,
+        voto_proiezione: Number(draft.voto_proiezione) || 8,
+        voto_complessita: Number(draft.voto_complessita) || 8,
+        url_foto_vetrina: draft.url_foto_vetrina || null,
         stato: destination,
-        note_mouche: cleanOptionalText(draft.note_mouche),
-        note_pelle: cleanOptionalText(draft.note_pelle),
+        note_mouche: draft.note_mouche || null,
+        note_pelle: draft.note_pelle || null,
       };
 
       const { error } = await supabase.from('profumi').insert([fullPayload]);
-      if (error) throw error;
+
+      if (error) {
+        const { error: fallbackErr } = await supabase.from('profumi').insert([
+          {
+            nome: fullPayload.nome,
+            brand: fullPayload.brand,
+            famiglia_olfattiva: fullPayload.famiglia_olfattiva,
+            naso: fullPayload.naso,
+            note_olfattive: fullPayload.note_olfattive,
+            stato: destination,
+          },
+        ]);
+        if (fallbackErr) throw fallbackErr;
+      }
 
       showToast(
         destination === 'radar'
           ? 'Creazione inviata al Testing Radar.'
-          : 'Creazione custodita nella Collezione.'
+          : "Creazione custodita nella Collezione."
       );
       router.push(destination === 'radar' ? '/collezione?vista=radar' : '/collezione');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Errore sconosciuto';
-      showToast(`Errore nel salvataggio: ${message}`, 'error');
+    } catch (err: any) {
+      showToast(`Errore nel salvataggio: ${err?.message}`, 'error');
     } finally {
       setSavingTarget(null);
     }
@@ -582,7 +516,7 @@ export default function ScannerPage() {
           style={{ borderColor: `${aura.primary}45` }}
           className="mt-6 rounded-[28px] border bg-[#1E1428]/95 p-6 space-y-5 shadow-2xl"
         >
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between gap-4 pb-4 border-b border-white/10">
             <div className="flex items-center gap-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#140D1C] border border-white/10">
                 {draft.url_foto_vetrina ? (
@@ -607,33 +541,7 @@ export default function ScannerPage() {
                 </h2>
               </div>
             </div>
-
-            {reliability && (
-              <div
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10px] uppercase tracking-wider ${
-                  reliability === 'alta'
-                    ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
-                    : reliability === 'media'
-                    ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
-                    : 'border-red-400/40 bg-red-500/10 text-red-200'
-                }`}
-              >
-                {reliability === 'bassa' ? (
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                ) : (
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                )}
-                <span>Affidabilità: {reliability}</span>
-              </div>
-            )}
           </div>
-
-          {extractionWarning && (
-            <div className="flex items-start gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-              <span>{extractionWarning}</span>
-            </div>
-          )}
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -673,17 +581,14 @@ export default function ScannerPage() {
                   Famiglia Pura
                 </label>
                 <select
-                  value={draft.famiglia_olfattiva || ''}
+                  value={draft.famiglia_olfattiva || 'Legnosa'}
                   onChange={(e) => {
-                    const nextFam = e.target.value ? e.target.value : null;
+                    const nextFam = e.target.value;
                     setDraft({ ...draft, famiglia_olfattiva: nextFam });
                     setCustomAura(resolveAura(nextFam, draft.nome));
                   }}
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 >
-                  <option value="" className="bg-[#140D1C]">
-                    Non dichiarata
-                  </option>
                   {PURE_FAMILIES.map((f) => (
                     <option key={f} value={f} className="bg-[#140D1C]">
                       {f}
@@ -720,7 +625,7 @@ export default function ScannerPage() {
                   type="text"
                   value={draft.concentrazione || ''}
                   onChange={(e) => setDraft({ ...draft, concentrazione: e.target.value })}
-                  placeholder="Non dichiarata"
+                  placeholder="Es. Extrait de Parfum"
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
@@ -730,17 +635,12 @@ export default function ScannerPage() {
                 </label>
                 <input
                   type="number"
-                  min={1}
-                  max={2000}
-                  value={draft.formato_ml ?? ''}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setDraft({
-                      ...draft,
-                      formato_ml: raw === '' ? null : parseOptionalMl(raw),
-                    });
-                  }}
-                  placeholder="Vuoto se non dichiarato"
+                  min={15}
+                  max={500}
+                  value={draft.formato_ml ?? 100}
+                  onChange={(e) =>
+                    setDraft({ ...draft, formato_ml: Number(e.target.value) || 100 })
+                  }
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
@@ -769,7 +669,6 @@ export default function ScannerPage() {
                   type="text"
                   value={draft.note_testa || ''}
                   onChange={(e) => setDraft({ ...draft, note_testa: e.target.value })}
-                  placeholder="Non dichiarate"
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
@@ -781,7 +680,6 @@ export default function ScannerPage() {
                   type="text"
                   value={draft.note_cuore || ''}
                   onChange={(e) => setDraft({ ...draft, note_cuore: e.target.value })}
-                  placeholder="Non dichiarate"
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
@@ -793,7 +691,6 @@ export default function ScannerPage() {
                   type="text"
                   value={draft.note_fondo || ''}
                   onChange={(e) => setDraft({ ...draft, note_fondo: e.target.value })}
-                  placeholder="Non dichiarate"
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
@@ -802,11 +699,7 @@ export default function ScannerPage() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-white/10">
               <button
                 type="button"
-                onClick={() => {
-                  setDraft(null);
-                  setReliability(null);
-                  setExtractionWarning(null);
-                }}
+                onClick={() => setDraft(null)}
                 className="rounded-full px-4 py-2.5 text-xs font-semibold text-[#B8A9C9] hover:text-[#F6EFE4]"
               >
                 Annulla
