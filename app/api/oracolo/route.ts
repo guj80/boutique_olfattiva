@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -28,11 +29,89 @@ Rispondi in italiano con tono caldo, colto e diretto, mai generico.
 - REGOLA ASSOLUTA: non inventare profumi che non possiede. Se chiede un profumo assente, dillo chiaramente e proponi alternative reali dalla sua collezione o dal Radar.
 - Rispondi in modo conciso (max 3-4 frasi salvo richieste esplicite di approfondimento).`;
 
+const MAX_MESSAGE_LENGTH = 1000;
+const MAX_MESSAGES = 20;
+const MAX_COLLECTION = 60;
+const MAX_RADAR = 40;
+const MAX_RECENT_WEARS = 10;
+const MAX_ITEM_LENGTH = 240;
+const MAX_DNA_KEYS = 12;
+
 const INJECTION_PATTERNS = [
-  /ignora\s+(tutte\s+)?le\s+istruzioni/i,
-  /ignore\s+(all\s+)?previous\s+instructions/i,
-  /system\s+prompt/i,
+  /ignor[ae]\s+(tutte\s+)?(le\s+|ogni\s+)?(tue\s+)?(istruzion[ei]|regole|direttive)/i,
+  /dimentica\s+(tutte\s+)?(le\s+)?(tue\s+)?(istruzion[ei]|regole)/i,
+  /ignore\s+(all\s+|any\s+)?(the\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules)/i,
+  /disregard\s+(all\s+|any\s+)?(the\s+)?(previous|prior|above)\s+(instructions?|prompts?)/i,
+  /system\s*prompt/i,
+  /prompt\s+di\s+sistema/i,
 ];
+
+function cleanLine(value: unknown, max: number): string | null {
+  if (typeof value !== 'string') return null;
+  const clean = value
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+  return clean.length > 0 ? clean : null;
+}
+
+function cleanList(value: unknown, maxItems: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value) {
+    if (out.length >= maxItems) break;
+    const clean = cleanLine(item, MAX_ITEM_LENGTH);
+    if (clean) out.push(clean);
+  }
+  return out;
+}
+
+function parseMessages(value: unknown): ChatMessage[] | string {
+  if (!Array.isArray(value) || value.length === 0) return 'Nessun messaggio fornito.';
+  if (value.length > MAX_MESSAGES) {
+    return `Conversazione troppo lunga (massimo ${MAX_MESSAGES} messaggi).`;
+  }
+  const turns: ChatMessage[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return 'Formato dei messaggi non valido.';
+    const { role, content } = raw as { role?: unknown; content?: unknown };
+    if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') {
+      return 'Formato dei messaggi non valido.';
+    }
+    const trimmed = content.trim();
+    if (!trimmed) return 'Messaggio vuoto.';
+    if (trimmed.length > MAX_MESSAGE_LENGTH) {
+      return `Messaggio troppo lungo (massimo ${MAX_MESSAGE_LENGTH} caratteri).`;
+    }
+    turns.push({ role, content: trimmed });
+  }
+  if (turns[turns.length - 1].role !== 'user') {
+    return "L'ultimo messaggio deve essere dell'utente.";
+  }
+  return turns;
+}
+
+function parseContext(value: unknown): NasoContext {
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const scentDNA: Record<string, number> = {};
+  if (raw.scentDNA && typeof raw.scentDNA === 'object' && !Array.isArray(raw.scentDNA)) {
+    for (const [key, val] of Object.entries(raw.scentDNA as Record<string, unknown>).slice(0, MAX_DNA_KEYS)) {
+      const label = cleanLine(key, 40);
+      if (label && typeof val === 'number' && Number.isFinite(val)) {
+        scentDNA[label] = Math.max(0, Math.min(100, Math.round(val)));
+      }
+    }
+  }
+  return {
+    collection: cleanList(raw.collection, MAX_COLLECTION),
+    radar: cleanList(raw.radar, MAX_RADAR),
+    recentWears: cleanList(raw.recentWears, MAX_RECENT_WEARS),
+    scentDNA,
+    currentTime: cleanLine(raw.currentTime, 80) ?? undefined,
+    weather: cleanLine(raw.weather, 100) ?? undefined,
+  };
+}
 
 function buildLocalNasoReply(userQuestion: string, ctx: NasoContext): string {
   const collection = Array.isArray(ctx.collection) ? ctx.collection : [];
@@ -69,35 +148,31 @@ export async function POST(req: Request) {
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
 
-  let body: { messages?: ChatMessage[]; context?: NasoContext };
+  let body: unknown;
   try {
-    body = (await req.json()) as { messages?: ChatMessage[]; context?: NasoContext };
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
   }
 
-  const messages = Array.isArray(body.messages) ? body.messages.slice(-20) : [];
-  const context = body.context ?? {};
+  const payload = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
 
-  if (messages.length === 0) {
-    return NextResponse.json({ error: 'Nessun messaggio fornito.' }, { status: 400 });
+  const messages = parseMessages(payload.messages);
+  if (typeof messages === 'string') {
+    return NextResponse.json({ error: messages }, { status: 400 });
   }
-
-  const lastMessage = messages[messages.length - 1];
-  if (!lastMessage?.content || lastMessage.content.length > 1000) {
-    return NextResponse.json({ error: 'Messaggio vuoto o troppo lungo (max 1000 caratteri).' }, { status: 400 });
-  }
-
-  if (INJECTION_PATTERNS.some((pattern) => pattern.test(lastMessage.content))) {
+  if (messages.some((m) => m.role === 'user' && INJECTION_PATTERNS.some((re) => re.test(m.content)))) {
     return NextResponse.json({ error: 'Richiesta non consentita.' }, { status: 400 });
   }
 
-  const collection = (context.collection ?? []).slice(0, 60);
-  const radar = (context.radar ?? []).slice(0, 40);
-  const recentWears = (context.recentWears ?? []).slice(0, 10);
+  const context = parseContext(payload.context);
+  const collection = context.collection ?? [];
+  const radar = context.radar ?? [];
+  const recentWears = context.recentWears ?? [];
+  const lastMessage = messages[messages.length - 1];
 
   const contextBlock = [
-    `CONTESTO UTENTE ATELIER LG:`,
+    `CONTESTO UTENTE ATELIER LG (usa solo questi dati, non aggiungere profumi che non compaiono):`,
     `- Ora attuale: ${context.currentTime ?? new Date().toLocaleString('it-IT')}`,
     context.weather ? `- Meteo: ${context.weather}` : null,
     `- Scent DNA (0-100): ${JSON.stringify(context.scentDNA ?? {})}`,
@@ -118,9 +193,12 @@ export async function POST(req: Request) {
     const res = await callAIWithFallback([{ text: fullPrompt }], {
       systemInstruction: SYSTEM_PROMPT,
       temperature: 0.7,
+      deadline: Date.now() + 20000,
     });
 
-    return NextResponse.json({ reply: res.text.trim() });
+    const reply = res.text.trim();
+    if (!reply) throw new Error('Risposta vuota');
+    return NextResponse.json({ reply });
   } catch (err) {
     console.warn('[il-naso] AI non disponibile, attivo salvagente locale:', err);
     const localReply = buildLocalNasoReply(lastMessage.content, {
