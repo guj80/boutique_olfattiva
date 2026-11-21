@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireUser } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,9 @@ function fold(s: string): string {
 }
 
 export async function GET(req: Request) {
+  const auth = await requireUser(req);
+  if (auth.error) return auth.error;
+
   try {
     const { searchParams } = new URL(req.url);
     const raw = (searchParams.get('q') || '').slice(0, 80);
