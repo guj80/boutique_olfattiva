@@ -16,6 +16,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api-fetch';
 import { PageHeader } from '@/components/Logo';
 import { useAura, resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
@@ -161,7 +162,7 @@ export default function ScannerPage() {
         payload.mimeType = imageMime;
       }
 
-      const res = await fetch('/api/extract', {
+      const res = await apiFetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
