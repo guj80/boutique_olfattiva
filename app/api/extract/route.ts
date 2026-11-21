@@ -10,6 +10,7 @@ import {
 } from '@/lib/gemini-engine';
 import { formatPerfumeNote } from '@/lib/dictionary';
 import { PURE_FAMILIES } from '@/lib/supabase';
+import { requireUser } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -675,6 +676,14 @@ function fail(message: string, status: number) {
 }
 
 export async function POST(req: Request) {
+  export async function POST(req: Request) {
+  // --- PROTEZIONE API ---
+  const auth = await requireUser(req);
+  if (auth.error) return auth.error;
+  // ----------------------
+
+  const t0 = Date.now();
+  // ... resto del codice ...
   const t0 = Date.now();
   const remaining = () => BUDGET_MS - (Date.now() - t0);
 
