@@ -16,11 +16,9 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ ms: number; value?: T; 
   }
 }
 
-export async function GET(req: Request) { 
-  // --- PROTEZIONE API ---
+export async function GET(req: Request) {
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
-  // ----------------------
 
   const report: Record<string, any> = {
     timestamp: new Date().toISOString(),
@@ -63,7 +61,6 @@ export async function GET(req: Request) {
     geminiModelsOverride: process.env.GEMINI_MODELS || null,
   };
 
-  // 1. Motore reale: quale modello risponde davvero, e in quanto tempo
   const engine = await timed(() =>
     callGeminiWithFallback([{ text: 'Rispondi solo con: {"ok":true}' }], {
       jsonMode: true,
@@ -75,7 +72,6 @@ export async function GET(req: Request) {
     ? { ok: false, ms: engine.ms, error: engine.error }
     : { ok: true, ms: engine.ms, modelUsed: engine.value?.modelUsed };
 
-  // 2. Elenco modelli Gemini disponibili per questa chiave
   if (geminiKey) {
     const list = await timed(async () => {
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
@@ -94,7 +90,6 @@ export async function GET(req: Request) {
       : { ok: true, count: list.value?.length, flash: (list.value || []).filter((n: string) => n.indexOf('flash') !== -1).slice(0, 12) };
   }
 
-  // 3. Groq
   if (groqKey) {
     const g = await timed(async () => {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -113,7 +108,6 @@ export async function GET(req: Request) {
     report.groqTest = g.error ? { ok: false, ms: g.ms, error: g.error } : { ok: true, ms: g.ms, reply: g.value };
   }
 
-  // 4. OpenRouter
   if (orKey) {
     const o = await timed(async () => {
       const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
@@ -125,7 +119,6 @@ export async function GET(req: Request) {
     report.openRouterTest = o.error ? { ok: false, error: o.error } : { ok: true, ms: o.ms };
   }
 
-  // 5. Supabase: catalogo, RPC e collezione
   if (supaUrl && supaKey) {
     try {
       const supabase = createClient(supaUrl, supaKey, { auth: { persistSession: false } });
@@ -169,7 +162,6 @@ export async function GET(req: Request) {
     }
   }
 
-  // 6. Ricerca web (Jina)
   const jinaHeaders: Record<string, string> = { Accept: 'text/plain', 'X-Retain-Images': 'none' };
   if (process.env.JINA_API_KEY) jinaHeaders.Authorization = `Bearer ${process.env.JINA_API_KEY}`;
   const jina = await timed(async () => {
