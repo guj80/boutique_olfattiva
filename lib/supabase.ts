@@ -43,6 +43,7 @@ export type PureFamily = (typeof PURE_FAMILIES)[number];
 
 export interface Profumo {
   id: string;
+  user_id?: string | null;
   created_at?: string;
   nome: string;
   brand: string;
@@ -74,6 +75,7 @@ export interface Profumo {
 
 export interface Indosso {
   id: string;
+  user_id?: string | null;
   profumo_id: string;
   created_at?: string;
   data_indosso?: string | null;
