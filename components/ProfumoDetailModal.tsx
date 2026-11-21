@@ -25,6 +25,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { supabase, Profumo, Momento } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api-fetch';
 import { formatPerfumeNote } from '@/lib/dictionary';
 import { BottlePedestal } from './BottleImage';
 import { resolveAura, useAura } from './AuraProvider';
@@ -131,7 +132,7 @@ export function ProfumoDetailModal({
 
     setEnriching(true);
     try {
-      const res = await fetch('/api/extract', {
+      const res = await apiFetch('/api/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: enrichUrl.trim() }),
