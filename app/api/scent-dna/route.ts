@@ -8,6 +8,7 @@ import {
   isScentDNAResponse,
   ScentDNAResponse,
 } from '@/lib/gemini-engine';
+import { requireUser } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,14 @@ function buildLocalScentDNA(axes: Record<string, number>): ScentDNAResponse {
 }
 
 export async function POST(req: Request) {
+  export async function POST(req: Request) {
+  // --- PROTEZIONE API ---
+  const auth = await requireUser(req);
+  if (auth.error) return auth.error;
+  // ----------------------
+
+  let body: unknown;
+  // ... resto del codice ...
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
