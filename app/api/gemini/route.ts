@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireUser } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -173,6 +174,15 @@ async function tryGeminiModel(
 }
 
 export async function POST(req: Request) {
+  export async function POST(req: Request) {
+  // --- PROTEZIONE API ---
+  const auth = await requireUser(req);
+  if (auth.error) return auth.error;
+  // ----------------------
+
+  try {
+    const body = await req.json();
+  // ... resto del codice ...
   try {
     const body = await req.json();
     const prompt = String(body?.prompt || '').trim();
