@@ -1,3 +1,5 @@
+import { apiFetch } from '@/lib/api-fetch';
+
 export interface ScoutFilters {
   scoutFamily: string;
   includeNotes: string[];
@@ -426,7 +428,7 @@ export async function collectProposals(
 ): Promise<any[]> {
   try {
     const prompt = buildScoutPrompt(filters, ownedNames);
-    const res = await fetch('/api/gemini', {
+    const res = await apiFetch('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, search: false }),
