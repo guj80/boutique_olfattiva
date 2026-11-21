@@ -9,6 +9,7 @@ import { requireUser } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 type AxisKey =
   | 'agrumatoFresco'
@@ -79,6 +80,41 @@ function buildLocalScentDNA(axes: Record<string, number>): ScentDNAResponse {
   return LOCAL_ARCHETYPES[topKey];
 }
 
+const AXIS_KEYS: AxisKey[] = [
+  'agrumatoFresco',
+  'florealeFruttato',
+  'legnosoTerroso',
+  'ambratoOrientale',
+  'gourmandDolce',
+  'cuoiatoAnimale',
+];
+
+function cleanToken(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const clean = value
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/[<>{}[\]`"\\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40);
+  return clean.length >= 2 ? clean : null;
+}
+
+function cleanTokens(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value.slice(0, 8)) {
+    const clean = cleanToken(item);
+    if (clean) out.push(clean);
+  }
+  return out;
+}
+
+function clip(value: string, max: number): string {
+  const clean = value.replace(/\s+/g, ' ').trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+}
+
 export async function POST(req: Request) {
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
@@ -90,18 +126,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Payload non valido' }, { status: 400 });
   }
 
-  const axes =
-    (body.axes as Record<string, number> | undefined) ??
-    (body.scentDNA as Record<string, number> | undefined) ??
-    (body.scores as Record<string, number> | undefined) ??
-    {};
+  const rawAxes = (body.axes ?? body.scentDNA ?? body.scores) as Record<string, unknown> | undefined;
+  const axes: Record<string, number> = {};
+  if (rawAxes && typeof rawAxes === 'object') {
+    for (const key of AXIS_KEYS) {
+      const v = rawAxes[key];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        axes[key] = Math.max(0, Math.min(100, Math.round(v)));
+      }
+    }
+  }
+  if (Object.keys(axes).length === 0) {
+    return NextResponse.json({ error: 'Dati del profilo olfattivo incompleti o non validi.' }, { status: 400 });
+  }
 
-  const dominantFamilies = Array.isArray(body.dominantFamilies)
-    ? body.dominantFamilies.filter((x): x is string => typeof x === 'string')
-    : [];
-  const topNotes = Array.isArray(body.topNotes)
-    ? body.topNotes.filter((x): x is string => typeof x === 'string')
-    : [];
+  const dominantFamilies = cleanTokens(body.dominantFamilies);
+  const topNotes = cleanTokens(body.topNotes);
 
   const prompt = `Sei un direttore artistico di alta profumeria per Atelier LG.
 Analizza SOLO questi dati reali della collezione dell'utente (non inventare profumi o brand):
@@ -110,9 +150,10 @@ Analizza SOLO questi dati reali della collezione dell'utente (non inventare prof
 - Note ricorrenti: ${topNotes.length > 0 ? topNotes.join(', ') : 'Non specificate'}
 
 Restituisci ESCLUSIVAMENTE un oggetto JSON con:
-- "archetipo": titolo evocativo in italiano (es. "L'Esploratore delle Ombre", "Il Nomade della Luce")
+- "archetipo": titolo evocativo in italiano, 2-5 parole (es. "L'Esploratore delle Ombre", "Il Nomade della Luce")
 - "descrizione": 2-3 frasi poetiche ma sobrie sul carattere olfattivo
-- "consiglio": 1 frase di consiglio pratico per la collezione`;
+- "consiglio": 1 frase di consiglio pratico per la collezione
+L'archetipo deve riflettere gli assi più alti.`;
 
   try {
     const res = await callAIWithFallback<ScentDNAResponse>([{ text: prompt }], {
@@ -120,10 +161,15 @@ Restituisci ESCLUSIVAMENTE un oggetto JSON con:
       responseSchema: SCENT_DNA_SCHEMA,
       validator: isScentDNAResponse,
       temperature: 0.7,
+      deadline: Date.now() + 20000,
     });
 
     if (res.data) {
-      return NextResponse.json(res.data);
+      return NextResponse.json({
+        archetipo: clip(res.data.archetipo, 60),
+        descrizione: clip(res.data.descrizione, 520),
+        consiglio: clip(res.data.consiglio, 240),
+      });
     }
   } catch (err) {
     console.warn('[scent-dna] AI non disponibile, attivo salvagente locale:', err);
