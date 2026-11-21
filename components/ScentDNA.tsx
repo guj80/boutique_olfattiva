@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { AlertTriangle, Fingerprint, Lightbulb, RefreshCw } from 'lucide-react';
 import type { Indosso, Profumo } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api-fetch';
 import {
   SCENT_AXES,
   computeScentDNA,
@@ -149,7 +150,7 @@ export function ScentDNA({ profumi, indossi, loading = false }: ScentDNAProps) {
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const res = await fetch('/api/scent-dna', {
+      const res = await apiFetch('/api/scent-dna', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
