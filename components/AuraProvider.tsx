@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase, Profumo } from '@/lib/supabase';
+import { getAuraForFamily, normalizeFamily } from '@/lib/families';
 
 export interface AuraPair {
   primary: string;
@@ -37,37 +38,6 @@ export const SECTION_THEMES: Record<string, AuraPair> = {
     familyLabel: 'Diario',
   },
 };
-
-const FAMILY_RULES: Array<{ keywords: string[]; pair: AuraPair }> = [
-  {
-    keywords: ['legnos', 'ambrat', 'wood', 'amber', 'oud', 'sandal', 'cedr', 'patchouli', 'vetiver'],
-    pair: { primary: '#F59E0B', secondary: '#592212', familyLabel: 'Legnoso Ambrato' },
-  },
-  {
-    keywords: ['agrum', 'fresc', 'citr', 'bergamot', 'limon', 'neroli', 'verde', 'pulit'],
-    pair: { primary: '#34D399', secondary: '#114232', familyLabel: 'Agrumato Verde' },
-  },
-  {
-    keywords: ['speziat', 'boozy', 'cald', 'spic', 'rum', 'cognac', 'cannell', 'pepe', 'cardamom', 'tabacc'],
-    pair: { primary: '#FB7185', secondary: '#4C1127', familyLabel: 'Speziato Caldo' },
-  },
-  {
-    keywords: ['gourmand', 'vanigl', 'dolc', 'caff', 'cioccol', 'caramel', 'mandorl', 'miele', 'fava tonka'],
-    pair: { primary: '#FBBF24', secondary: '#4A2511', familyLabel: 'Gourmand' },
-  },
-  {
-    keywords: ['marin', 'aromat', 'acquat', 'sale', 'ozon', 'lavand', 'salvia', 'rosmarin', 'foug'],
-    pair: { primary: '#38BDF8', secondary: '#172554', familyLabel: 'Marino Aromatico' },
-  },
-  {
-    keywords: ['cuoi', 'incens', 'fumos', 'leath', 'smok', 'resine', 'mirra', 'labdan', 'animal', 'musch'],
-    pair: { primary: '#C084FC', secondary: '#2E1065', familyLabel: 'Cuoiato Muschiato' },
-  },
-  {
-    keywords: ['fiorit', 'floreal', 'fruttat', 'rosa', 'gelsomin', 'iris', 'tuber', 'peon', 'violett', 'ylang'],
-    pair: { primary: '#F472B6', secondary: '#500724', familyLabel: 'Floreale' },
-  },
-];
 
 const FALLBACK_PALETTES: Array<[string, string]> = [
   ['#38BDF8', '#172554'],
@@ -141,21 +111,18 @@ function shiftHexHue(hex: string, degreeDelta: number): string {
 }
 
 export function resolveAura(famiglia?: string | null, nome?: string | null): AuraPair {
-  const raw = `${famiglia || ''}`.toLowerCase().trim();
   const cleanName = (nome || '').trim();
   const nameHash = cleanName ? hashString(cleanName) : 0;
   const hueOffset = cleanName ? (nameHash % 20) - 10 : 0;
 
-  if (raw) {
-    for (const rule of FAMILY_RULES) {
-      if (rule.keywords.some((k) => raw.includes(k))) {
-        return {
-          primary: shiftHexHue(rule.pair.primary, hueOffset),
-          secondary: shiftHexHue(rule.pair.secondary, hueOffset),
-          familyLabel: rule.pair.familyLabel,
-        };
-      }
-    }
+  const canonical = normalizeFamily(famiglia);
+  if (canonical) {
+    const base = getAuraForFamily(canonical);
+    return {
+      primary: shiftHexHue(base.primary, hueOffset),
+      secondary: shiftHexHue(base.secondary, hueOffset),
+      familyLabel: base.familyLabel,
+    };
   }
 
   if (cleanName) {
