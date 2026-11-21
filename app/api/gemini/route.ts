@@ -3,10 +3,9 @@ import { requireUser } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
-// Cache in memoria dei modelli realmente esistenti sugli account
 let cachedGroqModels: { at: number; list: string[] } | null = null;
 let cachedGeminiModels: { at: number; list: string[] } | null = null;
-const CACHE_TTL = 1000 * 60 * 60; // 1 ora
+const CACHE_TTL = 1000 * 60 * 60;
 
 async function discoverGroqModels(apiKey: string): Promise<string[]> {
   if (cachedGroqModels && Date.now() - cachedGroqModels.at < CACHE_TTL) {
@@ -23,7 +22,6 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
       .map((m: any) => String(m.id || ''))
       .filter((id: string) => {
         const lower = id.toLowerCase();
-        // Escludiamo modelli audio/whisper/guard/vision-only
         return (
           !lower.includes('whisper') &&
           !lower.includes('guard') &&
@@ -32,7 +30,6 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
           !lower.includes('embed')
         );
       })
-      // Preferiamo i modelli llama / qwen / deepseek / mixtral testuali
       .sort((a: string, b: string) => {
         const score = (s: string) =>
           s.includes('llama') ? 3 : s.includes('qwen') || s.includes('gemma') ? 2 : 1;
@@ -77,7 +74,6 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
           !lower.includes('audio')
         );
       })
-      // Mettiamo in cima i modelli flash (più rapidi e con più quota)
       .sort((a: string, b: string) => {
         const score = (s: string) =>
           s.includes('flash') && !s.includes('preview')
@@ -174,13 +170,12 @@ async function tryGeminiModel(
 }
 
 export async function POST(req: Request) {
-  // --- PROTEZIONE API ---
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
-  // ----------------------
 
   try {
     const body = await req.json();
+    const prompt = String(body?.prompt || '').trim();
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt mancante.' }, { status: 400 });
@@ -194,7 +189,6 @@ export async function POST(req: Request) {
       ''
     ).trim();
 
-    // 1. PRIORITÀ A GROQ CON AUTO-DISCOVERY (Risponde in < 1 secondo, zero timeout)
     if (groqKey) {
       const groqModels = await discoverGroqModels(groqKey);
       for (const model of groqModels.slice(0, 3)) {
@@ -205,7 +199,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. AUTO-DISCOVERY SU GEMINI (Prova i primi 3 modelli realmente attivi sulla chiave)
     if (geminiKey) {
       const geminiModels = await discoverGeminiModels(geminiKey);
       for (const model of geminiModels.slice(0, 3)) {
