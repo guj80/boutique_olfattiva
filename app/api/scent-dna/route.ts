@@ -1,128 +1,134 @@
+// app/api/scent-dna/route.ts
+// Genera l'archetipo Scent DNA tramite fallback chain AI con salvagente locale deterministico.
+
 import { NextResponse } from 'next/server';
-import { callGeminiWithFallback, extractJsonFromAiText } from '@/lib/gemini-engine';
 import {
-  SCENT_AXES,
-  isScentArchetype,
-  isScentAxisValues,
-  type ScentArchetype,
-} from '@/lib/scent-dna';
+  callAIWithFallback,
+  SCENT_DNA_SCHEMA,
+  isScentDNAResponse,
+  ScentDNAResponse,
+} from '@/lib/gemini-engine';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
 
-const MAX_LIST_ITEMS = 8;
-const MAX_ITEM_LENGTH = 40;
+type AxisKey =
+  | 'agrumatoFresco'
+  | 'florealeFruttato'
+  | 'legnosoTerroso'
+  | 'ambratoOrientale'
+  | 'gourmandDolce'
+  | 'cuoiatoAnimale';
 
-function sanitizeToken(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const clean = value
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
-    .replace(/[<>{}[\]`"\\]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_ITEM_LENGTH);
-  return clean.length >= 2 ? clean : null;
-}
+const LOCAL_ARCHETYPES: Record<AxisKey, ScentDNAResponse> = {
+  agrumatoFresco: {
+    archetipo: 'Il Nomade della Luce',
+    descrizione:
+      'La tua firma olfattiva privilegia la trasparenza, il respiro agrumato e le geometrie nitide. Cerchi fragranze che accompagnino la pelle con eleganza ariosa senza mai sovrastarla.',
+    consiglio:
+      'Esplora un fondo legnoso o muschiato leggero per dare più struttura alle tue giornate serali.',
+  },
+  florealeFruttato: {
+    archetipo: 'Il Custode dei Fiori Segreti',
+    descrizione:
+      'Ti muovi tra petali strutturati e sfumature fruttate mai banali, con un gusto spiccato per le evoluzioni morbide. La tua collezione racconta una sensibilità luminosa e curata nei dettagli.',
+    consiglio:
+      'Prova ad affiancare una nota speziata o verde per creare contrasto nelle mezze stagioni.',
+  },
+  legnosoTerroso: {
+    archetipo: "L'Architetto delle Radici",
+    descrizione:
+      'Prediligi materie asciutte, cortecce, resine e profondità tattili che resistono al tempo. Il tuo gusto olfattivo rifugge il superfluo e punta su carattere e presenza silenziosa.',
+    consiglio:
+      'Un agrume amaro o un tocco aromatico in apertura può alleggerire la tua rotazione estiva.',
+  },
+  ambratoOrientale: {
+    archetipo: "L'Esploratore delle Ombre",
+    descrizione:
+      'Ami il calore avvolgente delle resine, delle spezie scure e delle scie magnetiche che si rivelano lentamente. La tua collezione privilegia intensità, persistenza e atmosfera notturna.',
+    consiglio:
+      'Bilancia la collezione con una fragranza verde o marina per i momenti di luce piena.',
+  },
+  gourmandDolce: {
+    archetipo: "L'Alchimista Gourmand",
+    descrizione:
+      'Ti attraggono le composizioni avvolgenti, tattili e narcotiche, dove dolcezza e profondità si fondono in una firma riconoscibile. Cerchi nel profumo un piacere immediato ma costruito con maestria.',
+    consiglio:
+      'Alterna le tue note più calde con un legnoso secco o un cuoiato per evitare saturazione olfattiva.',
+  },
+  cuoiatoAnimale: {
+    archetipo: 'Il Collezionista Ribelle',
+    descrizione:
+      'Scegli fragranze di forte personalità, tra cuoio, fumo e accordi indomiti che non cercano compromessi. Il tuo percorso olfattivo è istintivo, deciso e profondamente identitario.',
+    consiglio:
+      'Un floreale scuro o un ambrato morbido può creare un layering sorprendente sulle tue basi cuoiate.',
+  },
+};
 
-function sanitizeList(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  const out: string[] = [];
-  for (const item of value.slice(0, MAX_LIST_ITEMS)) {
-    const clean = sanitizeToken(item);
-    if (clean) out.push(clean);
+function buildLocalScentDNA(axes: Record<string, number>): ScentDNAResponse {
+  const validKeys = Object.keys(LOCAL_ARCHETYPES) as AxisKey[];
+  let topKey: AxisKey = 'legnosoTerroso';
+  let topScore = -1;
+
+  for (const key of validKeys) {
+    const val = typeof axes[key] === 'number' ? axes[key] : 0;
+    if (val > topScore) {
+      topScore = val;
+      topKey = key;
+    }
   }
-  return out;
-}
 
-function stripFences(raw: string): string {
-  return raw
-    .replace(/^\uFEFF/, '')
-    .replace(/```json/gi, '')
-    .replace(/```/g, '')
-    .trim();
-}
-
-function clip(value: string, max: number): string {
-  const clean = value.replace(/\s+/g, ' ').trim();
-  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+  return LOCAL_ARCHETYPES[topKey];
 }
 
 export async function POST(req: Request) {
-  let body: unknown;
+  let body: Record<string, unknown> = {};
   try {
-    body = await req.json();
+    body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
+    return NextResponse.json({ error: 'Payload non valido' }, { status: 400 });
   }
 
-  const payload = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
-  const axes = payload.axes;
-  const dominantFamilies = sanitizeList(payload.dominantFamilies);
-  const topNotes = sanitizeList(payload.topNotes);
+  const axes =
+    (body.axes as Record<string, number> | undefined) ??
+    (body.scentDNA as Record<string, number> | undefined) ??
+    (body.scores as Record<string, number> | undefined) ??
+    {};
 
-  if (!isScentAxisValues(axes) || !dominantFamilies || !topNotes) {
-    return NextResponse.json(
-      { error: 'Dati del profilo olfattivo incompleti o non validi.' },
-      { status: 400 }
-    );
-  }
+  const dominantFamilies = Array.isArray(body.dominantFamilies)
+    ? body.dominantFamilies.filter((x): x is string => typeof x === 'string')
+    : [];
+  const topNotes = Array.isArray(body.topNotes)
+    ? body.topNotes.filter((x): x is string => typeof x === 'string')
+    : [];
 
-  const axesLines = SCENT_AXES.map((axis) => `- ${axis.label}: ${axes[axis.key]}%`).join('\n');
+  const prompt = `Sei un direttore artistico di alta profumeria per Atelier LG.
+Analizza SOLO questi dati reali della collezione dell'utente (non inventare profumi o brand):
+- Assi olfattivi (0-100): ${JSON.stringify(axes)}
+- Famiglie dominanti: ${dominantFamilies.length > 0 ? dominantFamilies.join(', ') : 'Non specificate'}
+- Note ricorrenti: ${topNotes.length > 0 ? topNotes.join(', ') : 'Non specificate'}
 
-  const prompt = `Sei un naso e narratore di profumeria di lusso. Analizza il profilo olfattivo REALE di una persona e descrivilo.
-
-DATI (percentuali reali sulla sua collezione, pesate sugli indossi recenti):
-${axesLines}
-
-Famiglie dominanti: ${dominantFamilies.length ? dominantFamilies.join(', ') : 'nessuna'}
-Note più ricorrenti: ${topNotes.length ? topNotes.join(', ') : 'nessuna'}
-
-COMPITO:
-Restituisci SOLO un oggetto JSON valido, senza testo prima o dopo e senza markdown, con esattamente queste chiavi:
-{
-  "archetipo": "nome evocativo in italiano, 2-5 parole (es. \\"L'Esploratore delle Ombre\\", \\"La Custode dei Fiori Segreti\\", \\"Il Nomade degli Agrumi\\", \\"L'Alchimista Gourmand\\")",
-  "descrizione": "2-3 frasi poetiche sul carattere olfattivo di questa persona",
-  "consiglio": "1 sola frase di consiglio pratico"
-}
-
-REGOLE:
-- Usa solo i dati sopra: non inventare profumi, brand o note che non compaiono.
-- Italiano, tono elegante e caldo, mai generico.
-- L'archetipo deve riflettere gli assi più alti.`;
+Restituisci ESCLUSIVAMENTE un oggetto JSON con:
+- "archetipo": titolo evocativo in italiano (es. "L'Esploratore delle Ombre", "Il Nomade della Luce")
+- "descrizione": 2-3 frasi poetiche ma sobrie sul carattere olfattivo
+- "consiglio": 1 frase di consiglio pratico per la collezione`;
 
   try {
-    const { text } = await callGeminiWithFallback([{ text: prompt }], {
+    const res = await callAIWithFallback<ScentDNAResponse>([{ text: prompt }], {
       jsonMode: true,
+      responseSchema: SCENT_DNA_SCHEMA,
+      validator: isScentDNAResponse,
       temperature: 0.7,
-      deadline: Date.now() + 20000,
     });
 
-    let parsed: unknown;
-    const cleaned = stripFences(text);
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch {
-      parsed = extractJsonFromAiText<unknown>(cleaned);
+    if (res.data) {
+      return NextResponse.json(res.data);
     }
-
-    if (!isScentArchetype(parsed)) {
-      return NextResponse.json(
-        { error: 'La risposta AI non aveva il formato atteso. Riprova.' },
-        { status: 502 }
-      );
-    }
-
-    const archetype: ScentArchetype = {
-      archetipo: clip(parsed.archetipo, 60),
-      descrizione: clip(parsed.descrizione, 520),
-      consiglio: clip(parsed.consiglio, 240),
-    };
-
-    return NextResponse.json(archetype);
-  } catch {
-    return NextResponse.json(
-      { error: 'Il motore AI non è raggiungibile in questo momento. Riprova tra poco.' },
-      { status: 502 }
-    );
+  } catch (err) {
+    console.warn('[scent-dna] AI non disponibile, attivo salvagente locale:', err);
   }
+
+  // Salvagente locale: non fallisce mai
+  const fallback = buildLocalScentDNA(axes);
+  return NextResponse.json({ ...fallback, _fallback: 'local' });
 }
