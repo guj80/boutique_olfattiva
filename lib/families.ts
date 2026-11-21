@@ -1,5 +1,5 @@
 // lib/families.ts
-// Fonte unica e oggettiva per famiglie olfattive canoniche (12), accordi secondari,
+// Fonte unica e oggettiva per famiglie olfattive canoniche (12),
 // proiezione verso i 6 assi dello Scent DNA e risoluzione cromatica Aura.
 
 export const PURE_FAMILIES = [
@@ -40,84 +40,78 @@ interface CanonicalFamilyDefinition {
   aura: FamilyAuraPalette;
 }
 
-/**
- * Definizione unica delle 12 Famiglie Canoniche:
- * - stems: radici IT/EN per il riconoscimento oggettivo da stringhe grezze o accordi
- * - axis: asse corrispondente nel radar Scent DNA
- * - aura: coppia cromatica ufficiale del tema Aura
- */
 export const CANONICAL_FAMILY_DEFS: ReadonlyArray<CanonicalFamilyDefinition> = [
   {
     family: 'Agrumata',
     stems: ['agrum', 'citrus', 'esperid', 'bergamot', 'limon', 'neroli', 'yuzu'],
     axis: 'agrumatoFresco',
-    aura: { primary: '#34D399', secondary: '#114232', familyLabel: 'Agrumato Verde' },
+    aura: { primary: '#34D399', secondary: '#114232', familyLabel: 'Agrumata' },
   },
   {
     family: 'Aromatica',
     stems: ['aromatic', 'fouger', 'fougèr', 'lavand', 'salvia', 'rosmarin', 'erbace'],
     axis: 'agrumatoFresco',
-    aura: { primary: '#38BDF8', secondary: '#172554', familyLabel: 'Marino Aromatico' },
+    aura: { primary: '#38BDF8', secondary: '#172554', familyLabel: 'Aromatica' },
   },
   {
     family: 'Marina',
     stems: ['marin', 'acquat', 'aquat', 'acque', 'ozon', 'sale', 'salin'],
     axis: 'agrumatoFresco',
-    aura: { primary: '#38BDF8', secondary: '#172554', familyLabel: 'Marino Aromatico' },
+    aura: { primary: '#22D3EE', secondary: '#0C2D48', familyLabel: 'Marina' },
   },
   {
     family: 'Verde',
     stems: ['verd', 'green', 'forestal', 'chypre', 'cipriat', 'terros', 'earth'],
     axis: 'agrumatoFresco',
-    aura: { primary: '#34D399', secondary: '#114232', familyLabel: 'Agrumato Verde' },
+    aura: { primary: '#10B981', secondary: '#0A2E22', familyLabel: 'Verde' },
   },
   {
     family: 'Floreale',
     stems: ['floreal', 'fiorit', 'floral', 'rosa', 'gelsomin', 'iris', 'tuber', 'polveros', 'powdery', 'talc'],
     axis: 'florealeFruttato',
-    aura: { primary: '#F472B6', secondary: '#500724', familyLabel: 'Floreale' },
+    aura: { primary: '#F472B6', secondary: '#4A0E2E', familyLabel: 'Floreale' },
   },
   {
     family: 'Fruttata',
     stems: ['fruttat', 'fruity', 'tropical', 'tropic'],
     axis: 'florealeFruttato',
-    aura: { primary: '#F472B6', secondary: '#500724', familyLabel: 'Floreale' },
+    aura: { primary: '#FB923C', secondary: '#431407', familyLabel: 'Fruttata' },
   },
   {
     family: 'Legnosa',
     stems: ['legnos', 'woody', 'bois', 'oud', 'sandal', 'cedr', 'vetiver', 'patchouli'],
     axis: 'legnosoTerroso',
-    aura: { primary: '#F59E0B', secondary: '#592212', familyLabel: 'Legnoso Ambrato' },
+    aura: { primary: '#D97706', secondary: '#271306', familyLabel: 'Legnosa' },
   },
   {
     family: 'Muschiata',
     stems: ['musch', 'musk', 'pulit', 'clean'],
     axis: 'legnosoTerroso',
-    aura: { primary: '#C084FC', secondary: '#2E1065', familyLabel: 'Cuoiato Muschiato' },
+    aura: { primary: '#A78BFA', secondary: '#231347', familyLabel: 'Muschiata' },
   },
   {
     family: 'Ambrata',
     stems: ['ambrat', 'amber', 'oriental', 'resin', 'balsam', 'incens', 'mirra', 'labdan'],
     axis: 'ambratoOrientale',
-    aura: { primary: '#F59E0B', secondary: '#592212', familyLabel: 'Legnoso Ambrato' },
+    aura: { primary: '#F97316', secondary: '#3B0D11', familyLabel: 'Ambrata' },
   },
   {
     family: 'Speziata',
     stems: ['spezi', 'spic', 'pepe', 'cannell', 'cardamom', 'zafferan'],
     axis: 'ambratoOrientale',
-    aura: { primary: '#FB7185', secondary: '#4C1127', familyLabel: 'Speziato Caldo' },
+    aura: { primary: '#FB7185', secondary: '#4C1127', familyLabel: 'Speziata' },
   },
   {
     family: 'Gourmand',
     stems: ['gourmand', 'vanigl', 'vanilla', 'dolc', 'sweet', 'lattonic', 'cremos', 'creamy', 'liquor', 'boozy', 'vino'],
     axis: 'gourmandDolce',
-    aura: { primary: '#FBBF24', secondary: '#4A2511', familyLabel: 'Gourmand' },
+    aura: { primary: '#EAB308', secondary: '#2E1A09', familyLabel: 'Gourmand' },
   },
   {
     family: 'Cuoiata',
     stems: ['cuoi', 'leath', 'animal', 'tabacc', 'fum', 'smok', 'affumicat', 'metall', 'ferros', 'sintetic'],
     axis: 'cuoiatoAnimale',
-    aura: { primary: '#C084FC', secondary: '#2E1065', familyLabel: 'Cuoiato Muschiato' },
+    aura: { primary: '#C084FC', secondary: '#2E1065', familyLabel: 'Cuoiata' },
   },
 ];
 
@@ -125,20 +119,11 @@ const DEF_BY_FAMILY = new Map<PureFamily, CanonicalFamilyDefinition>(
   CANONICAL_FAMILY_DEFS.map((d) => [d.family, d])
 );
 
-/**
- * Normalizza una stringa grezza o composita (es. "Fumée / Cuoiata / Speziata" o
- * "Oriental, Woody") nella famiglia canonica dominante, oppure null se assente/non riconosciuta.
- * Non inventa mai un default arbitrario.
- */
 export function normalizeFamily(raw?: string | null): PureFamily | null {
   const matches = extractCanonicalFamilies(raw);
   return matches.length > 0 ? matches[0] : null;
 }
 
-/**
- * Estrae tutte le famiglie canoniche presenti in una stringa composita o array JSON di tag,
- * preservando l'ordine di apparizione (dominanza) senza duplicati.
- */
 export function extractCanonicalFamilies(raw?: string | string[] | null): PureFamily[] {
   if (!raw) return [];
 
