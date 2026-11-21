@@ -16,15 +16,12 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ ms: number; value?: T; 
   }
 }
 
-export async function GET() {
-  export async function GET(req: Request) { // <-- Aggiunto req
+export async function GET(req: Request) { 
   // --- PROTEZIONE API ---
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
   // ----------------------
 
-  const report: Record<string, any> = {
-  // ... resto del codice ...
   const report: Record<string, any> = {
     timestamp: new Date().toISOString(),
     envCheck: {},
