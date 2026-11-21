@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { callGeminiWithFallback } from '@/lib/gemini-engine';
+import { requireUser } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -16,6 +17,14 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ ms: number; value?: T; 
 }
 
 export async function GET() {
+  export async function GET(req: Request) { // <-- Aggiunto req
+  // --- PROTEZIONE API ---
+  const auth = await requireUser(req);
+  if (auth.error) return auth.error;
+  // ----------------------
+
+  const report: Record<string, any> = {
+  // ... resto del codice ...
   const report: Record<string, any> = {
     timestamp: new Date().toISOString(),
     envCheck: {},
