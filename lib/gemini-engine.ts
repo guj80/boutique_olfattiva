@@ -1,8 +1,8 @@
 // lib/gemini-engine.ts
-// Motore AI multi-provider a cascata (Gemini -> Groq -> OpenRouter -> HuggingFace)
-// con structured output, timeout 8s, retry selettivo, type guard e logging [AtelierLG:AI].
+// Motore AI multi-provider a cascata (Gemini -> Groq -> OpenRouter free router)
+// con structured output, header x-goog-api-key, deadline globale, join delle parts e logging [AtelierLG:AI].
 
-export type ProviderName = 'gemini' | 'groq' | 'openrouter' | 'huggingface';
+export type ProviderName = 'gemini' | 'groq' | 'openrouter';
 
 export interface AIPart {
   text?: string;
@@ -83,7 +83,7 @@ export function isOracoloResponse(data: unknown): data is OracoloResponse {
 }
 
 // ==========================================
-// CONFIGURAZIONE CATENA DI FALLBACK
+// CONFIGURAZIONE CATENA DI FALLBACK (5 MODELLI)
 // ==========================================
 
 interface ProviderTarget {
@@ -92,23 +92,31 @@ interface ProviderTarget {
 }
 
 const FALLBACK_CHAIN: ProviderTarget[] = [
-  // 1. GEMINI (Provider principale)
+  // 1. GEMINI - motore principale
   { provider: 'gemini', model: 'gemini-3.8-flash' },
-  // 2. GROQ (Seconda linea - Velocità)
-  { provider: 'groq', model: 'llama-3.3-70b-versatile' },
-  { provider: 'groq', model: 'llama-3.1-8b-instant' },
-  // 3. OPENROUTER (Terza linea - Varietà)
-  { provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free' },
-  { provider: 'openrouter', model: 'google/gemma-2-9b-it:free' },
-  // 4. HUGGING FACE (Rete di sicurezza finale)
-  { provider: 'huggingface', model: 'Qwen/Qwen2.5-72B-Instruct' },
+  { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
+  // 2. GROQ - fallback alternativo
+  { provider: 'groq', model: 'openai/gpt-oss-20b' },
+  { provider: 'groq', model: 'qwen/qwen3.8-27b' },
+  // 3. OPENROUTER - router gratuito automatico
+  { provider: 'openrouter', model: 'openrouter/free' },
 ];
+
+type LogEvent =
+  | 'SUCCESS'
+  | 'HTTP_ERROR'
+  | 'TIMEOUT'
+  | 'INVALID_JSON'
+  | 'VALIDATION_ERROR'
+  | 'MISSING_API_KEY'
+  | 'ERROR';
 
 class ProviderError extends Error {
   constructor(
     message: string,
     public readonly status?: number,
-    public readonly retryable: boolean = true
+    public readonly retryable: boolean = true,
+    public readonly event: LogEvent = 'ERROR'
   ) {
     super(message);
     this.name = 'ProviderError';
@@ -145,12 +153,13 @@ async function fetchWithTimeout(
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new ProviderError(`Timeout dopo ${timeoutMs}ms`, 408, true);
+      throw new ProviderError(`Timeout dopo ${timeoutMs}ms`, 408, true, 'TIMEOUT');
     }
     throw new ProviderError(
       err instanceof Error ? err.message : 'Errore di rete sconosciuto',
       undefined,
-      true
+      true,
+      'ERROR'
     );
   } finally {
     clearTimeout(timer);
@@ -161,7 +170,7 @@ function logAttempt(params: {
   provider: ProviderName;
   model: string;
   latencyMs: number;
-  status: 'SUCCESS' | 'ERROR';
+  event: LogEvent;
   attempt: number;
   error?: string;
 }): void {
@@ -170,7 +179,7 @@ function logAttempt(params: {
     timestamp: new Date().toISOString(),
     ...params,
   };
-  if (params.status === 'ERROR') {
+  if (params.event !== 'SUCCESS') {
     console.warn(`[AtelierLG:AI] ${JSON.stringify(payload)}`);
   } else {
     console.info(`[AtelierLG:AI] ${JSON.stringify(payload)}`);
@@ -178,7 +187,14 @@ function logAttempt(params: {
 }
 
 function isNonRetryableStatus(status: number): boolean {
-  return status === 400 || status === 401 || status === 403 || status === 404 || status === 429;
+  return (
+    status === 400 ||
+    status === 401 ||
+    status === 403 ||
+    status === 404 ||
+    status === 429 ||
+    status === 503
+  );
 }
 
 // ==========================================
@@ -193,7 +209,7 @@ export async function callGeminiDirect(
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new ProviderError('GEMINI_API_KEY mancante', 401, false);
+    throw new ProviderError('GEMINI_API_KEY mancante', 401, false, 'MISSING_API_KEY');
   }
 
   const generationConfig: Record<string, unknown> = {
@@ -218,13 +234,16 @@ export async function callGeminiDirect(
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model
-  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  )}:generateContent`;
 
   const res = await fetchWithTimeout(
     url,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify(body),
     },
     timeoutMs
@@ -232,10 +251,13 @@ export async function callGeminiDirect(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
+    const retryAfter = res.headers.get('retry-after');
+    const retryInfo = retryAfter ? ` (retry-after: ${retryAfter}s)` : '';
     throw new ProviderError(
-      `Gemini HTTP ${res.status}: ${errText.slice(0, 200)}`,
+      `Gemini HTTP ${res.status}${retryInfo}: ${errText.slice(0, 200)}`,
       res.status,
-      !isNonRetryableStatus(res.status)
+      !isNonRetryableStatus(res.status),
+      'HTTP_ERROR'
     );
   }
 
@@ -243,9 +265,14 @@ export async function callGeminiDirect(
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   };
 
-  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new ProviderError('Gemini ha restituito una risposta vuota', 502, true);
+  const responseParts = json.candidates?.[0]?.content?.parts ?? [];
+  const text = responseParts
+    .map((part) => part.text ?? '')
+    .filter(Boolean)
+    .join('\n');
+
+  if (!text.trim()) {
+    throw new ProviderError('Gemini ha restituito una risposta vuota', 502, true, 'ERROR');
   }
   return text;
 }
@@ -261,7 +288,7 @@ async function callOpenAICompatible(
   extraHeaders?: Record<string, string>
 ): Promise<string> {
   if (!apiKey) {
-    throw new ProviderError(`${keyName} mancante`, 401, false);
+    throw new ProviderError(`${keyName} mancante`, 401, false, 'MISSING_API_KEY');
   }
 
   const promptText = extractTextFromParts(parts);
@@ -305,10 +332,13 @@ async function callOpenAICompatible(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
+    const retryAfter = res.headers.get('retry-after');
+    const retryInfo = retryAfter ? ` (retry-after: ${retryAfter}s)` : '';
     throw new ProviderError(
-      `HTTP ${res.status}: ${errText.slice(0, 200)}`,
+      `HTTP ${res.status}${retryInfo}: ${errText.slice(0, 200)}`,
       res.status,
-      !isNonRetryableStatus(res.status)
+      !isNonRetryableStatus(res.status),
+      'HTTP_ERROR'
     );
   }
 
@@ -317,8 +347,8 @@ async function callOpenAICompatible(
   };
 
   const text = json.choices?.[0]?.message?.content;
-  if (!text) {
-    throw new ProviderError('Risposta vuota dal provider', 502, true);
+  if (!text || !text.trim()) {
+    throw new ProviderError('Risposta vuota dal provider', 502, true, 'ERROR');
   }
   return text;
 }
@@ -361,23 +391,6 @@ export async function callOpenRouterDirect(
   );
 }
 
-export async function callHuggingFaceDirect(
-  model: string,
-  parts: AIPart[],
-  options: AICallOptions,
-  timeoutMs: number
-): Promise<string> {
-  return callOpenAICompatible(
-    'https://router.huggingface.co/v1/chat/completions',
-    process.env.HUGGINGFACE_API_KEY,
-    'HUGGINGFACE_API_KEY',
-    model,
-    parts,
-    options,
-    timeoutMs
-  );
-}
-
 // ==========================================
 // ORCHESTRATORE FALLBACK CHAIN
 // ==========================================
@@ -387,15 +400,17 @@ export async function callAIWithFallback<T = unknown>(
   options: AICallOptions<T> = {}
 ): Promise<AIResult<T>> {
   const defaultTimeout = options.timeoutMs ?? 8000;
-  const maxRetries = options.maxRetries ?? 2;
+  const maxRetries = options.maxRetries ?? 1;
+  const globalDeadline = options.deadline ?? Date.now() + 25000;
   const errors: string[] = [];
 
   for (const target of FALLBACK_CHAIN) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const remaining = options.deadline ? options.deadline - Date.now() : defaultTimeout;
+      const remaining = globalDeadline - Date.now();
       if (remaining <= 500) {
         throw new Error(`Deadline globale superata. Errori precedenti: ${errors.join(' | ')}`);
       }
+
       const effectiveTimeout = Math.min(defaultTimeout, remaining);
       const start = Date.now();
 
@@ -412,9 +427,6 @@ export async function callAIWithFallback<T = unknown>(
           case 'openrouter':
             rawText = await callOpenRouterDirect(target.model, parts, options, effectiveTimeout);
             break;
-          case 'huggingface':
-            rawText = await callHuggingFaceDirect(target.model, parts, options, effectiveTimeout);
-            break;
         }
 
         let validatedData: T | undefined;
@@ -426,14 +438,20 @@ export async function callAIWithFallback<T = unknown>(
           try {
             parsed = JSON.parse(cleaned);
           } catch {
-            throw new ProviderError('JSON malformato restituito dal modello', 422, true);
+            throw new ProviderError(
+              'JSON malformato restituito dal modello',
+              422,
+              true,
+              'INVALID_JSON'
+            );
           }
 
           if (options.validator && !options.validator(parsed)) {
             throw new ProviderError(
               'Validazione schema (type guard) fallita: risposta scartata',
               422,
-              true
+              true,
+              'VALIDATION_ERROR'
             );
           }
 
@@ -446,7 +464,7 @@ export async function callAIWithFallback<T = unknown>(
           provider: target.provider,
           model: target.model,
           latencyMs,
-          status: 'SUCCESS',
+          event: 'SUCCESS',
           attempt,
         });
 
@@ -461,12 +479,13 @@ export async function callAIWithFallback<T = unknown>(
         const latencyMs = Date.now() - start;
         const message = err instanceof Error ? err.message : String(err);
         const retryable = err instanceof ProviderError ? err.retryable : true;
+        const event: LogEvent = err instanceof ProviderError ? err.event : 'ERROR';
 
         logAttempt({
           provider: target.provider,
           model: target.model,
           latencyMs,
-          status: 'ERROR',
+          event,
           attempt,
           error: message,
         });
@@ -491,6 +510,8 @@ export async function callAIWithFallback<T = unknown>(
 // EXPORT RETROCOMPATIBILI
 // ==========================================
 
+export type GeminiPart = AIPart;
+
 export const callGeminiWithFallback = callAIWithFallback;
 
 export function extractJsonFromAiText<T = unknown>(text: string): T {
@@ -506,15 +527,29 @@ export function extractJsonFromAiText<T = unknown>(text: string): T {
   }
 }
 
-export type GeminiPart = AIPart;
-
 export async function callOpenRouterFree(
   partsOrPrompt: AIPart[] | string,
-  options: AICallOptions = {}
+  systemPromptOrOptions?: string | (AICallOptions & { json?: boolean }),
+  maybeOptions?: AICallOptions & { json?: boolean }
 ): Promise<{ text: string; modelUsed: string }> {
   const parts: AIPart[] =
     typeof partsOrPrompt === 'string' ? [{ text: partsOrPrompt }] : partsOrPrompt;
-  const model = 'meta-llama/llama-3.3-70b-instruct:free'; // Modello reale
-  const text = await callOpenRouterDirect(model, parts, options, options.timeoutMs ?? 8000);
+
+  const systemInstruction =
+    typeof systemPromptOrOptions === 'string' ? systemPromptOrOptions : undefined;
+  const rawOptions =
+    typeof systemPromptOrOptions === 'string' ? (maybeOptions ?? {}) : (systemPromptOrOptions ?? {});
+
+  const options: AICallOptions = {
+    ...rawOptions,
+    systemInstruction: rawOptions.systemInstruction ?? systemInstruction,
+    jsonMode: rawOptions.jsonMode ?? rawOptions.json,
+  };
+
+  const remaining = options.deadline ? Math.max(1000, options.deadline - Date.now()) : 8000;
+  const timeoutMs = Math.min(options.timeoutMs ?? 8000, remaining);
+  const model = 'openrouter/free';
+
+  const text = await callOpenRouterDirect(model, parts, options, timeoutMs);
   return { text, modelUsed: model };
 }
