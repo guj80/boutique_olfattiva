@@ -36,5 +36,14 @@ export async function requireUser(req: Request) {
     };
   }
 
+  // Se OWNER_USER_ID e' impostata su Vercel, solo quell'utente puo' usare le API.
+  // Se non e' impostata il comportamento resta invariato (qualsiasi utente loggato).
+  const ownerId = (process.env.OWNER_USER_ID || '').trim();
+  if (ownerId && user.id !== ownerId) {
+    return {
+      error: NextResponse.json({ error: 'Accesso non consentito.' }, { status: 403 }),
+    };
+  }
+
   return { user };
 }
