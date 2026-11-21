@@ -1,42 +1,13 @@
 import { Profumo, Indosso, isCollezioneProfumo } from './supabase';
 import { formatPerfumeNote } from './dictionary';
+import {
+  extractCanonicalFamilies,
+  getAxisForFamily,
+  type ScentAxisKey,
+} from './families';
 
-/* ------------------------------------------------------------------ */
-/* Assi del radar                                                      */
-/* ------------------------------------------------------------------ */
-
-export type ScentAxisKey =
-  | 'agrumatoFresco'
-  | 'florealeFruttato'
-  | 'legnosoTerroso'
-  | 'ambratoOrientale'
-  | 'gourmandDolce'
-  | 'cuoiatoAnimale';
-
+export type { ScentAxisKey };
 export type ScentAxisValues = Record<ScentAxisKey, number>;
-
-interface FamilyRule {
-  /** Nome canonico della famiglia */
-  family: string;
-  /** Radici (minuscole) cercate dentro famiglia_olfattiva */
-  stems: string[];
-  axis: ScentAxisKey;
-}
-
-const FAMILY_RULES: FamilyRule[] = [
-  { family: 'Agrumata', stems: ['agrum', 'citrus', 'esperid'], axis: 'agrumatoFresco' },
-  { family: 'Marina', stems: ['marin', 'acquat', 'aquat', 'ozon'], axis: 'agrumatoFresco' },
-  { family: 'Aromatica', stems: ['aromatic', 'fouger', 'fougèr'], axis: 'agrumatoFresco' },
-  { family: 'Verde', stems: ['verd', 'green'], axis: 'agrumatoFresco' },
-  { family: 'Floreale', stems: ['floreal', 'fiorit', 'floral'], axis: 'florealeFruttato' },
-  { family: 'Fruttata', stems: ['fruttat', 'fruity'], axis: 'florealeFruttato' },
-  { family: 'Legnosa', stems: ['legnos', 'woody', 'bois'], axis: 'legnosoTerroso' },
-  { family: 'Muschiata', stems: ['musch', 'musk'], axis: 'legnosoTerroso' },
-  { family: 'Ambrata', stems: ['ambrat', 'amber', 'oriental'], axis: 'ambratoOrientale' },
-  { family: 'Speziata', stems: ['spezi', 'spicy'], axis: 'ambratoOrientale' },
-  { family: 'Gourmand', stems: ['gourmand', 'vanigl'], axis: 'gourmandDolce' },
-  { family: 'Cuoiata', stems: ['cuoi', 'leather'], axis: 'cuoiatoAnimale' },
-];
 
 export const SCENT_AXES: ReadonlyArray<{
   key: ScentAxisKey;
@@ -62,10 +33,6 @@ function emptyAxes(): ScentAxisValues {
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* Risultato                                                           */
-/* ------------------------------------------------------------------ */
-
 export interface ScentDNAResult {
   /** true se la collezione e' vuota */
   isEmpty: boolean;
@@ -88,12 +55,6 @@ export interface ScentDNAResult {
 export const WEAR_WINDOW_DAYS = 90;
 const MAX_WEAR_BOOST = 10;
 
-function matchFamilies(raw?: string | null): FamilyRule[] {
-  const s = (raw || '').toLowerCase().trim();
-  if (!s) return [];
-  return FAMILY_RULES.filter((rule) => rule.stems.some((stem) => s.includes(stem)));
-}
-
 function splitNotes(raw?: string | null): string[] {
   if (!raw) return [];
   return raw
@@ -115,11 +76,8 @@ function countWearsLastDays(indossi: Indosso[], days: number, now: number): Map<
 }
 
 /**
- * Calcolo puro dello Scent DNA.
+ * Calcolo puro dello Scent DNA basato sulla fonte unica lib/families.ts.
  * peso profumo = 1 + min(indossi ultimi 90 giorni, 10) * 0.2  (da 1x a 3x)
- * Se la famiglia combacia con piu' famiglie (es. "Legnosa Ambrata") il peso
- * viene diviso in parti uguali. Famiglie null o non mappate non generano errori:
- * semplicemente non contribuiscono al radar.
  */
 export function computeScentDNA(
   profumi: Profumo[],
@@ -151,12 +109,13 @@ export function computeScentDNA(
   for (const p of collection) {
     const weight = 1 + Math.min(wears.get(p.id) ?? 0, MAX_WEAR_BOOST) * 0.2;
 
-    const rules = matchFamilies(p.famiglia_olfattiva);
-    if (rules.length > 0) {
-      const share = weight / rules.length;
-      for (const rule of rules) {
-        axisWeight[rule.axis] += share;
-        familyWeight.set(rule.family, (familyWeight.get(rule.family) ?? 0) + share);
+    const families = extractCanonicalFamilies(p.famiglia_olfattiva);
+    if (families.length > 0) {
+      const share = weight / families.length;
+      for (const fam of families) {
+        const axis = getAxisForFamily(fam);
+        axisWeight[axis] += share;
+        familyWeight.set(fam, (familyWeight.get(fam) ?? 0) + share);
         totalWeight += share;
       }
     }
@@ -207,7 +166,6 @@ export function computeScentDNA(
     .slice(0, 6)
     .map((stat) => stat.label);
 
-  // Firma: numero di profumi + 3 assi dominanti. I singoli indossi non la cambiano.
   const topAxes = (Object.keys(radar) as ScentAxisKey[])
     .sort((a, b) => radar[b] - radar[a])
     .slice(0, 3)
@@ -225,10 +183,6 @@ export function computeScentDNA(
     signature,
   };
 }
-
-/* ------------------------------------------------------------------ */
-/* Archetipo AI: tipo condiviso tra API e UI                           */
-/* ------------------------------------------------------------------ */
 
 export interface ScentArchetype {
   archetipo: string;
