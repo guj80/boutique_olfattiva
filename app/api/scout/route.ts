@@ -37,7 +37,7 @@ interface CandidatePerfume {
   url_foto_vetrina: string | null;
 }
 
-const DESIGNER_BRANDS = new Set([
+const DESIGNER_BRANDS: string[] = [
   'chanel',
   'dior',
   'christian dior',
@@ -69,9 +69,9 @@ const DESIGNER_BRANDS = new Set([
   'issey miyake',
   'kenzo',
   'lalique',
-]);
+];
 
-const ARTISTIC_BRANDS = new Set([
+const ARTISTIC_BRANDS: string[] = [
   'serge lutens',
   'diptyque',
   'editions de parfums frederic malle',
@@ -148,7 +148,7 @@ const ARTISTIC_BRANDS = new Set([
   'gritti',
   'moresque',
   'the merchant of venice',
-]);
+];
 
 function normalizeKey(value?: string | null): string {
   return (value || '')
@@ -163,15 +163,14 @@ function makePairKey(brand?: string | null, nome?: string | null): string {
   return `${normalizeKey(brand)}::${normalizeKey(nome)}`;
 }
 
+const NORMALIZED_DESIGNER_SET = new Set(DESIGNER_BRANDS.map((d) => normalizeKey(d)));
+const NORMALIZED_ARTISTIC_SET = new Set(ARTISTIC_BRANDS.map((a) => normalizeKey(a)));
+
 function classifyCatalogBrand(brandRaw: string): 'Designer' | 'Artistico' | null {
   const b = normalizeKey(brandRaw);
   if (!b) return null;
-  for (const d of DESIGNER_BRANDS) {
-    if (b === normalizeKey(d)) return 'Designer';
-  }
-  for (const a of ARTISTIC_BRANDS) {
-    if (b === normalizeKey(a)) return 'Artistico';
-  }
+  if (NORMALIZED_DESIGNER_SET.has(b)) return 'Designer';
+  if (NORMALIZED_ARTISTIC_SET.has(b)) return 'Artistico';
   return null;
 }
 
@@ -438,10 +437,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const targetBrands = shuffle([
-      ...Array.from(DESIGNER_BRANDS),
-      ...Array.from(ARTISTIC_BRANDS),
-    ]).slice(0, 32);
+    const targetBrands = shuffle([...DESIGNER_BRANDS, ...ARTISTIC_BRANDS]).slice(0, 32);
 
     const orBrandFilter = targetBrands
       .map((b) => `brand.ilike.%${b.replace(/[^a-z0-9\s'-]/gi, '')}%`)
