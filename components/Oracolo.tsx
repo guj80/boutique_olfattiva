@@ -11,6 +11,7 @@ import {
   type Indosso,
   type Profumo,
 } from '@/lib/supabase';
+import { apiFetch } from '@/lib/api-fetch';
 import { SCENT_AXES, computeScentDNA } from '@/lib/scent-dna';
 import { useAura } from './AuraProvider';
 
@@ -277,7 +278,7 @@ export function Oracolo() {
           );
         }
 
-        const res = await fetch('/api/oracolo', {
+        const res = await apiFetch('/api/oracolo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
