@@ -1,6 +1,3 @@
-// app/api/oracolo/route.ts
-// Endpoint conversazionale "Il Naso" con fallback AI multi-provider e salvagente locale sui dati reali.
-
 import { NextResponse } from 'next/server';
 import { callAIWithFallback } from '@/lib/gemini-engine';
 import { requireUser } from '@/lib/api-auth';
@@ -47,20 +44,17 @@ function buildLocalNasoReply(userQuestion: string, ctx: NasoContext): string {
     return 'Al momento sono in modalità essenziale e la tua collezione risulta vuota. Aggiungi almeno un profumo in collezione per ricevere suggerimenti mirati.';
   }
 
-  // Escludi i profumi indossati di recente
   const recentLower = recent.map((r) => r.toLowerCase());
   const freshPicks = collection.filter(
     (item) => !recentLower.some((r) => r.includes(item.toLowerCase()) || item.toLowerCase().includes(r))
   );
   const pool = freshPicks.length > 0 ? freshPicks : collection;
 
-  // Se chiede del Radar o di nuovi acquisti
   if ((q.includes('radar') || q.includes('comprare') || q.includes('acquist')) && radar.length > 0) {
     const picks = radar.slice(0, 2).join(' oppure ');
     return `In modalità essenziale ti segnalo dal tuo Radar: ${picks}. Sono già nella tua lista di interesse e meritano una prova su pelle prima del prossimo acquisto.`;
   }
 
-  // Selezione deterministica in base all'ora
   const hour = new Date().getHours();
   const moment =
     hour < 12 ? 'questa mattina' : hour < 18 ? 'questo pomeriggio' : 'questa sera';
@@ -72,10 +66,8 @@ function buildLocalNasoReply(userQuestion: string, ctx: NasoContext): string {
 }
 
 export async function POST(req: Request) {
-  // --- PROTEZIONE API ---
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
-  // ----------------------
 
   let body: { messages?: ChatMessage[]; context?: NasoContext };
   try {
