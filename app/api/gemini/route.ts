@@ -174,7 +174,6 @@ async function tryGeminiModel(
 }
 
 export async function POST(req: Request) {
-  export async function POST(req: Request) {
   // --- PROTEZIONE API ---
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
@@ -182,10 +181,6 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-  // ... resto del codice ...
-  try {
-    const body = await req.json();
-    const prompt = String(body?.prompt || '').trim();
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt mancante.' }, { status: 400 });
