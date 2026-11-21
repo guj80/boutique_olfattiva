@@ -33,7 +33,6 @@ import {
   collectProposals,
   ownedListForPrompt,
   makeScoutPairKey,
-  STRANGE_NOTES_PRESETS,
   type ScoutMode,
   type ScoutProposal,
 } from '@/lib/scout-logic';
@@ -54,10 +53,11 @@ export default function CollezionePage() {
   const [selectedBrand, setSelectedBrand] = useState('Tutti');
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
-  // Stati per Scouting Triade & Laboratorio Ultra-Nicchia (Radar)
-  const [scoutMode, setScoutMode] = useState<ScoutMode>('triad');
+  // Stati per Il Trittico & Ultra-Nicchia (Radar)
+  const [scoutMode, setScoutMode] = useState<ScoutMode>('trittico');
   const [scoutFamily, setScoutFamily] = useState('Qualsiasi');
   const [lastResolvedFamily, setLastResolvedFamily] = useState<string | null>(null);
+  const [ultraFreeQuery, setUltraFreeQuery] = useState('');
   const [includeNotes, setIncludeNotes] = useState<string[]>([]);
   const [currentIncludeInput, setCurrentIncludeInput] = useState('');
   const [excludeNotes, setExcludeNotes] = useState<string[]>([]);
@@ -97,16 +97,6 @@ export default function CollezionePage() {
     }
   }
 
-  function toggleIncludeNote(noteVal: string) {
-    const val = noteVal.trim();
-    if (!val) return;
-    setIncludeNotes((prev) =>
-      prev.some((n) => n.toLowerCase() === val.toLowerCase())
-        ? prev.filter((n) => n.toLowerCase() !== val.toLowerCase())
-        : [...prev, val]
-    );
-  }
-
   function handleAddIncludeNote() {
     const val = currentIncludeInput.trim();
     if (!val) return;
@@ -135,6 +125,7 @@ export default function CollezionePage() {
           mode: scoutMode,
           scoutFamily,
           lastFamily: lastResolvedFamily,
+          freeQuery: scoutMode === 'ultranicchia' ? ultraFreeQuery : '',
           includeNotes,
           excludeNotes,
         },
@@ -149,21 +140,11 @@ export default function CollezionePage() {
       if (response.proposals.length > 0) {
         const newKeys = response.proposals.map((p) => makeScoutPairKey(p.brand, p.nome));
         setSeenScoutKeys((prev) => Array.from(new Set([...prev, ...newKeys])).slice(-60));
-        showToast(
-          scoutMode === 'ultranicchia'
-            ? '3 creazioni ultra-nicchia estratte dal laboratorio.'
-            : response.resolvedFamily
-            ? `Triade selezionata (famiglia: ${response.resolvedFamily}).`
-            : 'Triade selezionata dal catalogo.'
-        );
       } else {
-        showToast(
-          'Nessuna creazione inedita trovata con questi filtri. Prova ad allargare le note.',
-          'error'
-        );
+        showToast('Nessuna creazione trovata con questi parametri.', 'error');
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Errore durante lo scouting.';
+      const message = err instanceof Error ? err.message : 'Errore durante la ricerca.';
       showToast(message, 'error');
     } finally {
       setScoutingLoading(false);
@@ -177,7 +158,7 @@ export default function CollezionePage() {
     );
 
     if (alreadyExists) {
-      showToast(`${item.brand} — ${item.nome} è già presente in Collezione o nel Radar.`, 'error');
+      showToast(`${item.brand} — ${item.nome} è già in archivio.`, 'error');
       return;
     }
 
@@ -206,9 +187,9 @@ export default function CollezionePage() {
       setScoutResults((prev) =>
         prev.filter((r) => makeScoutPairKey(r.brand, r.nome) !== pairKey)
       );
-      showToast(`${item.nome} aggiunto al Testing Radar.`);
+      showToast(`${item.nome} salvato nel Radar.`);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Errore salvataggio nel Radar.';
+      const message = err instanceof Error ? err.message : 'Errore salvataggio.';
       showToast(message, 'error');
     }
   }
@@ -339,7 +320,7 @@ export default function CollezionePage() {
         count={loading ? undefined : tabCount}
       />
 
-      {/* SEZIONE SPECIALE: RICERCA OLFATTIVA AI & LABORATORIO ULTRA-NICCHIA NEL RADAR */}
+      {/* ESPLORAZIONE NEL RADAR: IL TRITTICO & ULTRA-NICCHIA */}
       {activeTab === 'radar' && (
         <section
           style={{ borderColor: `${aura.primary}50` }}
@@ -362,13 +343,10 @@ export default function CollezionePage() {
                 style={{ color: aura.primary }}
                 className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
               >
-                {scoutMode === 'ultranicchia'
-                  ? 'Laboratorio Ultra-Nicchia'
-                  : 'Scouting Triade Olfattiva'}
+                {scoutMode === 'ultranicchia' ? 'Ultra-Nicchia' : 'Il Trittico'}
               </span>
             </div>
 
-            {/* Switcher Triade vs Ultra-Nicchia */}
             <div
               style={{ borderColor: `${aura.primary}35` }}
               className="flex rounded-full bg-[#161024] p-1 border w-fit"
@@ -376,18 +354,18 @@ export default function CollezionePage() {
               <button
                 type="button"
                 onClick={() => {
-                  setScoutMode('triad');
+                  setScoutMode('trittico');
                   setScoutResults([]);
                 }}
-                style={scoutMode === 'triad' ? { backgroundColor: aura.primary } : undefined}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[11px] transition ${
-                  scoutMode === 'triad'
+                style={scoutMode === 'trittico' ? { backgroundColor: aura.primary } : undefined}
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 font-mono text-[11px] transition ${
+                  scoutMode === 'trittico'
                     ? 'text-[#08060C] font-bold'
                     : 'text-[#B8A9C9] hover:text-white'
                 }`}
               >
                 <Layers className="h-3.5 w-3.5" />
-                <span>Triade (3 Fasce)</span>
+                <span>Il Trittico</span>
               </button>
               <button
                 type="button"
@@ -398,7 +376,7 @@ export default function CollezionePage() {
                 style={
                   scoutMode === 'ultranicchia' ? { backgroundColor: aura.primary } : undefined
                 }
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-[11px] transition ${
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 font-mono text-[11px] transition ${
                   scoutMode === 'ultranicchia'
                     ? 'text-[#08060C] font-bold'
                     : 'text-[#B8A9C9] hover:text-white'
@@ -410,54 +388,34 @@ export default function CollezionePage() {
             </div>
           </div>
 
-          <p className="text-xs text-[#B8A9C9] leading-relaxed">
+          <p className="text-xs text-[#B8A9C9]">
             {scoutMode === 'ultranicchia'
-              ? 'Esplora esclusivamente maison radicali e artigianali (385 referenze verificate). Seleziona una o più note rare o d’avanguardia per scoprire creazioni inedite.'
-              : 'Estrae 3 creazioni reali e mai possedute dal catalogo: 1 Designer, 1 Artistico e 1 Ultra-Nicchia, ruotando famiglia ad ogni nuova ricerca.'}
+              ? 'Ricerca libera tra maison radicali, nasi indipendenti e materie prime non convenzionali.'
+              : 'Tre interpretazioni della stessa direzione olfattiva: Designer · Nicchia · Artistico.'}
           </p>
 
-          {/* Chip Note Strane / Rare (attivo in modalità Ultra-Nicchia) */}
+          {/* Campo di ricerca libera dedicato all'Ultra-Nicchia */}
           {scoutMode === 'ultranicchia' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
-                  Note Strane & Materie Prime Rare (clicca per includere)
-                </span>
-                {includeNotes.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setIncludeNotes([])}
-                    className="font-mono text-[10px] text-[#B8A9C9] hover:text-white"
-                  >
-                    Azzera selezioni
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {STRANGE_NOTES_PRESETS.map((preset) => {
-                  const active = includeNotes.some(
-                    (n) => n.toLowerCase() === preset.query.toLowerCase()
-                  );
-                  return (
-                    <button
-                      key={preset.query}
-                      type="button"
-                      onClick={() => toggleIncludeNote(preset.query)}
-                      style={
-                        active
-                          ? { backgroundColor: aura.primary, borderColor: aura.primary }
-                          : { borderColor: `${aura.primary}35` }
-                      }
-                      className={`rounded-full border px-3 py-1 font-mono text-[11px] transition ${
-                        active
-                          ? 'text-[#08060C] font-bold'
-                          : 'bg-[#161024] text-[#F6EFE4]/90 hover:border-white/40'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  );
-                })}
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
+                Materia prima, accordo, naso o maison
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]" />
+                <input
+                  type="text"
+                  value={ultraFreeQuery}
+                  onChange={(e) => setUltraFreeQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleRunScout();
+                    }
+                  }}
+                  placeholder="Es. sangue, neve, benzina, cera, castoreo, Toskovat, Jimmy Bodin..."
+                  style={{ borderColor: `${aura.primary}40` }}
+                  className="w-full rounded-[14px] bg-[#161024] border pl-10 pr-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                />
               </div>
             </div>
           )}
@@ -473,11 +431,7 @@ export default function CollezionePage() {
                 style={{ borderColor: `${aura.primary}40` }}
                 className="w-full rounded-[14px] bg-[#161024] border p-3 text-[#F6EFE4] focus:outline-none"
               >
-                <option value="Qualsiasi">
-                  {scoutMode === 'triad'
-                    ? 'Qualsiasi (Rotazione automatica)'
-                    : 'Qualsiasi Famiglia'}
-                </option>
+                <option value="Qualsiasi">Qualsiasi</option>
                 {PURE_FAMILIES.map((fam) => (
                   <option key={fam} value={fam}>
                     {fam}
@@ -594,7 +548,7 @@ export default function CollezionePage() {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
             {lastResolvedFamily && scoutFamily === 'Qualsiasi' && scoutResults.length > 0 ? (
               <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
-                Famiglia esplorata: <strong style={{ color: aura.primary }}>{lastResolvedFamily}</strong>
+                Direzione: <strong style={{ color: aura.primary }}>{lastResolvedFamily}</strong>
               </span>
             ) : (
               <span />
@@ -614,25 +568,19 @@ export default function CollezionePage() {
               )}
               <span>
                 {scoutingLoading
-                  ? 'Ricerca nel catalogo...'
+                  ? 'Ricerca...'
                   : scoutResults.length > 0
-                  ? 'Rigenera Proposte'
-                  : 'Avvia Ricerca'}
+                  ? 'Nuova Selezione'
+                  : 'Esplora'}
               </span>
             </button>
           </div>
 
-          {/* Risultati Scouting */}
           {scoutResults.length > 0 && (
             <div
               style={{ borderColor: `${aura.primary}25` }}
               className="pt-6 border-t space-y-4"
             >
-              <h4 className="font-mono text-xs uppercase tracking-widest text-[#F6EFE4] font-bold">
-                {scoutMode === 'ultranicchia'
-                  ? 'Selezioni Ultra-Nicchia Verificate'
-                  : 'Triade Selezionata (Mai Posseduti)'}
-              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {scoutResults.map((item, idx) => (
                   <div
