@@ -676,14 +676,11 @@ function fail(message: string, status: number) {
 }
 
 export async function POST(req: Request) {
-  export async function POST(req: Request) {
   // --- PROTEZIONE API ---
   const auth = await requireUser(req);
   if (auth.error) return auth.error;
   // ----------------------
 
-  const t0 = Date.now();
-  // ... resto del codice ...
   const t0 = Date.now();
   const remaining = () => BUDGET_MS - (Date.now() - t0);
 
