@@ -1,3 +1,9 @@
+import {
+  isColdWeatherFamily,
+  isWarmEveningFamily,
+  isWarmWeatherFamily,
+} from './families';
+
 export interface IndossoItem {
   id: string;
   profumo_id: string;
@@ -45,8 +51,9 @@ export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoIt
   if (collection.length === 0) return [];
 
   const h = new Date().getHours();
-  const currentMomento = h >= 5 && h < 12 ? 'Mattina' : h >= 12 && h < 18 ? 'Pomeriggio' : h >= 18 && h < 23 ? 'Sera' : 'Notte';
-  
+  const currentMomento =
+    h >= 5 && h < 12 ? 'Mattina' : h >= 12 && h < 18 ? 'Pomeriggio' : h >= 18 && h < 23 ? 'Sera' : 'Notte';
+
   const month = new Date().getMonth();
   const isCold = month < 3 || month >= 10;
 
@@ -60,9 +67,10 @@ export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoIt
   const scored = collection.map((p) => {
     let score = 0;
     const reasons: string[] = [];
-    const fam = (p.famiglia_olfattiva || '').toLowerCase();
     const lastWorn = lastWornMap[p.id];
-    const daysSinceLast = lastWorn ? Math.floor((Date.now() - new Date(lastWorn).getTime()) / (1000 * 60 * 60 * 24)) : 999;
+    const daysSinceLast = lastWorn
+      ? Math.floor((Date.now() - new Date(lastWorn).getTime()) / (1000 * 60 * 60 * 24))
+      : 999;
 
     if (!lastWorn) {
       score += 15;
@@ -72,15 +80,15 @@ export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoIt
       reasons.push(`Non indossato da ${daysSinceLast} giorni`);
     }
 
-    if (isCold && (fam.includes('ambrata') || fam.includes('legnosa') || fam.includes('speziata') || fam.includes('gourmand'))) {
+    if (isCold && isColdWeatherFamily(p.famiglia_olfattiva)) {
       score += 8;
       reasons.push('Ideale per temperature fredde');
-    } else if (!isCold && (fam.includes('agrumata') || fam.includes('marina') || fam.includes('verde'))) {
+    } else if (!isCold && isWarmWeatherFamily(p.famiglia_olfattiva)) {
       score += 8;
       reasons.push('Perfetto per il clima attuale');
     }
 
-    if (currentMomento === 'Sera' && (fam.includes('ambrata') || fam.includes('cuoiata'))) {
+    if (currentMomento === 'Sera' && isWarmEveningFamily(p.famiglia_olfattiva)) {
       score += 5;
       reasons.push('Ottimale per la sera');
     }
