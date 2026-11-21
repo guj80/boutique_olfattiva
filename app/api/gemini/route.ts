@@ -3,9 +3,10 @@ import { requireUser } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
+// Cache in memoria dei modelli realmente esistenti sugli account
 let cachedGroqModels: { at: number; list: string[] } | null = null;
 let cachedGeminiModels: { at: number; list: string[] } | null = null;
-const CACHE_TTL = 1000 * 60 * 60;
+const CACHE_TTL = 1000 * 60 * 60; // 1 ora
 
 async function discoverGroqModels(apiKey: string): Promise<string[]> {
   if (cachedGroqModels && Date.now() - cachedGroqModels.at < CACHE_TTL) {
@@ -22,6 +23,7 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
       .map((m: any) => String(m.id || ''))
       .filter((id: string) => {
         const lower = id.toLowerCase();
+        // Escludiamo modelli audio/whisper/guard/vision-only
         return (
           !lower.includes('whisper') &&
           !lower.includes('guard') &&
@@ -30,6 +32,7 @@ async function discoverGroqModels(apiKey: string): Promise<string[]> {
           !lower.includes('embed')
         );
       })
+      // Preferiamo i modelli llama / qwen / deepseek / mixtral testuali
       .sort((a: string, b: string) => {
         const score = (s: string) =>
           s.includes('llama') ? 3 : s.includes('qwen') || s.includes('gemma') ? 2 : 1;
@@ -74,6 +77,7 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
           !lower.includes('audio')
         );
       })
+      // Mettiamo in cima i modelli flash (più rapidi e con più quota)
       .sort((a: string, b: string) => {
         const score = (s: string) =>
           s.includes('flash') && !s.includes('preview')
@@ -95,7 +99,7 @@ async function discoverGeminiModels(apiKey: string): Promise<string[]> {
 
 async function tryGroqModel(
   model: string,
-  prompt: string,
+  promptText: string,
   apiKey: string,
   timeoutMs: number
 ): Promise<string | null> {
@@ -110,7 +114,7 @@ async function tryGroqModel(
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: promptText }],
         temperature: 0.25,
         max_tokens: 1800,
       }),
@@ -130,7 +134,7 @@ async function tryGroqModel(
 
 async function tryGeminiModel(
   model: string,
-  prompt: string,
+  promptText: string,
   apiKey: string,
   timeoutMs: number
 ): Promise<string | null> {
@@ -147,7 +151,7 @@ async function tryGeminiModel(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: [{ role: 'user', parts: [{ text: promptText }] }],
         generationConfig,
       }),
       signal: controller.signal,
@@ -175,9 +179,9 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const prompt = String(body?.prompt || '').trim();
+    const promptText = String(body?.prompt || '').trim();
 
-    if (!prompt) {
+    if (!promptText) {
       return NextResponse.json({ error: 'Prompt mancante.' }, { status: 400 });
     }
 
@@ -189,20 +193,22 @@ export async function POST(req: Request) {
       ''
     ).trim();
 
+    // 1. PRIORITÀ A GROQ CON AUTO-DISCOVERY
     if (groqKey) {
       const groqModels = await discoverGroqModels(groqKey);
       for (const model of groqModels.slice(0, 3)) {
-        const text = await tryGroqModel(model, prompt, groqKey, 4500);
+        const text = await tryGroqModel(model, promptText, groqKey, 4500);
         if (text) {
           return NextResponse.json({ text, modelUsed: `groq:${model}` });
         }
       }
     }
 
+    // 2. AUTO-DISCOVERY SU GEMINI
     if (geminiKey) {
       const geminiModels = await discoverGeminiModels(geminiKey);
       for (const model of geminiModels.slice(0, 3)) {
-        const text = await tryGeminiModel(model, prompt, geminiKey, 5500);
+        const text = await tryGeminiModel(model, promptText, geminiKey, 5500);
         if (text) {
           return NextResponse.json({ text, modelUsed: `gemini:${model}` });
         }
