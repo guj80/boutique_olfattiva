@@ -9,13 +9,14 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-type ScoutMode = 'triad' | 'ultranicchia';
-type ScoutCategory = 'Designer' | 'Artistico' | 'Ultra-Nicchia';
+type ScoutMode = 'trittico' | 'ultranicchia';
+type ScoutCategory = 'Designer' | 'Nicchia' | 'Artistico' | 'Ultra-Nicchia';
 
 interface ScoutRequestPayload {
   mode?: ScoutMode;
   scoutFamily?: string;
   lastFamily?: string | null;
+  freeQuery?: string;
   includeNotes?: string[];
   excludeNotes?: string[];
   ownedKeys?: string[];
@@ -37,6 +38,7 @@ interface CandidatePerfume {
   url_foto_vetrina: string | null;
 }
 
+// 1. DESIGNER: Maison storiche della moda e linee esclusive classiche
 const DESIGNER_BRANDS: string[] = [
   'chanel',
   'dior',
@@ -71,13 +73,10 @@ const DESIGNER_BRANDS: string[] = [
   'lalique',
 ];
 
-const ARTISTIC_BRANDS: string[] = [
-  'serge lutens',
-  'diptyque',
-  'editions de parfums frederic malle',
-  'frederic malle',
-  'frédéric malle',
+// 2. NICCHIA: Case indipendenti strutturate e selettive
+const NICHE_BRANDS: string[] = [
   'byredo',
+  'diptyque',
   'le labo',
   'maison francis kurkdjian',
   'amouage',
@@ -91,15 +90,10 @@ const ARTISTIC_BRANDS: string[] = [
   "penhaligon's",
   'lartisan parfumeur',
   "l'artisan parfumeur",
-  'etat libre dorange',
-  "etat libre d'orange",
   'memo paris',
   'ex nihilo',
   'kilian',
   'by kilian',
-  'nasomatto',
-  'orto parisi',
-  'lorenzo pazzaglia',
   'profumum roma',
   'tiziana terenzi',
   'montale',
@@ -112,25 +106,6 @@ const ARTISTIC_BRANDS: string[] = [
   'james heeley',
   'laboratorio olfattivo',
   'santa maria novella',
-  'stephane humbert lucas',
-  's humbert lucas',
-  's. humbert lucas',
-  'les liquides imaginaires',
-  'marc-antoine barrois',
-  'marc antoine barrois',
-  'mendittorosa',
-  'meo fusciuni',
-  'naomi goodsir',
-  'francesca bianchi',
-  'tauer perfumes',
-  'andy tauer',
-  'juliette has a gun',
-  'zoologist',
-  'zoologist perfumes',
-  'imaginary authors',
-  'dusita',
-  'parfums dusita',
-  'masque milano',
   'histoires de parfums',
   'atelier cologne',
   'jovoy',
@@ -141,13 +116,57 @@ const ARTISTIC_BRANDS: string[] = [
   'bond no. 9',
   'sospiro',
   'casamorati',
-  'acqua delle langhe',
   'nobile 1942',
   'carthusia',
   'pantheon roma',
   'gritti',
   'moresque',
   'the merchant of venice',
+  'juliette has a gun',
+];
+
+// 3. ARTISTICO: Profumeria d'autore, nasi indipendenti e ricerca materica
+const ARTISTIC_BRANDS: string[] = [
+  'serge lutens',
+  'editions de parfums frederic malle',
+  'frederic malle',
+  'frédéric malle',
+  'etat libre dorange',
+  "etat libre d'orange",
+  'nasomatto',
+  'orto parisi',
+  'lorenzo pazzaglia',
+  'francesca bianchi',
+  'filippo sorcinelli',
+  'mendittorosa',
+  'meo fusciuni',
+  'naomi goodsir',
+  'stephane humbert lucas',
+  's humbert lucas',
+  's. humbert lucas',
+  'les liquides imaginaires',
+  'marc-antoine barrois',
+  'marc antoine barrois',
+  'tauer perfumes',
+  'andy tauer',
+  'zoologist',
+  'zoologist perfumes',
+  'imaginary authors',
+  'dusita',
+  'parfums dusita',
+  'masque milano',
+  'beaufort london',
+  'bogue',
+  'bogue profumo',
+  'baruti',
+  'kerosene',
+  'hiram green',
+  'papillon artisan perfumes',
+  'rogue perfumery',
+  'stora skuggan',
+  'jorum studio',
+  'rania j',
+  'olympic orchids',
 ];
 
 function normalizeKey(value?: string | null): string {
@@ -163,14 +182,16 @@ function makePairKey(brand?: string | null, nome?: string | null): string {
   return `${normalizeKey(brand)}::${normalizeKey(nome)}`;
 }
 
-const NORMALIZED_DESIGNER_SET = new Set(DESIGNER_BRANDS.map((d) => normalizeKey(d)));
-const NORMALIZED_ARTISTIC_SET = new Set(ARTISTIC_BRANDS.map((a) => normalizeKey(a)));
+const DESIGNER_SET = new Set(DESIGNER_BRANDS.map((b) => normalizeKey(b)));
+const NICHE_SET = new Set(NICHE_BRANDS.map((b) => normalizeKey(b)));
+const ARTISTIC_SET = new Set(ARTISTIC_BRANDS.map((b) => normalizeKey(b)));
 
-function classifyCatalogBrand(brandRaw: string): 'Designer' | 'Artistico' | null {
+function classifyCatalogBrand(brandRaw: string): 'Designer' | 'Nicchia' | 'Artistico' | null {
   const b = normalizeKey(brandRaw);
   if (!b) return null;
-  if (NORMALIZED_DESIGNER_SET.has(b)) return 'Designer';
-  if (NORMALIZED_ARTISTIC_SET.has(b)) return 'Artistico';
+  if (DESIGNER_SET.has(b)) return 'Designer';
+  if (NICHE_SET.has(b)) return 'Nicchia';
+  if (ARTISTIC_SET.has(b)) return 'Artistico';
   return null;
 }
 
@@ -189,13 +210,8 @@ function cleanNoteField(raw?: string | null): string | null {
   return formatted.trim() ? formatted : null;
 }
 
-function buildSearchableNotesText(
-  testa?: string | null,
-  cuore?: string | null,
-  fondo?: string | null,
-  accords?: string | null
-): string {
-  const rawCombined = [testa, cuore, fondo, accords].filter(Boolean).join(', ');
+function buildSearchableText(...parts: Array<string | null | undefined>): string {
+  const rawCombined = parts.filter(Boolean).join(', ');
   const translated = formatPerfumeNote(rawCombined);
   return normalizeKey(`${rawCombined} ${translated}`);
 }
@@ -205,14 +221,18 @@ function matchesNotesFilter(
   includeTokens: string[],
   excludeTokens: string[]
 ): { ok: boolean; matchScore: number } {
-  if (excludeTokens.some((ex) => ex && searchableNotes.includes(ex))) {
-    return { ok: false, matchScore: -1 };
+  for (let i = 0; i < excludeTokens.length; i++) {
+    const ex = excludeTokens[i];
+    if (ex && searchableNotes.includes(ex)) {
+      return { ok: false, matchScore: -1 };
+    }
   }
   if (includeTokens.length === 0) {
     return { ok: true, matchScore: 0 };
   }
   let matched = 0;
-  for (const inc of includeTokens) {
+  for (let i = 0; i < includeTokens.length; i++) {
+    const inc = includeTokens[i];
     if (inc && searchableNotes.includes(inc)) {
       matched += 1;
     }
@@ -220,7 +240,7 @@ function matchesNotesFilter(
   if (matched === 0) {
     return { ok: false, matchScore: 0 };
   }
-  return { ok: true, matchScore: matched * 20 };
+  return { ok: true, matchScore: matched * 25 };
 }
 
 function getSupabaseServer() {
@@ -232,12 +252,7 @@ function getSupabaseServer() {
 
 async function enrichReasonsWithAI(
   candidates: CandidatePerfume[],
-  filters: {
-    mode: ScoutMode;
-    targetFamily: string;
-    includeNotes: string[];
-    excludeNotes: string[];
-  }
+  contextHint: string
 ): Promise<CandidatePerfume[]> {
   if (candidates.length === 0) return candidates;
 
@@ -246,44 +261,37 @@ async function enrichReasonsWithAI(
       .filter(Boolean)
       .join(', ')
       .split(',')
-      .slice(0, 4)
+      .slice(0, 3)
       .map((s) => s.trim())
       .filter(Boolean)
       .join(', ');
-    if (notes) {
-      return `Creazione ${c.categoria.toLowerCase()} centrata su ${notes}.`;
-    }
-    return `Proposta ${c.categoria.toLowerCase()} selezionata per coerenza olfattiva.`;
+    return notes ? `Accordo costruito su ${notes}.` : `Selezione ${c.categoria.toLowerCase()}.`;
   };
 
   try {
     const listText = candidates
       .map(
         (c, idx) =>
-          `${idx + 1}. [${c.categoria}] ${c.brand} — ${c.nome} | Famiglia: ${
-            c.famiglia_olfattiva || 'Non dichiarata'
-          } | Testa: ${c.note_testa || '-'} | Cuore: ${c.note_cuore || '-'} | Fondo: ${
-            c.note_fondo || '-'
-          }`
+          `${idx + 1}. [${c.categoria}] ${c.brand} — ${c.nome} | Testa: ${
+            c.note_testa || '-'
+          } | Cuore: ${c.note_cuore || '-'} | Fondo: ${c.note_fondo || '-'}`
       )
       .join('\n');
 
-    const prompt = `Sei il curatore olfattivo di Atelier LG. Ti fornisco ${candidates.length} profumi REALI estratti dal database.
-NON cambiare brand, nome o note. Scrivi SOLO una breve motivazione tecnica in italiano (1 frase, max 140 caratteri) per ciascuno, spiegando perché vale la pena provarlo in base alle sue note reali${
-      filters.includeNotes.length > 0 ? ` e alle note richieste (${filters.includeNotes.join(', ')})` : ''
-    }.
+    const prompt = `Sei il curatore di Atelier LG. Scrivi una nota editoriale asciutta e tecnica in italiano (1 frase breve, max 120 caratteri, zero enfasi pubblicitaria) per ciascuna di queste ${candidates.length} fragranze reali${
+      contextHint ? ` (${contextHint})` : ''
+    }:
 
-PROFUMI:
 ${listText}
 
-Restituisci SOLO un oggetto JSON valido con questa struttura:
+Restituisci SOLO JSON valido:
 {
   "motivi": ["frase 1", "frase 2", "frase 3"]
 }`;
 
     const { text } = await callGeminiWithFallback([{ text: prompt }], {
       jsonMode: true,
-      temperature: 0.45,
+      temperature: 0.4,
       timeoutMs: 6500,
       deadline: Date.now() + 9000,
     });
@@ -295,7 +303,7 @@ Restituisci SOLO un oggetto JSON valido con questa struttura:
       const m = typeof motivi[idx] === 'string' ? motivi[idx].trim() : '';
       return {
         ...c,
-        motivo: m.length >= 8 ? m.slice(0, 180) : fallbackReason(c),
+        motivo: m.length >= 8 ? m.slice(0, 160) : fallbackReason(c),
       };
     });
   } catch {
@@ -322,9 +330,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Configurazione database mancante.' }, { status: 500 });
   }
 
-  const mode: ScoutMode = body.mode === 'ultranicchia' ? 'ultranicchia' : 'triad';
+  const mode: ScoutMode = body.mode === 'ultranicchia' ? 'ultranicchia' : 'trittico';
   const rawFamily = (body.scoutFamily || 'Qualsiasi').trim();
   const lastFamily = (body.lastFamily || '').trim();
+  const freeQueryTokens = normalizeKey(body.freeQuery)
+    .split(' ')
+    .filter((t) => t.length >= 2);
 
   let effectiveFamily = rawFamily;
   if (rawFamily === 'Qualsiasi') {
@@ -348,98 +359,114 @@ export async function POST(req: Request) {
   ]);
 
   try {
-    const { data: ultraRows, error: ultraErr } = await supabase
-      .from('ultranicchia_import')
-      .select(
-        'brand, nome, concentrazione, famiglia_originale, famiglia_tags, naso, note_testa, note_cuore, note_fondo, dati_completi'
-      );
+    // RAMO 1: ULTRA-NICCHIA (ricerca libera su ultranicchia_import)
+    if (mode === 'ultranicchia') {
+      const { data: ultraRows, error: ultraErr } = await supabase
+        .from('ultranicchia_import')
+        .select(
+          'brand, nome, concentrazione, famiglia_originale, famiglia_tags, naso, note_testa, note_cuore, note_fondo, dati_completi'
+        );
 
-    if (ultraErr) throw ultraErr;
+      if (ultraErr) throw ultraErr;
 
-    const ultraCandidates: Array<{ item: CandidatePerfume; score: number }> = [];
+      const ultraPool: Array<{ item: CandidatePerfume; score: number }> = [];
 
-    for (const row of ultraRows || []) {
-      const brand = String(row.brand || '').trim();
-      const nome = String(row.nome || '').trim();
-      if (!brand || !nome) continue;
+      for (const row of ultraRows || []) {
+        const brand = String(row.brand || '').trim();
+        const nome = String(row.nome || '').trim();
+        if (!brand || !nome) continue;
 
-      const pairKey = makePairKey(brand, nome);
-      if (blockedKeys.has(pairKey)) continue;
+        const pairKey = makePairKey(brand, nome);
+        if (blockedKeys.has(pairKey)) continue;
 
-      const testa = cleanNoteField(row.note_testa);
-      const cuore = cleanNoteField(row.note_cuore);
-      const fondo = cleanNoteField(row.note_fondo);
-      if (!testa && !cuore && !fondo) continue;
+        const testa = cleanNoteField(row.note_testa);
+        const cuore = cleanNoteField(row.note_cuore);
+        const fondo = cleanNoteField(row.note_fondo);
+        if (!testa && !cuore && !fondo) continue;
 
-      const fams = extractCanonicalFamilies(row.famiglia_tags || row.famiglia_originale);
-      const dominantFam =
-        normalizeFamily(row.famiglia_tags) || normalizeFamily(row.famiglia_originale);
+        const fams = extractCanonicalFamilies(row.famiglia_tags || row.famiglia_originale);
+        const dominantFam =
+          normalizeFamily(row.famiglia_tags) || normalizeFamily(row.famiglia_originale);
 
-      const familyMatch =
-        rawFamily === 'Qualsiasi'
-          ? fams.some((f) => f.toLowerCase() === effectiveFamily.toLowerCase())
-            ? 25
-            : 5
-          : fams.some((f) => f.toLowerCase() === rawFamily.toLowerCase())
-          ? 40
-          : -100;
+        if (
+          rawFamily !== 'Qualsiasi' &&
+          !fams.some((f) => f.toLowerCase() === rawFamily.toLowerCase())
+        ) {
+          continue;
+        }
 
-      if (familyMatch < 0) continue;
-
-      const searchable = buildSearchableNotesText(
-        row.note_testa,
-        row.note_cuore,
-        row.note_fondo,
-        row.famiglia_originale
-      );
-      const noteCheck = matchesNotesFilter(searchable, includeTokens, excludeTokens);
-      if (!noteCheck.ok) continue;
-
-      const completenessBonus = row.dati_completi ? 10 : 0;
-
-      ultraCandidates.push({
-        item: {
+        const searchable = buildSearchableText(
           brand,
           nome,
-          concentrazione: row.concentrazione ? String(row.concentrazione).trim() : 'Extrait de Parfum',
-          famiglia_olfattiva: dominantFam,
-          naso: row.naso ? String(row.naso).trim() : null,
-          note_testa: testa,
-          note_cuore: cuore,
-          note_fondo: fondo,
-          categoria: 'Ultra-Nicchia',
-          fonte: 'ultranicchia',
-          motivo: '',
-          url_foto_vetrina: null,
-        },
-        score: familyMatch + noteCheck.matchScore + completenessBonus + Math.random() * 15,
-      });
-    }
+          row.naso,
+          row.famiglia_originale,
+          row.note_testa,
+          row.note_cuore,
+          row.note_fondo
+        );
 
-    ultraCandidates.sort((a, b) => b.score - a.score);
+        // Ricerca libera: ogni parola digitata deve comparire tra note, accordi, naso o maison
+        if (freeQueryTokens.length > 0) {
+          const allTokensMatch = freeQueryTokens.every((tok) => searchable.includes(tok));
+          if (!allTokensMatch) continue;
+        }
 
-    if (mode === 'ultranicchia') {
-      const picked = shuffle(ultraCandidates.slice(0, 12))
+        const noteCheck = matchesNotesFilter(searchable, includeTokens, excludeTokens);
+        if (!noteCheck.ok) continue;
+
+        const completenessBonus = row.dati_completi ? 12 : 0;
+        const queryBonus = freeQueryTokens.length > 0 ? 30 : 0;
+
+        ultraPool.push({
+          item: {
+            brand,
+            nome,
+            concentrazione: row.concentrazione ? String(row.concentrazione).trim() : null,
+            famiglia_olfattiva: dominantFam,
+            naso: row.naso ? String(row.naso).trim() : null,
+            note_testa: testa,
+            note_cuore: cuore,
+            note_fondo: fondo,
+            categoria: 'Ultra-Nicchia',
+            fonte: 'ultranicchia',
+            motivo: '',
+            url_foto_vetrina: null,
+          },
+          score: noteCheck.matchScore + completenessBonus + queryBonus + Math.random() * 20,
+        });
+      }
+
+      ultraPool.sort((a, b) => b.score - a.score);
+
+      const picked = shuffle(ultraPool.slice(0, 14))
         .slice(0, 3)
         .map((c) => c.item);
 
-      const enriched = await enrichReasonsWithAI(picked, {
-        mode,
-        targetFamily: rawFamily === 'Qualsiasi' ? 'Tutte' : rawFamily,
-        includeNotes,
-        excludeNotes,
-      });
+      const hint = [
+        body.freeQuery?.trim(),
+        rawFamily !== 'Qualsiasi' ? `famiglia ${rawFamily}` : '',
+        includeNotes.length > 0 ? `note: ${includeNotes.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      const enriched = await enrichReasonsWithAI(picked, hint);
 
       return NextResponse.json({
         proposals: enriched,
         resolvedFamily: rawFamily === 'Qualsiasi' ? null : rawFamily,
-        totalMatches: ultraCandidates.length,
+        totalMatches: ultraPool.length,
       });
     }
 
-    const targetBrands = shuffle([...DESIGNER_BRANDS, ...ARTISTIC_BRANDS]).slice(0, 32);
+    // RAMO 2: IL TRITTICO (1 Designer · 1 Nicchia · 1 Artistico dal catalogo perfumes)
+    const sampledBrands = shuffle([
+      ...shuffle(DESIGNER_BRANDS).slice(0, 12),
+      ...shuffle(NICHE_BRANDS).slice(0, 14),
+      ...shuffle(ARTISTIC_BRANDS).slice(0, 14),
+    ]);
 
-    const orBrandFilter = targetBrands
+    const orBrandFilter = sampledBrands
       .map((b) => `brand.ilike.%${b.replace(/[^a-z0-9\s'-]/gi, '')}%`)
       .join(',');
 
@@ -448,11 +475,12 @@ export async function POST(req: Request) {
       .select('brand, name, concentration, main_accords, top_notes, middle_notes, base_notes, perfumers')
       .or(orBrandFilter)
       .not('top_notes', 'is', null)
-      .limit(450);
+      .limit(550);
 
     if (catErr) throw catErr;
 
     const designerPool: Array<{ item: CandidatePerfume; score: number }> = [];
+    const nichePool: Array<{ item: CandidatePerfume; score: number }> = [];
     const artisticPool: Array<{ item: CandidatePerfume; score: number }> = [];
 
     for (const row of catalogRows || []) {
@@ -479,7 +507,7 @@ export async function POST(req: Request) {
 
       if (rawFamily !== 'Qualsiasi' && !hasFam) continue;
 
-      const searchable = buildSearchableNotesText(
+      const searchable = buildSearchableText(
         row.top_notes,
         row.middle_notes,
         row.base_notes,
@@ -492,7 +520,7 @@ export async function POST(req: Request) {
         item: {
           brand,
           nome,
-          concentrazione: row.concentration ? String(row.concentration).trim() : 'Eau de Parfum',
+          concentrazione: row.concentration ? String(row.concentration).trim() : null,
           famiglia_olfattiva: dominantFam,
           naso: row.perfumers ? String(row.perfumers).trim() : null,
           note_testa: testa,
@@ -503,17 +531,19 @@ export async function POST(req: Request) {
           motivo: '',
           url_foto_vetrina: null,
         },
-        score: (hasFam ? 40 : 10) + noteCheck.matchScore + Math.random() * 20,
+        score: (hasFam ? 45 : 10) + noteCheck.matchScore + Math.random() * 20,
       };
 
       if (cat === 'Designer') designerPool.push(entry);
+      else if (cat === 'Nicchia') nichePool.push(entry);
       else artisticPool.push(entry);
     }
 
     designerPool.sort((a, b) => b.score - a.score);
+    nichePool.sort((a, b) => b.score - a.score);
     artisticPool.sort((a, b) => b.score - a.score);
 
-    const triad: CandidatePerfume[] = [];
+    const trittico: CandidatePerfume[] = [];
     const usedKeys = new Set<string>();
 
     const pickOne = (pool: Array<{ item: CandidatePerfume; score: number }>) => {
@@ -522,42 +552,44 @@ export async function POST(req: Request) {
         const k = makePairKey(entry.item.brand, entry.item.nome);
         if (!usedKeys.has(k)) {
           usedKeys.add(k);
-          triad.push(entry.item);
+          trittico.push(entry.item);
           return;
         }
       }
     };
 
     pickOne(designerPool);
+    pickOne(nichePool);
     pickOne(artisticPool);
-    pickOne(ultraCandidates);
 
-    for (const pool of [ultraCandidates, artisticPool, designerPool]) {
-      if (triad.length >= 3) break;
+    for (const pool of [artisticPool, nichePool, designerPool]) {
+      if (trittico.length >= 3) break;
       for (const entry of pool) {
-        if (triad.length >= 3) break;
+        if (trittico.length >= 3) break;
         const k = makePairKey(entry.item.brand, entry.item.nome);
         if (!usedKeys.has(k)) {
           usedKeys.add(k);
-          triad.push(entry.item);
+          trittico.push(entry.item);
         }
       }
     }
 
-    const enriched = await enrichReasonsWithAI(triad, {
-      mode,
-      targetFamily: effectiveFamily,
-      includeNotes,
-      excludeNotes,
-    });
+    const hint = [
+      `direzione ${effectiveFamily}`,
+      includeNotes.length > 0 ? `note: ${includeNotes.join(', ')}` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const enriched = await enrichReasonsWithAI(trittico, hint);
 
     return NextResponse.json({
       proposals: enriched,
       resolvedFamily: effectiveFamily,
-      totalMatches: designerPool.length + artisticPool.length + ultraCandidates.length,
+      totalMatches: designerPool.length + nichePool.length + artisticPool.length,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Errore durante la ricerca nel catalogo.';
+    const message = err instanceof Error ? err.message : 'Errore durante la ricerca.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
