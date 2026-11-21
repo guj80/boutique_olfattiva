@@ -172,7 +172,10 @@ export function ScentDNA({ profumi, indossi, loading = false }: ScentDNAProps) {
 
       setArchetype(data);
       setStatus('idle');
-      writeCache(current.signature, data);
+      // Il salvagente locale (AI non raggiungibile) non va memorizzato per 24 ore.
+      if (!(data as unknown as Record<string, unknown>)._fallback) {
+        writeCache(current.signature, data);
+      }
     } catch (err) {
       if (id !== requestId.current) return;
       const aborted = err instanceof DOMException && err.name === 'AbortError';
