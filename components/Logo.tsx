@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
-import Image from 'next/image';
+import React, { useId, useState } from 'react';
 import Link from 'next/link';
 import {
   motion,
@@ -15,56 +14,141 @@ import { useAura } from './AuraProvider';
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  variant?: string;
+  /** Se true, attiva un sottile bagliore ambientale legato all'aura attiva */
+  glow?: boolean;
 }
 
-const LUMA_FILTER_ID = 'lg-luma-to-alpha';
+const SIZE_CLASSES: Record<NonNullable<LogoProps['size']>, string> = {
+  sm: 'h-8 w-8',
+  md: 'h-11 w-11',
+  lg: 'h-14 w-14',
+  xl: 'h-44 w-44 sm:h-52 sm:w-52',
+};
 
-export function Logo({ className = '', size = 'md' }: LogoProps) {
-  const sizeClasses = {
-    sm: 'h-8 w-8',
-    md: 'h-11 w-11',
-    lg: 'h-16 w-16',
-    xl: 'h-44 w-44 sm:h-52 sm:w-52',
-  };
+/**
+ * Monogramma vettoriale ufficiale Atelier LG.
+ * Riproduce fedelmente le geometrie sfaccettate del flacone-monogramma
+ * adattando il gradiente interno alle variabili CSS dell'Aura attiva.
+ */
+export function Logo({ className = '', size = 'md', glow = false }: LogoProps) {
+  const uid = useId().replace(/:/g, '');
+  const gradMainId = `lg-grad-${uid}`;
+  const gradCapId = `lg-cap-${uid}`;
+  const sheenId = `lg-sheen-${uid}`;
 
   return (
     <div
-      style={{
-        WebkitMaskImage: 'radial-gradient(circle at center, black 62%, transparent 98%)',
-        maskImage: 'radial-gradient(circle at center, black 62%, transparent 98%)',
-      }}
-      className={`relative flex items-center justify-center shrink-0 select-none ${sizeClasses[size]} ${className}`}
+      className={`relative flex items-center justify-center shrink-0 select-none ${SIZE_CLASSES[size]} ${className}`}
     >
-      {/*
-        Il nero del JPG diventa trasparenza reale: l'alpha deriva dalla
-        luminosita' del pixel. Funziona su qualsiasi sfondo e dentro
-        qualsiasi contenitore animato (a differenza del solo blend-mode,
-        che non attraversa gli stacking context).
-      */}
+      {glow && (
+        <span
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(circle, color-mix(in srgb, var(--aura-1) 42%, transparent) 0%, transparent 70%)',
+          }}
+          className="pointer-events-none absolute -inset-2 rounded-full blur-md"
+        />
+      )}
+
       <svg
-        aria-hidden="true"
-        focusable="false"
-        width="0"
-        height="0"
-        style={{ position: 'absolute' }}
+        viewBox="0 0 200 220"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="Atelier LG"
+        className="relative h-full w-full overflow-visible"
       >
-        <filter id={LUMA_FILTER_ID} colorInterpolationFilters="sRGB">
-          <feColorMatrix
-            type="matrix"
-            values="1.12 0 0 0 0  0 1.12 0 0 0  0 0 1.12 0 0  0.51 1.72 0.17 0 -0.03"
-          />
-        </filter>
+        <defs>
+          {/* Gradiente principale del corpo flacone/monogramma: Aura 1 -> Champagne -> Aura 2 */}
+          <linearGradient id={gradMainId} x1="30" y1="58" x2="170" y2="205" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" style={{ stopColor: 'var(--aura-1)' }} />
+            <stop
+              offset="52%"
+              style={{
+                stopColor: 'color-mix(in srgb, var(--aura-1) 58%, #F6EFE4)',
+              }}
+            />
+            <stop
+              offset="100%"
+              style={{
+                stopColor: 'color-mix(in srgb, var(--aura-2) 72%, var(--aura-1))',
+              }}
+            />
+          </linearGradient>
+
+          {/* Gradiente del tappo asimmetrico: luminosita' pura di Aura 1 + avorio */}
+          <linearGradient id={gradCapId} x1="60" y1="14" x2="148" y2="54" gradientUnits="userSpaceOnUse">
+            <stop
+              offset="0%"
+              style={{
+                stopColor: 'color-mix(in srgb, var(--aura-1) 75%, #F6EFE4)',
+              }}
+            />
+            <stop offset="100%" style={{ stopColor: 'var(--aura-1)' }} />
+          </linearGradient>
+
+          {/* Riflesso interno sottile sui tagli geometrici */}
+          <linearGradient id={sheenId} x1="100" y1="14" x2="100" y2="205" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.28" />
+            <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.14" />
+          </linearGradient>
+        </defs>
+
+        {/* 1. Tappo inclinato superiore (poligono cavo con taglio interno) */}
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M61 28 L145 14 L132 46 L124 44 L131 24 L76 33 L103 44 L91 49 L61 28 Z"
+          fill={`url(#${gradCapId})`}
+        />
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M61 28 L145 14 L132 46 L124 44 L131 24 L76 33 L103 44 L91 49 L61 28 Z"
+          fill={`url(#${sheenId})`}
+        />
+
+        {/* 2. Colletto / atomizzatore sottile */}
+        <polygon points="87,51 118,51 87,59" fill={`url(#${gradCapId})`} />
+
+        {/* 3. Spalla sinistra sfaccettata */}
+        <polygon
+          points="54,67 54,82 40,95 57,178 30,93"
+          fill={`url(#${gradMainId})`}
+          opacity="0.92"
+        />
+
+        {/* 4. Spalla destra sfaccettata */}
+        <polygon
+          points="146,67 170,93 143,178 160,95 146,82"
+          fill={`url(#${gradMainId})`}
+          opacity="0.92"
+        />
+
+        {/* 5. Lettera L strutturale (asta verticale + base orizzontale) */}
+        <polygon
+          points="64,67 79,67 79,179 134,179 144,193 64,193"
+          fill={`url(#${gradMainId})`}
+        />
+
+        {/* 6. Lettera G incastrata con taglio diagonale */}
+        <polygon
+          points="89,67 141,67 127,81 104,81 104,132 146,184 146,133 128,133 116,120 159,120 159,195 148,195 89,137"
+          fill={`url(#${gradMainId})`}
+        />
+
+        {/* Velatura speculare su corpo L + G */}
+        <polygon
+          points="64,67 79,67 79,179 134,179 144,193 64,193"
+          fill={`url(#${sheenId})`}
+        />
+        <polygon
+          points="89,67 141,67 127,81 104,81 104,132 146,184 146,133 128,133 116,120 159,120 159,195 148,195 89,137"
+          fill={`url(#${sheenId})`}
+        />
       </svg>
-      <Image
-        src="/LOGO_LG.jpg"
-        alt="Atelier LG"
-        fill
-        sizes="(max-width: 768px) 180px, 240px"
-        style={{ filter: `url(#${LUMA_FILTER_ID})` }}
-        className="object-contain mix-blend-screen"
-        priority
-      />
     </div>
   );
 }
@@ -73,10 +157,12 @@ interface PageHeaderProps {
   title: string;
   subtitle?: string;
   rightSlot?: React.ReactNode;
-  /** Numero di creazioni mostrato a destra nella barra compatta (es. 57 -> "57 CREAZIONI"). */
+  /** Numero di creazioni mostrato nella pillola contatore */
   count?: number;
-  /** Etichetta personalizzata del conteggio. Di default CREAZIONE/CREAZIONI. */
+  /** Etichetta personalizzata del conteggio (default: CREAZIONE / CREAZIONI) */
   countLabel?: string;
+  /** 'editorial' (default: impianto asimmetrico di sala regia) | 'compact' (barra snella per gallerie/tool) */
+  variant?: 'editorial' | 'compact';
 }
 
 export function PageHeader({
@@ -85,6 +171,7 @@ export function PageHeader({
   rightSlot,
   count,
   countLabel,
+  variant = 'editorial',
 }: PageHeaderProps) {
   const { aura } = useAura();
   const prefersReducedMotion = useReducedMotion();
@@ -92,30 +179,26 @@ export function PageHeader({
   const [barActive, setBarActive] = useState(false);
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
-    setBarActive(latest > 90);
+    setBarActive(latest > 72);
   });
 
-  // Transizioni fluide
-  const titleOpacity = useTransform(scrollY, [0, 90], [1, 0]);
-  const titleY = useTransform(scrollY, [0, 90], [0, -16]);
-  const bigLogoOpacity = useTransform(scrollY, [0, 70], [1, 0]);
-  const bigLogoScale = useTransform(scrollY, [0, 70], [1, 0.5]);
-  const bigLogoX = useTransform(scrollY, [0, 70], [0, -48]);
-  const barOpacity = useTransform(scrollY, [50, 120], [0, 1]);
-  const barLogoX = useTransform(scrollY, [50, 120], [-16, 0]);
+  const headerOpacity = useTransform(scrollY, [0, 75], [1, 0]);
+  const headerY = useTransform(scrollY, [0, 75], [0, -10]);
+  const barOpacity = useTransform(scrollY, [40, 95], [0, 1]);
 
-  // Versioni "a scatto" per prefers-reduced-motion (nessun movimento)
-  const titleOpacityStep = useTransform(scrollY, [89, 90], [1, 0]);
-  const barOpacityStep = useTransform(scrollY, [89, 90], [0, 1]);
+  const headerOpacityStep = useTransform(scrollY, [71, 72], [1, 0]);
+  const barOpacityStep = useTransform(scrollY, [71, 72], [0, 1]);
 
   const countText =
     typeof count === 'number'
       ? `${count} ${countLabel ?? (count === 1 ? 'CREAZIONE' : 'CREAZIONI')}`
       : null;
 
+  const isCompact = variant === 'compact';
+
   return (
     <>
-      {/* Barra glassmorphism sticky: compare quando il titolo grande svanisce */}
+      {/* Barra glassmorphism sticky: emerge quando si scorre */}
       <motion.div
         style={{
           opacity: prefersReducedMotion ? barOpacityStep : barOpacity,
@@ -127,97 +210,111 @@ export function PageHeader({
       >
         <div
           aria-hidden="true"
-          style={{ borderColor: `${aura.primary}30` }}
-          className="absolute inset-0 border-b bg-[#08060C]/60 backdrop-blur-xl"
+          style={{ borderColor: `${aura.primary}28` }}
+          className="absolute inset-0 border-b bg-[#08060C]/75 backdrop-blur-xl"
         />
         <div className="relative mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8">
           <Link
             href="/"
             tabIndex={barActive ? 0 : -1}
-            title="Torna alla Home"
-            className="flex min-w-0 items-center gap-2.5"
+            title="Torna all'Atelier"
+            className="flex min-w-0 items-center gap-3"
           >
-            <motion.div style={prefersReducedMotion ? undefined : { x: barLogoX }}>
-              <Logo size="sm" />
-            </motion.div>
-            <span className="truncate font-serif text-lg tracking-tight text-[#F6EFE4]">
-              {title}
-            </span>
+            <Logo size="sm" />
+            <div className="flex min-w-0 items-baseline gap-2.5">
+              <span className="truncate font-serif text-lg tracking-tight text-[#F6EFE4]">
+                {title}
+              </span>
+              {subtitle && (
+                <span
+                  style={{ color: aura.primary }}
+                  className="hidden sm:inline font-mono text-[9px] uppercase tracking-[0.22em] opacity-80"
+                >
+                  {subtitle}
+                </span>
+              )}
+            </div>
           </Link>
 
-          {countText && (
-            <span
-              style={{ color: aura.primary }}
-              className="shrink-0 font-mono text-[11px] font-bold uppercase tracking-[0.18em]"
-            >
-              {countText}
-            </span>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {countText && (
+              <span
+                style={{ color: aura.primary, borderColor: `${aura.primary}35` }}
+                className="rounded-full border bg-[#0E0A16]/90 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
+              >
+                {countText}
+              </span>
+            )}
+          </div>
         </div>
       </motion.div>
 
-      {/* Header espanso */}
-      <header
-        style={{ borderColor: `${aura.primary}30` }}
-        className="flex flex-col items-center border-b pb-6 text-center"
+      {/* Header principale: impianto editoriale asimmetrico, zero ingombro verticale inutile */}
+      <motion.header
+        style={
+          prefersReducedMotion
+            ? { opacity: headerOpacityStep, borderColor: `${aura.primary}28` }
+            : { opacity: headerOpacity, y: headerY, borderColor: `${aura.primary}28` }
+        }
+        className={`relative border-b ${isCompact ? 'pb-4' : 'pb-6'}`}
       >
-        <motion.div
-          style={
-            prefersReducedMotion
-              ? { opacity: titleOpacityStep }
-              : { opacity: bigLogoOpacity, scale: bigLogoScale, x: bigLogoX }
-          }
-        >
-          <Link
-            href="/"
-            title="Torna alla Home"
-            className="group relative flex items-center justify-center transition-transform duration-300 hover:scale-105 active:scale-95 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
-          >
-            <div
-              style={{ backgroundColor: aura.primary }}
-              className="absolute inset-0 rounded-full blur-xl opacity-20 transition-opacity duration-300 group-hover:opacity-40"
-            />
-            <Logo size="lg" />
-          </Link>
-        </motion.div>
-
-        {subtitle && (
-          <div
-            style={{ borderColor: `${aura.primary}55`, backgroundColor: '#0E0A16' }}
-            className="mt-4 inline-block rounded-md border px-2.5 py-0.5 shadow-sm"
-          >
-            <span
-              style={{ color: aura.primary }}
-              className="block font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          {/* Blocco sinistro: Monogramma + Gerarchia tipografica */}
+          <div className="flex items-center gap-4 sm:gap-5 min-w-0">
+            <Link
+              href="/"
+              title="Torna all'Atelier"
+              className="group relative flex items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0E0A16]/90 p-2.5 shadow-lg transition-transform duration-300 hover:scale-105 active:scale-95 motion-reduce:transition-none"
+              style={{
+                boxShadow: `0 8px 28px -10px color-mix(in srgb, var(--aura-1) 45%, transparent)`,
+              }}
             >
-              {subtitle}
-            </span>
+              <Logo size={isCompact ? 'sm' : 'md'} glow />
+            </Link>
+
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {subtitle && (
+                  <span
+                    style={{ color: aura.primary }}
+                    className="font-mono text-[10px] font-bold uppercase tracking-[0.24em]"
+                  >
+                    {subtitle}
+                  </span>
+                )}
+                {subtitle && countText && (
+                  <span className="text-white/20 text-[10px]" aria-hidden="true">
+                    •
+                  </span>
+                )}
+                {countText && (
+                  <span
+                    style={{ borderColor: `${aura.primary}40`, color: '#F6EFE4' }}
+                    className="inline-flex items-center rounded-full border bg-[#0E0A16] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+                  >
+                    {countText}
+                  </span>
+                )}
+              </div>
+
+              <h1
+                className={`font-serif tracking-tight text-[#F6EFE4] leading-[1.05] ${
+                  isCompact ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'
+                }`}
+              >
+                {title}
+              </h1>
+            </div>
           </div>
-        )}
 
-        <motion.div
-          style={
-            prefersReducedMotion
-              ? { opacity: titleOpacityStep }
-              : { opacity: titleOpacity, y: titleY }
-          }
-          className={subtitle ? 'mt-2' : 'mt-4'}
-        >
-          <h1 className="font-serif text-4xl tracking-tight text-[#F6EFE4] sm:text-5xl">
-            {title}
-          </h1>
-          {countText && (
-            <p
-              style={{ color: aura.primary }}
-              className="mt-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em]"
-            >
-              {countText}
-            </p>
+          {/* Blocco destro: Azioni contestuali allineate alla base del titolo */}
+          {rightSlot && (
+            <div className="flex items-center justify-start sm:justify-end shrink-0">
+              {rightSlot}
+            </div>
           )}
-        </motion.div>
-
-        {rightSlot && <div className="mt-5 flex justify-center">{rightSlot}</div>}
-      </header>
+        </div>
+      </motion.header>
     </>
   );
 }
