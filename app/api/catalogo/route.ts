@@ -24,13 +24,11 @@ const STOPWORDS = new Set([
   'and',
   'et',
   'pour',
-  'eau',
-  'parfum',
-  'extrait',
 ]);
 
-interface CatalogSearchResult {
+export interface CatalogSearchResult {
   id: string;
+  rawId: string | number;
   name: string;
   brand: string;
   release_year: number | string | null;
@@ -48,8 +46,35 @@ function fold(s: string): string {
     .trim();
 }
 
-function makeDedupeKey(brand: string, name: string): string {
-  return `${fold(brand)}::${fold(name)}`;
+function canonicalConcentration(raw: unknown): string | null {
+  const clean = String(raw || '').trim();
+  if (!clean) return null;
+  const f = fold(clean);
+  if (f === 'edp' || f === 'eau de parfum') return 'Eau de Parfum';
+  if (f === 'edt' || f === 'eau de toilette') return 'Eau de Toilette';
+  if (f === 'edc' || f === 'eau de cologne') return 'Eau de Cologne';
+  if (f === 'extrait' || f === 'extrait de parfum' || f === 'pure perfume') {
+    return 'Extrait de Parfum';
+  }
+  if (f === 'parfum') return 'Parfum';
+  if (f === 'elixir') return 'Elixir';
+  return clean;
+}
+
+function concentrationKey(conc: string | null): string {
+  if (!conc) return 'std';
+  const f = fold(conc);
+  if (f.includes('extrait')) return 'extrait';
+  if (f.includes('elixir')) return 'elixir';
+  if (f.includes('parfum') && !f.includes('eau')) return 'parfum';
+  if (f.includes('eau de parfum') || f === 'edp') return 'edp';
+  if (f.includes('eau de toilette') || f === 'edt') return 'edt';
+  if (f.includes('cologne') || f === 'edc') return 'edc';
+  return f;
+}
+
+function makeVariantDedupeKey(brand: string, name: string, conc: string | null): string {
+  return `${fold(brand)}::${fold(name)}::${concentrationKey(conc)}`;
 }
 
 export async function GET(req: Request) {
@@ -61,7 +86,6 @@ export async function GET(req: Request) {
     const raw = (searchParams.get('q') || '').slice(0, 80);
     const foldedQuery = fold(raw);
 
-    // Solo [a-z0-9]: nessuna possibilità di alterare filtri PostgREST
     const tokens = foldedQuery
       .split(' ')
       .map((t) => t.slice(0, 30))
@@ -78,7 +102,6 @@ export async function GET(req: Request) {
 
     const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-    // Usa il token più lungo/specifico come ancora SQL per evitare di saturare il limite righe
     const anchorToken = [...tokens].sort((a, b) => b.length - a.length)[0];
 
     const [ultraRes, catalogRes] = await Promise.all([
@@ -86,12 +109,12 @@ export async function GET(req: Request) {
         .from('ultranicchia_import')
         .select('id, nome, brand, concentrazione')
         .or(`brand.ilike.%${anchorToken}%,nome.ilike.%${anchorToken}%`)
-        .limit(60),
+        .limit(80),
       supabase
         .from('perfumes')
         .select('id, name, brand, release_year, concentration')
         .or(`brand.ilike.%${anchorToken}%,name.ilike.%${anchorToken}%`)
-        .limit(120),
+        .limit(150),
     ]);
 
     const merged = new Map<string, CatalogSearchResult>();
@@ -101,17 +124,19 @@ export async function GET(req: Request) {
       const name = String(row.nome || '').trim();
       if (!brand || !name) continue;
 
-      const full = fold(`${brand} ${name}`);
-      if (!tokens.every((t) => full.includes(t))) continue;
+      const conc = canonicalConcentration(row.concentrazione);
+      const searchable = fold(`${brand} ${name} ${conc || ''}`);
+      if (!tokens.every((t) => searchable.includes(t))) continue;
 
-      const k = makeDedupeKey(brand, name);
+      const k = makeVariantDedupeKey(brand, name, conc);
       if (!merged.has(k)) {
         merged.set(k, {
           id: `ultra-${row.id}`,
+          rawId: row.id,
           name,
           brand,
           release_year: null,
-          concentration: row.concentrazione ? String(row.concentrazione).trim() : null,
+          concentration: conc,
           source: 'ultranicchia',
         });
       }
@@ -122,22 +147,29 @@ export async function GET(req: Request) {
       const name = String(row.name || '').trim();
       if (!brand || !name) continue;
 
-      const full = fold(`${brand} ${name}`);
-      if (!tokens.every((t) => full.includes(t))) continue;
+      const conc = canonicalConcentration(row.concentration);
+      const searchable = fold(`${brand} ${name} ${conc || ''}`);
+      if (!tokens.every((t) => searchable.includes(t))) continue;
 
-      const k = makeDedupeKey(brand, name);
+      const k = makeVariantDedupeKey(brand, name, conc);
       const existing = merged.get(k);
       if (!existing) {
         merged.set(k, {
           id: `cat-${row.id}`,
+          rawId: row.id,
           name,
           brand,
           release_year: row.release_year ?? null,
-          concentration: row.concentration ? String(row.concentration).trim() : null,
+          concentration: conc,
           source: 'catalogo',
         });
-      } else if (!existing.release_year && row.release_year) {
-        existing.release_year = row.release_year;
+      } else {
+        if (!existing.release_year && row.release_year) {
+          existing.release_year = row.release_year;
+        }
+        if (!existing.concentration && conc) {
+          existing.concentration = conc;
+        }
       }
     }
 
@@ -148,10 +180,12 @@ export async function GET(req: Request) {
       .map((item) => {
         const fBrand = fold(item.brand);
         const fName = fold(item.name);
-        const fFull = `${fBrand} ${fName}`;
+        const fConc = fold(item.concentration || '');
+        const fFull = `${fBrand} ${fName} ${fConc}`.trim();
 
         let score = 0;
-        if (fFull === foldedQuery || fName === foldedQuery) score += 30;
+        if (`${fBrand} ${fName}` === foldedQuery || fName === foldedQuery) score += 30;
+        if (fFull === foldedQuery) score += 35;
         if (fName.startsWith(foldedQuery)) score += 16;
         if (fFull.startsWith(foldedQuery)) score += 14;
         if (fName.startsWith(firstToken) || fName.startsWith(lastToken)) score += 6;
@@ -161,7 +195,7 @@ export async function GET(req: Request) {
         return { item, score, len: fFull.length };
       })
       .sort((a, b) => b.score - a.score || a.len - b.len)
-      .slice(0, 12)
+      .slice(0, 15)
       .map((entry) => entry.item);
 
     return NextResponse.json({ results: ranked });
