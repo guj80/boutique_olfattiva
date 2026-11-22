@@ -16,8 +16,12 @@ import {
   Sliders,
   Loader2,
   BookmarkCheck,
+  Globe,
+  Wand2,
 } from 'lucide-react';
 import { supabase, Profumo, PURE_FAMILIES } from '@/lib/supabase';
+import { normalizeFamily } from '@/lib/families';
+import { apiFetch } from '@/lib/api-fetch';
 import { BottlePedestal } from './BottleImage';
 import { resolveAura } from './AuraProvider';
 import { useToast } from './Toast';
@@ -29,6 +33,7 @@ interface ProfumoDetailModalProps {
   onUpdated?: (updated: Profumo) => void;
   onDeleted?: (deletedId: string) => void;
   onIndossoRegistered?: () => void;
+  onBottleApplied?: (brand: string, nome: string, publicUrl: string) => void;
 }
 
 function getCurrentMoment(): string {
@@ -45,6 +50,7 @@ export function ProfumoDetailModal({
   onUpdated,
   onDeleted,
   onIndossoRegistered,
+  onBottleApplied,
 }: ProfumoDetailModalProps) {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -68,6 +74,11 @@ export function ProfumoDetailModal({
   const [prezzoStimato, setPrezzoStimato] = useState('');
   const [immagineUrl, setImmagineUrl] = useState('');
 
+  // Arricchimento scheda da URL (Sito Ufficiale / Parfumo / Fragrantica)
+  const [sourceUrlInput, setSourceUrlInput] = useState('');
+  const [enrichingFromSource, setEnrichingFromSource] = useState(false);
+
+  // Studio Isolamento Flacone
   const [bottleStudioOpen, setBottleStudioOpen] = useState(false);
   const [rawImageSource, setRawImageSource] = useState<File | string | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -93,6 +104,8 @@ export function ProfumoDetailModal({
       );
       setPrezzoStimato(profumo.prezzo_stimato_euro || '');
       setImmagineUrl(profumo.url_foto_vetrina || profumo.immagine_url || '');
+      setSourceUrlInput('');
+      setEnrichingFromSource(false);
       setIsEditing(false);
       setConfirmDelete(false);
       setBottleStudioOpen(false);
@@ -172,13 +185,61 @@ export function ProfumoDetailModal({
     targetNome: string
   ): Promise<string> {
     const publicUrl = await uploadProcessedBottle(blob, targetBrand, targetNome);
-    // Aggiorna sempre anche ultranicchia_import se esiste corrispondenza
     await supabase
       .from('ultranicchia_import')
       .update({ immagine_url: publicUrl })
       .ilike('brand', targetBrand)
       .ilike('nome', targetNome);
+
+    if (onBottleApplied) {
+      onBottleApplied(targetBrand, targetNome, publicUrl);
+    }
     return publicUrl;
+  }
+
+  async function handleEnrichMetadata() {
+    const link = sourceUrlInput.trim();
+    const queryText = `${brand.trim()} ${nome.trim()}`.trim();
+
+    if (!link && !queryText) {
+      showToast('Inserisci un link o indica Maison e Nome.', 'error');
+      return;
+    }
+
+    setEnrichingFromSource(true);
+    try {
+      const bodyPayload = link ? { url: link } : { query: queryText };
+      const res = await apiFetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.error) {
+        throw new Error(data?.error || 'Impossibile estrarre i dati dalla fonte.');
+      }
+
+      if (data.brand) setBrand(String(data.brand));
+      if (data.nome) setNome(String(data.nome));
+      if (data.concentrazione) setConcentrazione(String(data.concentrazione));
+      if (data.anno_lancio) setAnnoLancio(String(data.anno_lancio));
+      if (data.naso) setNaso(String(data.naso));
+      if (data.famiglia_olfattiva) {
+        const canonical = normalizeFamily(String(data.famiglia_olfattiva));
+        if (canonical) setFamigliaOlfattiva(canonical);
+      }
+      if (data.note_testa) setNoteTesta(String(data.note_testa));
+      if (data.note_cuore) setNoteCuore(String(data.note_cuore));
+      if (data.note_fondo) setNoteFondo(String(data.note_fondo));
+
+      showToast('Dati importati nei campi. Controlla e premi Salva Modifiche.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore importazione dati.';
+      showToast(msg, 'error');
+    } finally {
+      setEnrichingFromSource(false);
+    }
   }
 
   async function handleQuickWear() {
@@ -248,8 +309,6 @@ export function ProfumoDetailModal({
     try {
       let finalBottleUrl = immagineUrl.trim() || null;
 
-      // Se l'utente aveva appena isolato un flacone nello studio e ha cliccato direttamente "Salva",
-      // carichiamo prima il PNG sul bucket Storage 'flaconi'
       if (processedBlob) {
         finalBottleUrl = await syncBottleToStorage(
           processedBlob,
@@ -689,7 +748,52 @@ export function ProfumoDetailModal({
             </div>
           </div>
         ) : (
+          /* MODALITÀ MODIFICA & ARRICCHIMENTO DA URL */
           <div className="relative z-10 mt-6 space-y-4 text-xs">
+            {/* Barra Importazione da Sito Ufficiale / Parfumo / Fragrantica */}
+            <div
+              style={{ borderColor: `${aura.primary}45` }}
+              className="rounded-2xl border bg-[#0E0A16] p-4 space-y-2.5"
+            >
+              <label
+                style={{ color: aura.primary }}
+                className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest"
+              >
+                <Globe className="h-3.5 w-3.5" />
+                <span>Aggiorna scheda da URL (Sito Ufficiale, Parfumo, Fragrantica)</span>
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="url"
+                  value={sourceUrlInput}
+                  onChange={(e) => setSourceUrlInput(e.target.value)}
+                  placeholder="https://www.fragrantica.it/... oppure link sito ufficiale della maison"
+                  style={{ borderColor: `${aura.primary}40` }}
+                  className="flex-1 rounded-xl border bg-[#161024] px-3 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleEnrichMetadata}
+                  disabled={enrichingFromSource}
+                  style={{ backgroundColor: aura.primary }}
+                  className="flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {enrichingFromSource ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-3.5 w-3.5" />
+                  )}
+                  <span>
+                    {enrichingFromSource
+                      ? 'Lettura...'
+                      : sourceUrlInput.trim()
+                      ? 'Importa da Link'
+                      : 'Completa Dati'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1">
