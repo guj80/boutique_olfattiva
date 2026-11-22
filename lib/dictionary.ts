@@ -1,6 +1,6 @@
 // lib/dictionary.ts
 // Dizionario tecnico EN -> IT di note olfattive, resine, legni rari, materie prime animaliche
-// e accordi dell'alta profumeria e ultra-nicchia.
+// e accordi dell'alta profumeria e ultra-nicchia, con supporto bidirezionale per ricerca e autocomplete.
 
 const TECHNICAL_NOTES_DICTIONARY: Record<string, string> = {
   // Agrumi & Esperidati
@@ -381,6 +381,37 @@ const SORTED_ENTRIES = Object.entries(TECHNICAL_NOTES_DICTIONARY).sort(
   (a, b) => b[0].length - a[0].length
 );
 
+// Elenco deduplicato delle etichette italiane pulite per l'autocomplete UI
+const CANONICAL_IT_NOTES: string[] = Array.from(
+  new Set([
+    ...Object.values(TECHNICAL_NOTES_DICTIONARY).map((label) =>
+      label.replace(/\s*\([^)]*\)/g, '').trim()
+    ),
+    'Sangue',
+    'Neve',
+    'Ghiaccio',
+    'Cemento Bagnato',
+    'Geosmina',
+    'Petrichor',
+    'Tartufo',
+    'Fungo',
+    'Note Metalliche',
+    'Note Minerali',
+    'Cera di Candela',
+    'Libri Antichi',
+  ])
+).sort((a, b) => a.localeCompare(b, 'it'));
+
+function normalizeTerm(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function formatPerfumeNote(text?: string | null): string {
   if (!text || !text.trim()) return '';
 
@@ -398,4 +429,61 @@ export function formatPerfumeNote(text?: string | null): string {
     })
     .filter(Boolean)
     .join(', ');
+}
+
+/**
+ * Restituisce suggerimenti canonici in italiano per l'autocomplete dell'input note.
+ */
+export function suggestNotes(prefix: string, limit = 7): string[] {
+  const q = normalizeTerm(prefix);
+  if (q.length < 2) return [];
+
+  const startsWith: string[] = [];
+  const contains: string[] = [];
+
+  for (let i = 0; i < CANONICAL_IT_NOTES.length; i++) {
+    const label = CANONICAL_IT_NOTES[i];
+    const norm = normalizeTerm(label);
+    if (norm === q) {
+      startsWith.unshift(label);
+    } else if (norm.startsWith(q)) {
+      startsWith.push(label);
+    } else if (norm.includes(q)) {
+      contains.push(label);
+    }
+  }
+
+  return [...startsWith, ...contains].slice(0, limit);
+}
+
+/**
+ * Dato un termine inserito dall'utente (IT o EN, es. "Iris" o "Incenso"),
+ * restituisce tutte le varianti equivalenti IT + EN normalizzate per interrogare
+ * sia il catalogo inglese (perfumes) sia quello italiano (ultranicchia_import).
+ */
+export function getNoteSearchVariants(rawQuery: string): string[] {
+  const q = normalizeTerm(rawQuery);
+  if (!q) return [];
+
+  const variants = new Set<string>([q]);
+
+  for (const [en, it] of SORTED_ENTRIES) {
+    const enNorm = normalizeTerm(en);
+    const itFullNorm = normalizeTerm(it);
+    const itBaseNorm = normalizeTerm(it.replace(/\s*\([^)]*\)/g, ''));
+
+    // Match esatto sul termine base (es. "iris" -> "iris", "orris", "orris root", "florentine iris")
+    if (
+      q === itBaseNorm ||
+      q === itFullNorm ||
+      q === enNorm ||
+      (q.length >= 4 &&
+        (itBaseNorm.split(' ').includes(q) || enNorm.split(' ').includes(q)))
+    ) {
+      variants.add(enNorm);
+      variants.add(itBaseNorm);
+    }
+  }
+
+  return Array.from(variants).filter((v) => v.length >= 2);
 }
