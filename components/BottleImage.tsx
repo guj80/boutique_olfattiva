@@ -44,11 +44,6 @@ function getBrandMonogram(brand?: string | null, alt?: string): string {
   return clean.slice(0, 3).toUpperCase() || 'LG';
 }
 
-/**
- * Flacone vettoriale scultoreo deterministico:
- * calibra silhouette, spessore del vetro, colore del jus e sigla della Maison
- * quando non è ancora presente una fotografia isolata del flacone.
- */
 function SculpturalBottleSvg({
   alt,
   brand,
@@ -303,14 +298,8 @@ export function BottlePedestal({
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden rounded-3xl p-4 ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden rounded-3xl p-2 ${className}`}
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-4 rounded-full opacity-35 blur-2xl"
-        style={{ backgroundColor: 'var(--aura-1)' }}
-      />
-
       <BottleImage
         src={src}
         alt={alt}
@@ -319,11 +308,6 @@ export function BottlePedestal({
         concentrazione={concentrazione}
         size={size}
         className="relative z-10 h-full w-full"
-      />
-
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-2 h-3 w-24 rounded-full bg-black/75 blur-md"
       />
     </div>
   );
