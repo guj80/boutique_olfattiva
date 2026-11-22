@@ -290,12 +290,18 @@ export default function ScannerPage() {
         throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
+      const extractedBrand = String(data.brand || '').trim();
+      const extractedName = String(data.nome || '').trim();
+
+      if (!extractedBrand && !extractedName) {
+        throw new Error(
+          'Creazione non trovata con certezza. Prova a selezionarla dai suggerimenti o incolla il link ufficiale.'
+        );
+      }
+
       if (mode === 'photo' && !overridePayload) {
         setImagePreview(null);
       }
-
-      const extractedBrand = String(data.brand || '').trim();
-      const extractedName = String(data.nome || '').trim();
 
       const storedBottle = await lookupExistingBottleUrl(extractedBrand, extractedName);
 
