@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireUser } from '@/lib/api-auth';
 import { callGeminiWithFallback, extractJsonFromAiText } from '@/lib/gemini-engine';
 import { extractCanonicalFamilies, normalizeFamily, PURE_FAMILIES } from '@/lib/families';
-import { formatPerfumeNote } from '@/lib/dictionary';
+import { formatPerfumeNote, getNoteSearchVariants } from '@/lib/dictionary';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,6 @@ interface ScoutRequestPayload {
   mode?: ScoutMode;
   scoutFamily?: string;
   lastFamily?: string | null;
-  freeQuery?: string;
   includeNotes?: string[];
   excludeNotes?: string[];
   ownedKeys?: string[];
@@ -38,7 +37,6 @@ interface CandidatePerfume {
   url_foto_vetrina: string | null;
 }
 
-// 1. DESIGNER: Maison storiche della moda e linee esclusive classiche
 const DESIGNER_BRANDS: string[] = [
   'chanel',
   'dior',
@@ -73,7 +71,6 @@ const DESIGNER_BRANDS: string[] = [
   'lalique',
 ];
 
-// 2. NICCHIA: Case indipendenti strutturate e selettive
 const NICHE_BRANDS: string[] = [
   'byredo',
   'diptyque',
@@ -125,7 +122,6 @@ const NICHE_BRANDS: string[] = [
   'juliette has a gun',
 ];
 
-// 3. ARTISTICO: Profumeria d'autore, nasi indipendenti e ricerca materica
 const ARTISTIC_BRANDS: string[] = [
   'serge lutens',
   'editions de parfums frederic malle',
@@ -210,37 +206,75 @@ function cleanNoteField(raw?: string | null): string | null {
   return formatted.trim() ? formatted : null;
 }
 
-function buildSearchableText(...parts: Array<string | null | undefined>): string {
-  const rawCombined = parts.filter(Boolean).join(', ');
+/**
+ * Estrae una lista di singole note normalizzate (IT + EN) dalla piramide di un profumo
+ * e verifica il match a livello di nota reale (non sottostringa casuale).
+ */
+function buildNoteHaystack(
+  testa?: string | null,
+  cuore?: string | null,
+  fondo?: string | null
+): { tokens: string[]; fullText: string } {
+  const rawCombined = [testa, cuore, fondo].filter(Boolean).join(', ');
   const translated = formatPerfumeNote(rawCombined);
-  return normalizeKey(`${rawCombined} ${translated}`);
+  const allPieces = `${rawCombined}, ${translated}`
+    .split(/[,;/|]+/)
+    .map((p) => normalizeKey(p))
+    .filter(Boolean);
+
+  return {
+    tokens: allPieces,
+    fullText: ` ${allPieces.join(' , ')} `,
+  };
 }
 
-function matchesNotesFilter(
-  searchableNotes: string,
-  includeTokens: string[],
-  excludeTokens: string[]
-): { ok: boolean; matchScore: number } {
-  for (let i = 0; i < excludeTokens.length; i++) {
-    const ex = excludeTokens[i];
-    if (ex && searchableNotes.includes(ex)) {
-      return { ok: false, matchScore: -1 };
+function tokenMatchesVariant(
+  haystack: { tokens: string[]; fullText: string },
+  variant: string
+): boolean {
+  const v = normalizeKey(variant);
+  if (!v) return false;
+  // Match esatto su una nota o presenza come parola intera all'interno di una nota composta (es. "iris fiorentino" contiene "iris")
+  const paddedVariant = ` ${v} `;
+  for (let i = 0; i < haystack.tokens.length; i++) {
+    const paddedToken = ` ${haystack.tokens[i]} `;
+    if (paddedToken.includes(paddedVariant)) {
+      return true;
     }
   }
-  if (includeTokens.length === 0) {
-    return { ok: true, matchScore: 0 };
-  }
-  let matched = 0;
-  for (let i = 0; i < includeTokens.length; i++) {
-    const inc = includeTokens[i];
-    if (inc && searchableNotes.includes(inc)) {
-      matched += 1;
+  return false;
+}
+
+/**
+ * Verifica rigorosa:
+ * - NESSUNA delle note escluse deve comparire.
+ * - TUTTE le note incluse (logica AND) devono comparire nella piramide del profumo.
+ */
+function matchesStrictNotesFilter(
+  haystack: { tokens: string[]; fullText: string },
+  includeGroups: string[][],
+  excludeGroups: string[][]
+): boolean {
+  for (let i = 0; i < excludeGroups.length; i++) {
+    const group = excludeGroups[i];
+    if (group.some((variant) => tokenMatchesVariant(haystack, variant))) {
+      return false;
     }
   }
-  if (matched === 0) {
-    return { ok: false, matchScore: 0 };
+
+  for (let i = 0; i < includeGroups.length; i++) {
+    const group = includeGroups[i];
+    const matchedThisGroup = group.some((variant) => tokenMatchesVariant(haystack, variant));
+    if (!matchedThisGroup) {
+      return false;
+    }
   }
-  return { ok: true, matchScore: matched * 25 };
+
+  return true;
+}
+
+function sanitizeSqlLikeTerm(term: string): string {
+  return term.replace(/[%_,()]/g, '').trim();
 }
 
 function getSupabaseServer() {
@@ -333,9 +367,6 @@ export async function POST(req: Request) {
   const mode: ScoutMode = body.mode === 'ultranicchia' ? 'ultranicchia' : 'trittico';
   const rawFamily = (body.scoutFamily || 'Qualsiasi').trim();
   const lastFamily = (body.lastFamily || '').trim();
-  const freeQueryTokens = normalizeKey(body.freeQuery)
-    .split(' ')
-    .filter((t) => t.length >= 2);
 
   let effectiveFamily = rawFamily;
   if (rawFamily === 'Qualsiasi') {
@@ -344,14 +375,19 @@ export async function POST(req: Request) {
   }
 
   const includeNotes = Array.isArray(body.includeNotes)
-    ? body.includeNotes.map((n) => String(n).trim()).filter(Boolean).slice(0, 8)
+    ? body.includeNotes.map((n) => String(n).trim()).filter(Boolean).slice(0, 6)
     : [];
   const excludeNotes = Array.isArray(body.excludeNotes)
     ? body.excludeNotes.map((n) => String(n).trim()).filter(Boolean).slice(0, 8)
     : [];
 
-  const includeTokens = includeNotes.map(normalizeKey).filter(Boolean);
-  const excludeTokens = excludeNotes.map(normalizeKey).filter(Boolean);
+  // Per ogni nota inserita generiamo tutte le varianti IT + EN
+  const includeGroups = includeNotes
+    .map((n) => getNoteSearchVariants(n))
+    .filter((g) => g.length > 0);
+  const excludeGroups = excludeNotes
+    .map((n) => getNoteSearchVariants(n))
+    .filter((g) => g.length > 0);
 
   const blockedKeys = new Set<string>([
     ...(Array.isArray(body.ownedKeys) ? body.ownedKeys.map(String) : []),
@@ -359,7 +395,7 @@ export async function POST(req: Request) {
   ]);
 
   try {
-    // RAMO 1: ULTRA-NICCHIA (ricerca libera su ultranicchia_import)
+    // RAMO 1: ULTRA-NICCHIA (ultranicchia_import — 385 righe)
     if (mode === 'ultranicchia') {
       const { data: ultraRows, error: ultraErr } = await supabase
         .from('ultranicchia_import')
@@ -395,27 +431,12 @@ export async function POST(req: Request) {
           continue;
         }
 
-        const searchable = buildSearchableText(
-          brand,
-          nome,
-          row.naso,
-          row.famiglia_originale,
-          row.note_testa,
-          row.note_cuore,
-          row.note_fondo
-        );
-
-        // Ricerca libera: ogni parola digitata deve comparire tra note, accordi, naso o maison
-        if (freeQueryTokens.length > 0) {
-          const allTokensMatch = freeQueryTokens.every((tok) => searchable.includes(tok));
-          if (!allTokensMatch) continue;
+        const haystack = buildNoteHaystack(row.note_testa, row.note_cuore, row.note_fondo);
+        if (!matchesStrictNotesFilter(haystack, includeGroups, excludeGroups)) {
+          continue;
         }
 
-        const noteCheck = matchesNotesFilter(searchable, includeTokens, excludeTokens);
-        if (!noteCheck.ok) continue;
-
         const completenessBonus = row.dati_completi ? 12 : 0;
-        const queryBonus = freeQueryTokens.length > 0 ? 30 : 0;
 
         ultraPool.push({
           item: {
@@ -432,18 +453,17 @@ export async function POST(req: Request) {
             motivo: '',
             url_foto_vetrina: null,
           },
-          score: noteCheck.matchScore + completenessBonus + queryBonus + Math.random() * 20,
+          score: completenessBonus + Math.random() * 25,
         });
       }
 
       ultraPool.sort((a, b) => b.score - a.score);
 
-      const picked = shuffle(ultraPool.slice(0, 14))
+      const picked = shuffle(ultraPool.slice(0, 15))
         .slice(0, 3)
         .map((c) => c.item);
 
       const hint = [
-        body.freeQuery?.trim(),
         rawFamily !== 'Qualsiasi' ? `famiglia ${rawFamily}` : '',
         includeNotes.length > 0 ? `note: ${includeNotes.join(', ')}` : '',
       ]
@@ -460,23 +480,45 @@ export async function POST(req: Request) {
     }
 
     // RAMO 2: IL TRITTICO (1 Designer · 1 Nicchia · 1 Artistico dal catalogo perfumes)
-    const sampledBrands = shuffle([
-      ...shuffle(DESIGNER_BRANDS).slice(0, 12),
-      ...shuffle(NICHE_BRANDS).slice(0, 14),
-      ...shuffle(ARTISTIC_BRANDS).slice(0, 14),
-    ]);
-
-    const orBrandFilter = sampledBrands
-      .map((b) => `brand.ilike.%${b.replace(/[^a-z0-9\s'-]/gi, '')}%`)
-      .join(',');
-
-    const { data: catalogRows, error: catErr } = await supabase
+    let catalogQuery = supabase
       .from('perfumes')
-      .select('brand, name, concentration, main_accords, top_notes, middle_notes, base_notes, perfumers')
-      .or(orBrandFilter)
-      .not('top_notes', 'is', null)
-      .limit(550);
+      .select('brand, name, concentration, main_accords, top_notes, middle_notes, base_notes, perfumers');
 
+    // Spingiamo il filtro delle note incluse direttamente nella query SQL su Supabase
+    // così su 59.000 righe estraiamo subito i profumi che contengono davvero quelle materie prime!
+    if (includeGroups.length > 0) {
+      for (let i = 0; i < includeGroups.length; i++) {
+        const variants = includeGroups[i]
+          .map(sanitizeSqlLikeTerm)
+          .filter((v) => v.length >= 2)
+          .slice(0, 5);
+
+        if (variants.length > 0) {
+          const orClauses = variants
+            .flatMap((v) => [
+              `top_notes.ilike.%${v}%`,
+              `middle_notes.ilike.%${v}%`,
+              `base_notes.ilike.%${v}%`,
+            ])
+            .join(',');
+          catalogQuery = catalogQuery.or(orClauses);
+        }
+      }
+      catalogQuery = catalogQuery.limit(1200);
+    } else {
+      // Senza filtro note specifico, campioniamo tra i brand delle 3 fasce
+      const sampledBrands = shuffle([
+        ...shuffle(DESIGNER_BRANDS).slice(0, 14),
+        ...shuffle(NICHE_BRANDS).slice(0, 16),
+        ...shuffle(ARTISTIC_BRANDS).slice(0, 16),
+      ]);
+      const orBrandFilter = sampledBrands
+        .map((b) => `brand.ilike.%${sanitizeSqlLikeTerm(b)}%`)
+        .join(',');
+      catalogQuery = catalogQuery.or(orBrandFilter).not('top_notes', 'is', null).limit(650);
+    }
+
+    const { data: catalogRows, error: catErr } = await catalogQuery;
     if (catErr) throw catErr;
 
     const designerPool: Array<{ item: CandidatePerfume; score: number }> = [];
@@ -507,14 +549,10 @@ export async function POST(req: Request) {
 
       if (rawFamily !== 'Qualsiasi' && !hasFam) continue;
 
-      const searchable = buildSearchableText(
-        row.top_notes,
-        row.middle_notes,
-        row.base_notes,
-        row.main_accords
-      );
-      const noteCheck = matchesNotesFilter(searchable, includeTokens, excludeTokens);
-      if (!noteCheck.ok) continue;
+      const haystack = buildNoteHaystack(row.top_notes, row.middle_notes, row.base_notes);
+      if (!matchesStrictNotesFilter(haystack, includeGroups, excludeGroups)) {
+        continue;
+      }
 
       const entry = {
         item: {
@@ -531,7 +569,7 @@ export async function POST(req: Request) {
           motivo: '',
           url_foto_vetrina: null,
         },
-        score: (hasFam ? 45 : 10) + noteCheck.matchScore + Math.random() * 20,
+        score: (hasFam ? 45 : 10) + Math.random() * 25,
       };
 
       if (cat === 'Designer') designerPool.push(entry);
@@ -547,8 +585,9 @@ export async function POST(req: Request) {
     const usedKeys = new Set<string>();
 
     const pickOne = (pool: Array<{ item: CandidatePerfume; score: number }>) => {
-      const topSlice = shuffle(pool.slice(0, 8));
-      for (const entry of topSlice) {
+      const topSlice = shuffle(pool.slice(0, 10));
+      for (let i = 0; i < topSlice.length; i++) {
+        const entry = topSlice[i];
         const k = makePairKey(entry.item.brand, entry.item.nome);
         if (!usedKeys.has(k)) {
           usedKeys.add(k);
@@ -562,10 +601,12 @@ export async function POST(req: Request) {
     pickOne(nichePool);
     pickOne(artisticPool);
 
+    // Riempie fino a 3 solo usando candidati CHE HANNO GIA SUPERATO TUTTI I FILTRI
     for (const pool of [artisticPool, nichePool, designerPool]) {
       if (trittico.length >= 3) break;
-      for (const entry of pool) {
+      for (let i = 0; i < pool.length; i++) {
         if (trittico.length >= 3) break;
+        const entry = pool[i];
         const k = makePairKey(entry.item.brand, entry.item.nome);
         if (!usedKeys.has(k)) {
           usedKeys.add(k);
