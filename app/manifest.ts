@@ -2,23 +2,24 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Atelier LG — Haute Parfumerie',
+    name: 'Atelier LG — Boutique Olfattiva',
     short_name: 'Atelier LG',
-    description: 'Haute Parfumerie Collection & Olfactive Radar',
+    description: 'Collezione di Alta Profumeria & Radar Olfattivo',
     start_url: '/',
     display: 'standalone',
-    background_color: '#000000',
-    theme_color: '#000000',
+    background_color: '#050308',
+    theme_color: '#050308',
     icons: [
       {
-        src: '/LOGO_LG.jpg',
-        sizes: '192x192',
-        type: 'image/jpeg',
+        src: '/icon',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
       },
       {
-        src: '/LOGO_LG.jpg',
-        sizes: '512x512',
-        type: 'image/jpeg',
+        src: '/apple-icon',
+        sizes: '180x180',
+        type: 'image/png',
       },
     ],
   };
