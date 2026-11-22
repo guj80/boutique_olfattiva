@@ -19,65 +19,83 @@ type AxisKey =
   | 'gourmandDolce'
   | 'cuoiatoAnimale';
 
-const LOCAL_ARCHETYPES: Record<AxisKey, ScentDNAResponse> = {
+const AXIS_LABELS: Record<AxisKey, string> = {
+  agrumatoFresco: 'Agrumato & Fresco',
+  florealeFruttato: 'Floreale & Fruttato',
+  legnosoTerroso: 'Legnoso & Terroso',
+  ambratoOrientale: 'Ambrato & Resinoso',
+  gourmandDolce: 'Gourmand & Vanigliato',
+  cuoiatoAnimale: 'Cuoiato & Fumoso',
+};
+
+const LOCAL_PROFILES: Record<AxisKey, ScentDNAResponse> = {
   agrumatoFresco: {
-    archetipo: 'Il Nomade della Luce',
+    archetipo: 'Asse Esperidato & Trasparente',
     descrizione:
-      'La tua firma olfattiva privilegia la trasparenza, il respiro agrumato e le geometrie nitide. Cerchi fragranze che accompagnino la pelle con eleganza ariosa senza mai sovrastarla.',
+      'La rotazione privilegia aperture esperidate, strutture ariose e costruzioni nitide ad alta leggibilità. Il baricentro olfattivo resta orientato su freschezza e pulizia formale.',
     consiglio:
-      'Esplora un fondo legnoso o muschiato leggero per dare più struttura alle tue giornate serali.',
+      'Affianca una struttura legnosa secca o muschiata per estendere la tenuta nelle ore serali.',
   },
   florealeFruttato: {
-    archetipo: 'Il Custode dei Fiori Segreti',
+    archetipo: 'Asse Floreale & Strutturato',
     descrizione:
-      'Ti muovi tra petali strutturati e sfumature fruttate mai banali, con un gusto spiccato per le evoluzioni morbide. La tua collezione racconta una sensibilità luminosa e curata nei dettagli.',
+      'Il profilo mostra una netta prevalenza di accordi floreali articolati e sfumature fruttate calibrate. La selezione privilegia evoluzioni morbide e centralità del cuore.',
     consiglio:
-      'Prova ad affiancare una nota speziata o verde per creare contrasto nelle mezze stagioni.',
+      'Introduci un contrappunto verde o speziato freddo per bilanciare la rotondità nelle mezze stagioni.',
   },
   legnosoTerroso: {
-    archetipo: "L'Architetto delle Radici",
+    archetipo: 'Struttura Legnosa & Terrosa',
     descrizione:
-      'Prediligi materie asciutte, cortecce, resine e profondità tattili che resistono al tempo. Il tuo gusto olfattivo rifugge il superfluo e punta su carattere e presenza silenziosa.',
+      'Prevalenza di materie asciutte, radici, cortecce e fondi minerali a bassa dolcezza. Il guardaroba punta su persistenza strutturale e linearità di fondo.',
     consiglio:
-      'Un agrume amaro o un tocco aromatico in apertura può alleggerire la tua rotazione estiva.',
+      'Un agrume amaro o una nota aromatica in apertura può alleggerire la rotazione nei mesi caldi.',
   },
   ambratoOrientale: {
-    archetipo: "L'Esploratore delle Ombre",
+    archetipo: 'Struttura Ambrata & Resina',
     descrizione:
-      'Ami il calore avvolgente delle resine, delle spezie scure e delle scie magnetiche che si rivelano lentamente. La tua collezione privilegia intensità, persistenza e atmosfera notturna.',
+      'Dominanza di resine, balsami, incensi e spezie calde con forte sviluppo nel fondo. La collezione privilegia densità aromatica e scia persistente.',
     consiglio:
-      'Bilancia la collezione con una fragranza verde o marina per i momenti di luce piena.',
+      'Integra una composizione verde o esperidata per avere un’alternativa diurna ad alta trasparenza.',
   },
   gourmandDolce: {
-    archetipo: "L'Alchimista Gourmand",
+    archetipo: 'Asse Gourmand & Balsamico',
     descrizione:
-      'Ti attraggono le composizioni avvolgenti, tattili e narcotiche, dove dolcezza e profondità si fondono in una firma riconoscibile. Cerchi nel profumo un piacere immediato ma costruito con maestria.',
+      'Forte incidenza di vaniglia, fave tonka, accordi liquorosi e materie avvolgenti. Il profilo ricerca rotondità tattile e profondità dolce nel fondo.',
     consiglio:
-      'Alterna le tue note più calde con un legnoso secco o un cuoiato per evitare saturazione olfattiva.',
+      'Alterna le composizioni più dense con un legnoso secco o un cuoiato per evitare assuefazione olfattiva.',
   },
   cuoiatoAnimale: {
-    archetipo: 'Il Collezionista Ribelle',
+    archetipo: 'Struttura Cuoiata & Fumosa',
     descrizione:
-      'Scegli fragranze di forte personalità, tra cuoio, fumo e accordi indomiti che non cercano compromessi. Il tuo percorso olfattivo è istintivo, deciso e profondamente identitario.',
+      'Netta predilezione per cuoio, catrame di betulla, tabacco e accordi affumicati o animali. La collezione privilegia materie prime di carattere netto e asciutto.',
     consiglio:
-      'Un floreale scuro o un ambrato morbido può creare un layering sorprendente sulle tue basi cuoiate.',
+      'Un floreale scuro o un ambrato resinoso può offrire un contrappunto morbido per il layering.',
   },
 };
 
-function buildLocalScentDNA(axes: Record<string, number>): ScentDNAResponse {
-  const validKeys = Object.keys(LOCAL_ARCHETYPES) as AxisKey[];
-  let topKey: AxisKey = 'legnosoTerroso';
-  let topScore = -1;
+function buildLocalScentDNA(axes: Record<string, number>, topNotes: string[]): ScentDNAResponse {
+  const validKeys = Object.keys(LOCAL_PROFILES) as AxisKey[];
+  const ranked = [...validKeys].sort((a, b) => (axes[b] ?? 0) - (axes[a] ?? 0));
+  const primary = ranked[0] || 'legnosoTerroso';
+  const secondary = ranked[1];
+  const base = LOCAL_PROFILES[primary];
 
-  for (const key of validKeys) {
-    const val = typeof axes[key] === 'number' ? axes[key] : 0;
-    if (val > topScore) {
-      topScore = val;
-      topKey = key;
+  const primaryPct = axes[primary] ?? 0;
+  const secondaryPct = secondary ? axes[secondary] ?? 0 : 0;
+
+  let descrizione = base.descrizione;
+  if (primaryPct > 0 && secondary && secondaryPct >= 15) {
+    descrizione = `Prevalenza dell’asse ${AXIS_LABELS[primary].toLowerCase()} (${primaryPct}%) con supporto ${AXIS_LABELS[secondary].toLowerCase()} (${secondaryPct}%).`;
+    if (topNotes.length > 0) {
+      descrizione += ` Materie prime più ricorrenti nelle piramidi: ${topNotes.slice(0, 4).join(', ')}.`;
     }
   }
 
-  return LOCAL_ARCHETYPES[topKey];
+  return {
+    archetipo: base.archetipo,
+    descrizione,
+    consiglio: base.consiglio,
+  };
 }
 
 const AXIS_KEYS: AxisKey[] = [
@@ -143,24 +161,28 @@ export async function POST(req: Request) {
   const dominantFamilies = cleanTokens(body.dominantFamilies);
   const topNotes = cleanTokens(body.topNotes);
 
-  const prompt = `Sei un direttore artistico di alta profumeria per Atelier LG.
-Analizza SOLO questi dati reali della collezione dell'utente (non inventare profumi o brand):
-- Assi olfattivi (0-100): ${JSON.stringify(axes)}
+  const prompt = `Sei un valutatore tecnico di profumeria per l'archivio personale Atelier LG.
+Analizza SOLO questi dati oggettivi della collezione e degli indossi dell'utente (non inventare profumi, brand o note):
+- Distribuzione assi olfattivi (%): ${JSON.stringify(axes)}
 - Famiglie dominanti: ${dominantFamilies.length > 0 ? dominantFamilies.join(', ') : 'Non specificate'}
-- Note ricorrenti: ${topNotes.length > 0 ? topNotes.join(', ') : 'Non specificate'}
+- Materie prime ricorrenti: ${topNotes.length > 0 ? topNotes.join(', ') : 'Non specificate'}
+
+STILE OBBLIGATORIO:
+- Registro asciutto, tecnico, da scheda di laboratorio olfattivo.
+- VIETATI titoli poetici o da oroscopo (no "Nomade", "Alchimista", "Custode", "Ribelle", "Ombre", "Luce").
+- VIETATI aggettivi enfatici o pubblicitari (no "seducente", "magnetico", "irresistibile", "sofisticato").
 
 Restituisci ESCLUSIVAMENTE un oggetto JSON con:
-- "archetipo": titolo evocativo in italiano, 2-5 parole (es. "L'Esploratore delle Ombre", "Il Nomade della Luce")
-- "descrizione": 2-3 frasi poetiche ma sobrie sul carattere olfattivo
-- "consiglio": 1 frase di consiglio pratico per la collezione
-L'archetipo deve riflettere gli assi più alti.`;
+- "archetipo": etichetta strutturale sintetica dell'accordo dominante in italiano, 2-4 parole (es. "Struttura Legnosa & Resina", "Asse Cuoiato & Spezie", "Equilibrio Esperidato & Verde")
+- "descrizione": 2 frasi fattuali e sobrie sull'equilibrio tra gli assi e sulle materie prime ricorrenti
+- "consiglio": 1 frase tecnica e concreta su quale famiglia o nota complementare può bilanciare la rotazione`;
 
   try {
     const res = await callAIWithFallback<ScentDNAResponse>([{ text: prompt }], {
       jsonMode: true,
       responseSchema: SCENT_DNA_SCHEMA,
       validator: isScentDNAResponse,
-      temperature: 0.7,
+      temperature: 0.25,
       deadline: Date.now() + 20000,
     });
 
@@ -175,6 +197,6 @@ L'archetipo deve riflettere gli assi più alti.`;
     console.warn('[scent-dna] AI non disponibile, attivo salvagente locale:', err);
   }
 
-  const fallback = buildLocalScentDNA(axes);
+  const fallback = buildLocalScentDNA(axes, topNotes);
   return NextResponse.json({ ...fallback, _fallback: 'local' });
 }
