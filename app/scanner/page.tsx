@@ -477,6 +477,7 @@ export default function ScannerPage() {
       <PageHeader
         title="Acquisizione"
         subtitle="Scanner Olfattivo"
+        variant="compact"
         rightSlot={
           <Link
             href="/collezione"
