@@ -1,107 +1,98 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Logo } from './Logo';
+import React, { useState, useEffect } from 'react';
+import { Sparkles } from 'lucide-react';
 
-interface BottlePedestalProps {
+interface BottleImageProps {
   src?: string | null;
   alt: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  iconSize?: string;
   className?: string;
-  showSigil?: boolean;
-  bare?: boolean;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-const SIZE_MAP = {
-  sm: {
-    wrapper: 'h-24 w-24 p-2',
-    sigil: 'h-6 w-6 bottom-1.5 right-1.5',
-  },
-  md: {
-    wrapper: 'h-48 w-full p-4',
-    sigil: 'h-8 w-8 bottom-2.5 right-2.5',
-  },
-  lg: {
-    wrapper: 'h-64 w-full p-6',
-    sigil: 'h-10 w-10 bottom-3 right-3',
-  },
-  xl: {
-    wrapper: 'h-80 w-full p-8',
-    sigil: 'h-12 w-12 bottom-4 right-4',
-  },
-};
-
-export function BottlePedestal({
+export function BottleImage({
   src,
   alt,
-  size = 'md',
   className = '',
-  showSigil = false,
-  bare = false,
-}: BottlePedestalProps) {
-  const [imgError, setImgError] = useState(false);
-  const cfg = SIZE_MAP[size] ?? SIZE_MAP.md;
+  size = 'md',
+}: BottleImageProps) {
+  const [hasError, setHasError] = useState(false);
 
-  const hasValidImage = Boolean(
-    src &&
-      /^https?:\/\//i.test(src.trim()) &&
-      !imgError
-  );
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
 
-  if (bare) {
+  const sizeClasses = {
+    sm: 'h-16 w-12',
+    md: 'h-32 w-24',
+    lg: 'h-48 w-36',
+    xl: 'h-72 w-52',
+  };
+
+  if (!src || hasError) {
     return (
-      <div className={`relative flex items-center justify-center overflow-hidden ${className}`}>
-        {hasValidImage ? (
-          <img
-            src={src!.trim()}
-            alt={alt}
-            loading="lazy"
-            onError={() => setImgError(true)}
-            className="relative z-10 h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div
-            aria-label={alt ? `Immagine non disponibile: ${alt}` : 'Immagine non disponibile'}
-            className="h-full w-full"
-          />
-        )}
+      <div
+        className={`relative flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#08060C]/60 backdrop-blur-md text-white/30 ${sizeClasses[size]} ${className}`}
+      >
+        <div className="h-2.5 w-5 rounded-t-sm border-x border-t border-white/20 mb-0.5" />
+        <div className="flex h-1/2 w-3/5 flex-col items-center justify-center rounded-lg border border-white/15 bg-white/[0.02]">
+          <Sparkles className="h-3.5 w-3.5 opacity-40" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div
-      className={`relative flex items-center justify-center overflow-hidden rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_50%_40%,rgba(255,255,255,0.06)_0%,rgba(5,3,8,0.92)_80%)] ${cfg.wrapper} ${className}`}
-    >
-      {hasValidImage ? (
-        <>
-          <img
-            src={src!.trim()}
-            alt={alt}
-            loading="lazy"
-            onError={() => setImgError(true)}
-            className="relative z-10 h-full w-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.85)] transition-transform duration-500 group-hover:scale-105"
-          />
-
-          {showSigil && (
-            <div
-              title="Pezzo in Collezione"
-              aria-hidden="true"
-              className={`pointer-events-none absolute z-20 flex items-center justify-center rounded-full border border-white/15 bg-[#050308]/90 p-1 shadow-[0_4px_14px_rgba(0,0,0,0.9)] backdrop-blur-md ${cfg.sigil}`}
-            >
-              <Logo className="h-full w-full" />
-            </div>
-          )}
-        </>
-      ) : (
-        <div
-          aria-label={alt ? `Immagine non disponibile: ${alt}` : 'Immagine non disponibile'}
-          className="h-full w-full"
-        />
-      )}
-    </div>
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className={`object-contain select-none transition-transform duration-500 group-hover:scale-105 ${sizeClasses[size]} ${className}`}
+      style={{
+        filter: 'drop-shadow(0 18px 24px rgba(0, 0, 0, 0.75))',
+      }}
+      loading="lazy"
+    />
   );
 }
 
-export const SmartBottleImage = BottlePedestal;
+interface BottlePedestalProps {
+  src?: string | null;
+  alt: string;
+  size?: 'md' | 'lg' | 'xl';
+  showSigil?: boolean;
+  className?: string;
+}
+
+export function BottlePedestal({
+  src,
+  alt,
+  size = 'lg',
+  className = '',
+}: BottlePedestalProps) {
+  return (
+    <div
+      className={`relative flex items-center justify-center overflow-hidden rounded-3xl p-4 ${className}`}
+    >
+      {/* Bagliore uniforme dietro il flacone scontornato */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-4 rounded-full opacity-35 blur-2xl"
+        style={{ backgroundColor: 'var(--aura-1)' }}
+      />
+
+      <BottleImage
+        src={src}
+        alt={alt}
+        size={size}
+        className="relative z-10 h-full w-full"
+      />
+
+      {/* Ombra di contatto uniforme alla base del flacone */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-2 h-3 w-24 rounded-full bg-black/75 blur-md"
+      />
+    </div>
+  );
+}
