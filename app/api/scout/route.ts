@@ -175,6 +175,16 @@ function normalizeKey(value?: string | null): string {
     .trim();
 }
 
+function slugifyFilePart(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
 function makePairKey(brand?: string | null, nome?: string | null): string {
   return `${normalizeKey(brand)}::${normalizeKey(nome)}`;
 }
@@ -276,13 +286,56 @@ function getSupabaseServer() {
 }
 
 /**
- * Risoluzione rapida on-demand (0 token AI) per le sole 3 proposte estratte:
- * se è già salvata un'immagine nello Storage la mantiene; altrimenti tenta un lookup
- * leggero sulla pagina sorgente con timeout stretto (2.2s) prima di lasciare campo
- * al flacone scultoreo generativo.
+ * Controlla nell'ordine:
+ * 1) URL già presente nella riga
+ * 2) Bucket Supabase Storage 'flaconi/<brand-slug>/<nome-slug>-*.png' (le foto isolate da te!)
+ * 3) Tabella 'ultranicchia_import' / 'profumi' per eventuale match già salvato
+ * 4) Fallback rapido OpenGraph sulla pagina sorgente
  */
-async function resolveCandidateImage(candidate: CandidatePerfume): Promise<string | null> {
+async function resolveCandidateImage(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  candidate: CandidatePerfume
+): Promise<string | null> {
   if (candidate.url_foto_vetrina) return candidate.url_foto_vetrina;
+
+  if (supabase) {
+    try {
+      const brandFolder = slugifyFilePart(candidate.brand);
+      const nomePrefix = `${slugifyFilePart(candidate.nome)}-`;
+      if (brandFolder && nomePrefix.length > 1) {
+        const { data: files } = await supabase.storage
+          .from('flaconi')
+          .list(brandFolder, {
+            limit: 5,
+            search: slugifyFilePart(candidate.nome),
+            sortBy: { column: 'created_at', order: 'desc' },
+          });
+
+        const match = (files || []).find((f) => f.name.startsWith(nomePrefix));
+        if (match) {
+          const { data: pub } = supabase.storage
+            .from('flaconi')
+            .getPublicUrl(`${brandFolder}/${match.name}`);
+          if (pub?.publicUrl) return pub.publicUrl;
+        }
+      }
+
+      // Controlla anche se esiste già un'immagine salvata in ultranicchia_import
+      const { data: ultraMatch } = await supabase
+        .from('ultranicchia_import')
+        .select('immagine_url')
+        .ilike('brand', candidate.brand)
+        .ilike('nome', candidate.nome)
+        .not('immagine_url', 'is', null)
+        .limit(1)
+        .maybeSingle();
+
+      if (ultraMatch?.immagine_url) return String(ultraMatch.immagine_url);
+    } catch {
+      // ignora e prosegui col fallback
+    }
+  }
+
   if (!candidate.sourcePageUrl) return null;
 
   const controller = new AbortController();
@@ -303,7 +356,6 @@ async function resolveCandidateImage(candidate: CandidatePerfume): Promise<strin
       html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
     const found = ogMatch?.[1]?.trim() || null;
     if (!found || !found.startsWith('http')) return null;
-    // Scarta loghi generici del sito
     if (/logo|icon|avatar|placeholder/i.test(found)) return null;
     return found;
   } catch {
@@ -314,6 +366,7 @@ async function resolveCandidateImage(candidate: CandidatePerfume): Promise<strin
 }
 
 async function enrichCandidates(
+  supabase: ReturnType<typeof getSupabaseServer>,
   candidates: CandidatePerfume[],
   contextHint: string
 ): Promise<CandidatePerfume[]> {
@@ -331,7 +384,6 @@ async function enrichCandidates(
     return notes ? `Accordo costruito su ${notes}.` : `Selezione ${c.categoria.toLowerCase()}.`;
   };
 
-  // Eseguiamo in parallelo l'arricchimento editoriale e il lookup rapido immagini sui soli 3 candidati
   const [aiReasons, resolvedImages] = await Promise.all([
     (async (): Promise<string[]> => {
       try {
@@ -370,7 +422,7 @@ Restituisci SOLO JSON valido:
         return [];
       }
     })(),
-    Promise.all(candidates.map((c) => resolveCandidateImage(c))),
+    Promise.all(candidates.map((c) => resolveCandidateImage(supabase, c))),
   ]);
 
   return candidates.map((c, idx) => {
@@ -472,7 +524,7 @@ export async function POST(req: Request) {
         }
 
         const completenessBonus = row.dati_completi ? 12 : 0;
-        const imageBonus = row.immagine_url ? 15 : 0;
+        const imageBonus = row.immagine_url ? 20 : 0;
 
         ultraPool.push({
           item: {
@@ -506,7 +558,7 @@ export async function POST(req: Request) {
         .filter(Boolean)
         .join(', ');
 
-      const enriched = await enrichCandidates(picked, hint);
+      const enriched = await enrichCandidates(supabase, picked, hint);
 
       return NextResponse.json({
         proposals: enriched,
@@ -657,7 +709,7 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join(', ');
 
-    const enriched = await enrichCandidates(trittico, hint);
+    const enriched = await enrichCandidates(supabase, trittico, hint);
 
     return NextResponse.json({
       proposals: enriched,
