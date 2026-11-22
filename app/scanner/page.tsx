@@ -16,6 +16,7 @@ import {
   Sliders,
   Check,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api-fetch';
@@ -753,6 +754,59 @@ export default function ScannerPage() {
               <Camera className="h-3.5 w-3.5" />
               <span>Isola flacone</span>
             </button>
+          </div>
+
+          {/* Collegamenti rapidi cliccabili per verifica su Sito Ufficiale, Parfumo e Fragrantica */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#140D1C]/85 px-4 py-2.5">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
+              Verifica fonte:
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(
+                  `${draft.brand || ''} ${draft.nome || ''} official website`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold text-[#F6EFE4] transition hover:border-white/40"
+              >
+                <span>Sito Ufficiale</span>
+                <ExternalLink className="h-2.5 w-2.5 opacity-75" />
+              </a>
+              <a
+                href={`https://www.parfumo.com/s_perfumes_x.php?in=1&filter=${encodeURIComponent(
+                  `${draft.brand || ''} ${draft.nome || ''}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold text-[#F6EFE4] transition hover:border-white/40"
+              >
+                <span>Parfumo</span>
+                <ExternalLink className="h-2.5 w-2.5 opacity-75" />
+              </a>
+              <a
+                href={`https://www.fragrantica.com/search/?query=${encodeURIComponent(
+                  `${draft.brand || ''} ${draft.nome || ''}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold text-[#F6EFE4] transition hover:border-white/40"
+              >
+                <span>Fragrantica</span>
+                <ExternalLink className="h-2.5 w-2.5 opacity-75" />
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('url');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                style={{ borderColor: `${aura.primary}50`, color: aura.primary }}
+                className="rounded-full border bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold transition hover:bg-white/5"
+              >
+                Importa da Link
+              </button>
+            </div>
           </div>
 
           {detectedVariants.length > 0 && (
