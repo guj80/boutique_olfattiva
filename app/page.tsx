@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { CalendarHeart, Compass, Library, Check, X } from 'lucide-react';
+import { CalendarHeart, Check, X } from 'lucide-react';
 import { supabase, Profumo, isCollezioneProfumo } from '@/lib/supabase';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
@@ -12,6 +11,7 @@ import { useToast } from '@/components/Toast';
 import { useSpruzzo } from '@/components/Spruzzo';
 import { getLocalIsoDate, getAutoMomento, computePodio } from '@/lib/home-logic';
 import { ScentDNA } from '@/components/ScentDNA';
+import { AccordWheel } from '@/components/AccordWheel';
 
 export default function HomePage() {
   const [profumi, setProfumi] = useState<Profumo[]>([]);
@@ -24,7 +24,9 @@ export default function HomePage() {
   const [wearModalOpen, setWearModalOpen] = useState(false);
   const [selectedProfumoId, setSelectedProfumoId] = useState<string>('');
   const [wearData, setWearData] = useState<string>(getLocalIsoDate());
-  const [wearMomento, setWearMomento] = useState<'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte'>(getAutoMomento());
+  const [wearMomento, setWearMomento] = useState<'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte'>(
+    getAutoMomento()
+  );
   const [wearOutfit, setWearOutfit] = useState('');
   const [wearNote, setWearNote] = useState('');
   const [savingWear, setSavingWear] = useState(false);
@@ -108,7 +110,7 @@ export default function HomePage() {
   const podio = useMemo(() => computePodio(indossi), [indossi]);
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36 space-y-10">
+    <main className="mx-auto w-full max-w-6xl px-4 sm:px-8 py-8 pb-36 space-y-10">
       <PageHeader
         title="Atelier"
         subtitle="Control Room"
@@ -125,206 +127,91 @@ export default function HomePage() {
         }
       />
 
+      {/* ATLANTE OLFATTIVO INTERATTIVO (NOTE · ACCORDI · PIRAMIDE) */}
+      <AccordWheel
+        profumi={profumi}
+        indossi={indossi}
+        onSelectProfumo={(p) => {
+          setSelectedDetailProfumo(p);
+          setAuraFromProfumo(p);
+        }}
+      />
+
+      {/* PROFILO SINTETICO SCENT DNA */}
       <ScentDNA profumi={profumi} indossi={indossi} loading={loading} />
 
-      {/* PODIO A SCATOLETTE NERE ELEGANTI CON BORDI IN TINTA TEMA */}
-      <section className="space-y-4">
+      {/* PODIO COMPATTO IN CHIUSURA */}
+      <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between px-1">
-          <div
-            style={{ borderColor: `${aura.primary}55` }}
-            className="inline-block rounded-md bg-[#0E0A16] border px-3 py-1"
-          >
-            <h2
-              style={{ color: aura.primary }}
-              className="font-mono text-xs uppercase tracking-[0.2em] font-bold"
-            >
+          <div className="flex items-center gap-2.5">
+            <h2 className="font-serif text-2xl text-[#F6EFE4]">I più indossati</h2>
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#B8A9C9]/70">
               Podio
-            </h2>
+            </span>
           </div>
+
           {podio.length > 0 && (
             <button
               type="button"
               onClick={() => setPodioModalOpen(true)}
-              style={{ borderColor: `${aura.primary}55`, color: aura.primary }}
-              className="rounded-full bg-[#0E0A16] border px-3.5 py-1.5 font-mono text-[11px] font-bold hover:opacity-85 transition"
+              className="rounded-full border border-white/15 bg-[#0E0A16] px-3.5 py-1.5 font-mono text-[11px] font-semibold text-[#F6EFE4] transition hover:border-white/35"
             >
-              Classifica Completa →
+              Classifica completa →
             </button>
           )}
         </div>
 
         {podio.length === 0 ? (
-          <div
-            style={{ borderColor: `${aura.primary}35` }}
-            className="rounded-[20px] border bg-[#0E0A16] p-6 text-center text-xs text-[#B8A9C9]"
-          >
-            Nessun indosso registrato. Usa il tasto &quot;Indossato oggi&quot;.
+          <div className="rounded-[24px] border border-white/10 bg-[#0E0A16]/80 p-6 text-center text-xs text-[#B8A9C9]">
+            Nessun indosso registrato. Usa il tasto &quot;Indossato oggi&quot; per iniziare.
           </div>
         ) : (
-          <div className="mx-auto max-w-2xl grid grid-cols-3 gap-2.5 sm:gap-4 items-end pt-4 pb-2 text-center">
-            {podio[1] ? (
-              <div
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {podio.slice(0, 3).map(({ count, profumo }, idx) => (
+              <button
+                key={profumo.id}
+                type="button"
                 onClick={() => {
-                  setSelectedDetailProfumo(podio[1].profumo);
-                  setAuraFromProfumo(podio[1].profumo);
+                  setSelectedDetailProfumo(profumo);
+                  setAuraFromProfumo(profumo);
                 }}
-                style={{ borderColor: `${aura.primary}40` }}
-                className="group flex flex-col items-center justify-between cursor-pointer transition hover:scale-[1.03] rounded-[20px] border bg-[#0E0A16] px-2.5 py-3.5 shadow-xl h-48"
-              >
-                <div className="h-20 w-full flex items-center justify-center">
-                  <BottlePedestal
-                    src={podio[1].profumo.url_foto_vetrina || podio[1].profumo.immagine_url}
-                    alt={podio[1].profumo.nome}
-                    bare={true}
-                    className="h-full w-full"
-                  />
-                </div>
-                <span className="font-mono text-xs font-extrabold text-[#B8A9C9] tracking-tight">
-                  #2
-                </span>
-                <div className="space-y-0.5 w-full">
-                  <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9] truncate">
-                    {podio[1].profumo.brand}
-                  </p>
-                  <h3 className="font-sans text-[11px] font-extrabold uppercase tracking-wide text-[#F6EFE4] leading-tight line-clamp-2 text-center">
-                    {podio[1].profumo.nome}
-                  </h3>
-                </div>
-              </div>
-            ) : (
-              <div />
-            )}
-
-            {podio[0] && (
-              <div
-                onClick={() => {
-                  setSelectedDetailProfumo(podio[0].profumo);
-                  setAuraFromProfumo(podio[0].profumo);
+                style={{
+                  borderColor:
+                    idx === 0 ? `${aura.primary}65` : 'rgba(255, 255, 255, 0.1)',
                 }}
-                style={{ borderColor: aura.primary }}
-                className="group flex flex-col items-center justify-between cursor-pointer transition hover:scale-[1.03] rounded-[22px] border-2 bg-[#0E0A16] px-3 py-4 shadow-2xl h-56 -mt-4"
+                className="group flex items-center gap-3.5 rounded-[22px] border bg-[#0E0A16]/90 p-3.5 text-left transition hover:border-white/30 hover:bg-[#140D1C]"
               >
-                <div className="h-24 w-full flex items-center justify-center">
-                  <BottlePedestal
-                    src={podio[0].profumo.url_foto_vetrina || podio[0].profumo.immagine_url}
-                    alt={podio[0].profumo.nome}
-                    bare={true}
-                    className="h-full w-full"
-                  />
-                </div>
                 <span
-                  style={{ color: aura.primary }}
-                  className="font-mono text-sm font-extrabold tracking-tight"
+                  style={{ color: idx === 0 ? aura.primary : '#B8A9C9' }}
+                  className="font-mono text-xs font-extrabold w-6 text-center shrink-0"
                 >
-                  #1
+                  #{idx + 1}
                 </span>
-                <div className="space-y-0.5 w-full">
-                  <p
-                    style={{ color: aura.primary }}
-                    className="font-mono text-[9px] uppercase tracking-wider font-bold truncate"
-                  >
-                    {podio[0].profumo.brand}
-                  </p>
-                  <h3 className="font-sans text-xs sm:text-[13px] font-extrabold uppercase tracking-wide text-[#F6EFE4] leading-tight line-clamp-2 text-center">
-                    {podio[0].profumo.nome}
-                  </h3>
-                </div>
-              </div>
-            )}
 
-            {podio[2] ? (
-              <div
-                onClick={() => {
-                  setSelectedDetailProfumo(podio[2].profumo);
-                  setAuraFromProfumo(podio[2].profumo);
-                }}
-                style={{ borderColor: `${aura.primary}40` }}
-                className="group flex flex-col items-center justify-between cursor-pointer transition hover:scale-[1.03] rounded-[20px] border bg-[#0E0A16] px-2.5 py-3.5 shadow-xl h-44"
-              >
-                <div className="h-16 w-full flex items-center justify-center">
+                <div className="h-14 w-12 shrink-0 flex items-center justify-center">
                   <BottlePedestal
-                    src={podio[2].profumo.url_foto_vetrina || podio[2].profumo.immagine_url}
-                    alt={podio[2].profumo.nome}
+                    src={profumo.url_foto_vetrina || profumo.immagine_url}
+                    alt={profumo.nome}
                     bare={true}
                     className="h-full w-full"
                   />
                 </div>
-                <span className="font-mono text-xs font-extrabold text-[#B8A9C9] tracking-tight">
-                  #3
-                </span>
-                <div className="space-y-0.5 w-full">
+
+                <div className="min-w-0 flex-1">
                   <p className="font-mono text-[9px] uppercase tracking-wider text-[#B8A9C9] truncate">
-                    {podio[2].profumo.brand}
+                    {profumo.brand}
                   </p>
-                  <h3 className="font-sans text-[11px] font-extrabold uppercase tracking-wide text-[#F6EFE4] leading-tight line-clamp-2 text-center">
-                    {podio[2].profumo.nome}
+                  <h3 className="font-serif text-base text-[#F6EFE4] truncate group-hover:text-white">
+                    {profumo.nome}
                   </h3>
+                  <p className="font-mono text-[10px] text-[#B8A9C9]/75 mt-0.5">
+                    {count} {count === 1 ? 'indosso' : 'indossi'}
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div />
-            )}
+              </button>
+            ))}
           </div>
         )}
-      </section>
-
-      {/* ACCESSI RAPIDI (VETRINA & SCANNER) CON BOX E BORDI DEL COLORE DEL TEMA */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link
-          href="/collezione"
-          style={{ borderColor: `${aura.primary}50` }}
-          className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
-        >
-          <div className="space-y-1.5">
-            <div
-              style={{ borderColor: `${aura.primary}55` }}
-              className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
-            >
-              <span
-                style={{ color: aura.primary }}
-                className="font-mono text-[10px] uppercase tracking-widest font-bold block"
-              >
-                Vetrina
-              </span>
-            </div>
-            <h3 className="font-serif text-2xl text-[#F6EFE4]">La mia Collezione</h3>
-            <p className="text-xs text-[#B8A9C9]">{profumi.length} creazioni catalogate</p>
-          </div>
-          <div
-            style={{ backgroundColor: `${aura.primary}20`, color: aura.primary, borderColor: `${aura.primary}45` }}
-            className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
-          >
-            <Library className="h-5 w-5" />
-          </div>
-        </Link>
-
-        <Link
-          href="/scanner"
-          style={{ borderColor: `${aura.primary}50` }}
-          className="group flex items-center justify-between rounded-[24px] border bg-[#0E0A16] p-6 transition hover:scale-[1.01] shadow-xl"
-        >
-          <div className="space-y-1.5">
-            <div
-              style={{ borderColor: `${aura.primary}55` }}
-              className="inline-block rounded-md bg-[#161024] border px-2.5 py-0.5"
-            >
-              <span
-                style={{ color: aura.primary }}
-                className="font-mono text-[10px] uppercase tracking-widest font-bold block"
-              >
-                Acquisizione
-              </span>
-            </div>
-            <h3 className="font-serif text-2xl text-[#F6EFE4]">Scanner & AI</h3>
-            <p className="text-xs text-[#B8A9C9]">Aggiungi flaconi o campioni</p>
-          </div>
-          <div
-            style={{ backgroundColor: `${aura.primary}20`, color: aura.primary, borderColor: `${aura.primary}45` }}
-            className="flex h-12 w-12 items-center justify-center rounded-full border transition group-hover:scale-110"
-          >
-            <Compass className="h-5 w-5" />
-          </div>
-        </Link>
       </section>
 
       {/* MODALE CLASSIFICA COMPLETA */}
@@ -344,7 +231,9 @@ export default function HomePage() {
               style={{ borderColor: `${aura.primary}25` }}
               className="flex items-center justify-between pb-3 border-b"
             >
-              <h3 className="font-serif text-2xl text-[#F6EFE4]">Classifica Generale Indossi</h3>
+              <h3 className="font-serif text-2xl text-[#F6EFE4]">
+                Classifica Generale Indossi
+              </h3>
               <button
                 type="button"
                 onClick={() => setPodioModalOpen(false)}
@@ -434,7 +323,10 @@ export default function HomePage() {
 
             <form onSubmit={handleSaveIndosso} className="space-y-4 text-xs">
               <div>
-                <label htmlFor="select-profumo" className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5">
+                <label
+                  htmlFor="select-profumo"
+                  className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5"
+                >
                   Seleziona Fragranza
                 </label>
                 <select
@@ -454,7 +346,10 @@ export default function HomePage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="input-data" className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5">
+                  <label
+                    htmlFor="input-data"
+                    className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5"
+                  >
                     Data
                   </label>
                   <input
@@ -468,7 +363,10 @@ export default function HomePage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="select-momento" className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5">
+                  <label
+                    htmlFor="select-momento"
+                    className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5"
+                  >
                     Momento
                   </label>
                   <select
@@ -487,7 +385,10 @@ export default function HomePage() {
               </div>
 
               <div>
-                <label htmlFor="input-outfit" className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5">
+                <label
+                  htmlFor="input-outfit"
+                  className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5"
+                >
                   Contesto o Outfit (facoltativo)
                 </label>
                 <input
@@ -502,7 +403,10 @@ export default function HomePage() {
               </div>
 
               <div>
-                <label htmlFor="input-note" className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5">
+                <label
+                  htmlFor="input-note"
+                  className="block font-mono text-[11px] uppercase text-[#B8A9C9] mb-1.5"
+                >
                   Note personali / Sensazioni (facoltativo)
                 </label>
                 <textarea
@@ -551,7 +455,9 @@ export default function HomePage() {
         }}
         onUpdated={(updated) => {
           setSelectedDetailProfumo(updated);
-          setProfumi((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+          setProfumi((prev) =>
+            prev.map((item) => (item.id === updated.id ? updated : item))
+          );
           fetchHomeData();
         }}
         onDeleted={(deletedId) => {
