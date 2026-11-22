@@ -14,6 +14,14 @@ export interface IndossoItem {
   profumi?: any;
 }
 
+export interface PodioEntry {
+  count: number;
+  profumo: any;
+  lastDate: string;
+  topContesto: string | null;
+  topSensazione: string | null;
+}
+
 export function getLocalIsoDate(date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -29,21 +37,89 @@ export function getAutoMomento(): 'Mattina' | 'Pomeriggio' | 'Sera' | 'Notte' {
   return 'Notte';
 }
 
-export function computePodio(indossi: IndossoItem[]) {
-  const counts: Record<string, { count: number; profumo: any; lastDate: string }> = {};
-  indossi.forEach((item) => {
-    if (item.profumi) {
-      const id = item.profumo_id;
-      if (!counts[id]) {
-        counts[id] = { count: 0, profumo: item.profumi, lastDate: item.created_at };
-      }
-      counts[id].count += 1;
-      if (new Date(item.created_at) > new Date(counts[id].lastDate)) {
-        counts[id].lastDate = item.created_at;
-      }
+function getMostFrequentToken(map: Record<string, number>): string | null {
+  let best: string | null = null;
+  let max = 0;
+  Object.keys(map).forEach((k) => {
+    if (map[k] > max) {
+      max = map[k];
+      best = k;
     }
   });
-  return Object.values(counts).sort((a, b) => b.count - a.count);
+  return best;
+}
+
+export function computePodio(
+  indossi: IndossoItem[],
+  timeframe: 'all' | 'month' = 'all'
+): PodioEntry[] {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+
+  const filtered =
+    timeframe === 'month'
+      ? indossi.filter((item) => {
+          const d = new Date(item.created_at);
+          return d.getFullYear() === curYear && d.getMonth() === curMonth;
+        })
+      : indossi;
+
+  const counts: Record<
+    string,
+    {
+      count: number;
+      profumo: any;
+      lastDate: string;
+      contesti: Record<string, number>;
+      sensazioni: Record<string, number>;
+    }
+  > = {};
+
+  filtered.forEach((item) => {
+    if (!item.profumi) return;
+    const id = item.profumo_id;
+    if (!counts[id]) {
+      counts[id] = {
+        count: 0,
+        profumo: item.profumi,
+        lastDate: item.created_at,
+        contesti: {},
+        sensazioni: {},
+      };
+    }
+    counts[id].count += 1;
+    if (new Date(item.created_at) > new Date(counts[id].lastDate)) {
+      counts[id].lastDate = item.created_at;
+    }
+
+    if (item.contesto_outfit) {
+      const ctx = item.contesto_outfit.trim();
+      if (ctx) {
+        counts[id].contesti[ctx] = (counts[id].contesti[ctx] || 0) + 1;
+      }
+    }
+
+    if (item.note_giorno) {
+      item.note_giorno
+        .split(/[·,;]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 2 && s.length <= 24)
+        .forEach((tag) => {
+          counts[id].sensazioni[tag] = (counts[id].sensazioni[tag] || 0) + 1;
+        });
+    }
+  });
+
+  return Object.values(counts)
+    .map((entry) => ({
+      count: entry.count,
+      profumo: entry.profumo,
+      lastDate: entry.lastDate,
+      topContesto: getMostFrequentToken(entry.contesti),
+      topSensazione: getMostFrequentToken(entry.sensazioni),
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export function getSmartConsultantSuggestions(profumi: any[], indossi: IndossoItem[]) {
