@@ -19,7 +19,7 @@ import { useAura } from './AuraProvider';
 /* Cache localStorage (24h)                                            */
 /* ------------------------------------------------------------------ */
 
-const CACHE_KEY = 'atelier_lg_scent_dna_v1';
+const CACHE_KEY = 'atelier_lg_scent_dna_v2';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 26000;
 
