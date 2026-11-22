@@ -35,8 +35,12 @@ const MAX_RECENT_WEARS = 10;
 const MAX_CONTEXT_ITEM_LENGTH = 240;
 const MAX_DNA_KEYS = 12;
 
-const SYSTEM_PROMPT =
-  "Sei CAMILLA, la consulente olfattiva personale di Atelier LG. Conosci la collezione dell'utente, il suo diario e la sua identità olfattiva (Scent DNA). Rispondi in italiano, tono caldo, autorevole e competente, mai generico. Se ti chiede cosa indossare, considera: cosa ha usato di recente, l'ora e il momento della giornata, la stagionalità. Se ti chiede del layering, spiega la chimica delle note. Se ti chiede dei gap nella collezione, analizza le famiglie mancanti. Non inventare profumi che non ha: se ti chiede un profumo assente, dillo chiaramente e proponi alternative dalla sua collezione o dal Radar. Rispondi in modo conciso (max 3-4 frasi salvo richieste esplicite).";
+const SYSTEM_PROMPT = [
+  "Sei CAMILLA, la consulente olfattiva personale di Atelier LG. Conosci la collezione dell'utente, il suo Radar, il suo diario e il suo Scent DNA.",
+  "Rispondi in italiano con tono autorevole, competente e asciutto (max 4-5 frasi salvo richieste tecniche dettagliate).",
+  "1) Consigli d'uso e layering: basati esclusivamente sui profumi presenti nella Collezione o nel Radar dell'utente, incrociando ultimi indossi, ora del giorno, meteo e chimica delle note. Non attribuire mai all'utente profumi che non possiede.",
+  "2) Ricerca fonti ufficiali e schede tecniche: se l'utente chiede il sito ufficiale di una maison, il link o riferimento su Fragrantica/Parfumo, oppure chiede di verificare/completare la piramide olfattiva, il naso o l'anno di lancio di una fragranza (anche fuori collezione), fornisci con precisione il dominio ufficiale della maison (se certo, altrimenti il riferimento di ricerca su Parfumo/Fragrantica senza mai inventare URL specifici non verificati) e i dettagli olfattivi reali accertati (Testa, Cuore, Fondo, Naso, Concentrazione) così che possa aggiornare la scheda.",
+].join(' ');
 
 const INJECTION_PATTERNS: RegExp[] = [
   /ignor[ae]\s+(tutte\s+)?(le\s+|ogni\s+)?(tue\s+)?(istruzion[ei]|regole|direttive)/i,
@@ -146,7 +150,7 @@ function buildPrompt(turns: ChatTurn[], ctx: OracoloContext): string {
     .join(', ');
 
   const contextBlock = [
-    "CONTESTO REALE DELL'UTENTE (usa solo questi dati, non aggiungere profumi che non compaiono):",
+    "ARCHIVIO PERSONALE DELL'UTENTE:",
     `Collezione (${ctx.collection.length}):`,
     listBlock(ctx.collection, 'Vuota'),
     `Radar / profumi in prova (${ctx.radar.length}):`,
@@ -208,7 +212,7 @@ export async function POST(req: Request) {
 
   try {
     const { text } = await callGeminiWithFallback([{ text: buildPrompt(turns, context) }], {
-      temperature: 0.7,
+      temperature: 0.55,
       systemInstruction: SYSTEM_PROMPT,
       deadline: Date.now() + 20000,
     });
