@@ -54,7 +54,6 @@ export default function CollezionePage() {
   const [selectedBrand, setSelectedBrand] = useState('Tutti');
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
-  // Stati per Il Trittico & Ultra-Nicchia (Radar)
   const [scoutMode, setScoutMode] = useState<ScoutMode>('trittico');
   const [scoutFamily, setScoutFamily] = useState('Qualsiasi');
   const [lastResolvedFamily, setLastResolvedFamily] = useState<string | null>(null);
@@ -139,7 +138,6 @@ export default function CollezionePage() {
     setIncludeFocused(false);
     setExcludeFocused(false);
     try {
-      // Se l'utente ha digitato una nota nell'input ma non ha premuto "+", la includiamo automaticamente
       const pendingInclude = currentIncludeInput.trim();
       const effectiveInclude =
         pendingInclude &&
@@ -456,7 +454,6 @@ export default function CollezionePage() {
               </select>
             </div>
 
-            {/* NOTE DA INCLUDERE CON AUTOCOMPLETE ISTANTANEO + INPUT LIBERO */}
             <div className="relative">
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
                 Note da Includere
@@ -540,7 +537,6 @@ export default function CollezionePage() {
               )}
             </div>
 
-            {/* NOTE DA ESCLUDERE CON AUTOCOMPLETE ISTANTANEO + INPUT LIBERO */}
             <div className="relative">
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
                 Note da Escludere
@@ -662,11 +658,11 @@ export default function CollezionePage() {
                   <div
                     key={`${item.brand}-${item.nome}-${idx}`}
                     style={{ borderColor: `${aura.primary}45` }}
-                    className="flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-4 shadow-xl"
+                    className="group flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-4 shadow-xl"
                   >
                     <div
                       onClick={() => handlePreviewScoutItem(item)}
-                      className="space-y-1.5 cursor-pointer group"
+                      className="space-y-2 cursor-pointer"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span
@@ -681,9 +677,20 @@ export default function CollezionePage() {
                           </span>
                         )}
                       </div>
+
+                      <BottlePedestal
+                        src={item.url_foto_vetrina}
+                        alt={item.nome}
+                        brand={item.brand}
+                        famiglia={item.famiglia_olfattiva}
+                        concentrazione={item.concentrazione}
+                        size="md"
+                        className="w-full !h-36 my-1"
+                      />
+
                       <p
                         style={{ color: aura.primary }}
-                        className="font-mono text-[10px] uppercase tracking-wider pt-1 truncate"
+                        className="font-mono text-[10px] uppercase tracking-wider truncate"
                       >
                         {item.brand}
                       </p>
@@ -691,7 +698,7 @@ export default function CollezionePage() {
                         {item.nome}
                       </h5>
                       {item.motivo && (
-                        <p className="text-xs leading-relaxed text-[#B8A9C9] pt-1">
+                        <p className="text-xs leading-relaxed text-[#B8A9C9] pt-0.5">
                           {item.motivo}
                         </p>
                       )}
@@ -911,6 +918,9 @@ export default function CollezionePage() {
                       <BottlePedestal
                         src={imgUrl}
                         alt={p.nome}
+                        brand={p.brand}
+                        famiglia={p.famiglia_olfattiva}
+                        concentrazione={p.concentrazione}
                         size="lg"
                         showSigil={false}
                         className="relative z-10 !h-52 w-full"
