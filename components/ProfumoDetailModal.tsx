@@ -83,7 +83,7 @@ export function ProfumoDetailModal({
       setBrand(profumo.brand || '');
       setNome(profumo.nome || '');
       setConcentrazione(profumo.concentrazione || '');
-      setAnnoLancio(profumo.anno_lancio || '');
+      setAnnoLancio(profumo.anno_lancio ? String(profumo.anno_lancio) : '');
       setNaso(profumo.naso || '');
       setFamigliaOlfattiva(profumo.famiglia_olfattiva || 'Legnosa');
       setNoteTesta(profumo.note_testa || '');
@@ -240,7 +240,7 @@ export function ProfumoDetailModal({
         brand: brand.trim(),
         nome: nome.trim(),
         concentrazione: concentrazione.trim() || null,
-        anno_lancio: annoLancio.trim() || null,
+        anno_lancio: annoLancio.trim() ? Number(annoLancio.trim()) || null : null,
         naso: naso.trim() || null,
         famiglia_olfattiva: famigliaOlfattiva,
         note_testa: noteTesta.trim() || null,
