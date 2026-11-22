@@ -457,7 +457,7 @@ export function ScentDNA({ profumi, indossi, loading = false }: ScentDNAProps) {
                   isGenerating ? 'animate-pulse motion-reduce:animate-none' : ''
                 }`}
               >
-                {isGenerating ? 'Lettura…' : 'Il tuo DNA'}
+                {isGenerating ? 'Analisi…' : 'Profilo'}
               </span>
             )}
           </div>
