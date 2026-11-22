@@ -26,6 +26,7 @@ import { BottlePedestal } from './BottleImage';
 import { resolveAura } from './AuraProvider';
 import { useToast } from './Toast';
 import { processBottleImage, uploadProcessedBottle } from '@/lib/bottle-pipeline';
+import { PerfumeChord } from './PerfumeChord';
 
 interface ProfumoDetailModalProps {
   profumo: Profumo | null;
@@ -650,102 +651,107 @@ export function ProfumoDetailModal({
 
         {/* Contenuto Principale */}
         {!isEditing ? (
-          <div className="relative z-10 mt-6 grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
-            <div className="sm:col-span-5 flex flex-col items-center">
-              <BottlePedestal
-                src={currentImg}
-                alt={profumo.nome}
-                brand={profumo.brand}
-                famiglia={profumo.famiglia_olfattiva}
-                concentrazione={profumo.concentrazione}
-                size="xl"
-                className="w-full !h-72"
-              />
-            </div>
-
-            <div className="sm:col-span-7 space-y-5">
-              <div>
-                <p
-                  style={{ color: aura.primary }}
-                  className="font-mono text-xs font-bold uppercase tracking-[0.2em]"
-                >
-                  {profumo.brand}
-                </p>
-                <h2 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] leading-tight mt-1">
-                  {profumo.nome}
-                </h2>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#B8A9C9]">
-                  {profumo.famiglia_olfattiva && (
-                    <span
-                      style={{ borderColor: `${aura.primary}40` }}
-                      className="inline-flex items-center gap-1 rounded-full border bg-[#0E0A16] px-3 py-1 font-mono text-[11px] text-[#F6EFE4]"
-                    >
-                      <Droplets style={{ color: aura.primary }} className="h-3 w-3" />
-                      {profumo.famiglia_olfattiva}
-                    </span>
-                  )}
-                  {profumo.concentrazione && (
-                    <span className="rounded-full border border-white/10 bg-[#0E0A16] px-3 py-1 font-mono text-[11px]">
-                      {profumo.concentrazione}
-                    </span>
-                  )}
-                  {profumo.anno_lancio && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#0E0A16] px-3 py-1 font-mono text-[11px]">
-                      <Calendar className="h-3 w-3" />
-                      {profumo.anno_lancio}
-                    </span>
-                  )}
-                </div>
+          <div className="relative z-10 mt-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+              <div className="sm:col-span-5 flex flex-col items-center">
+                <BottlePedestal
+                  src={currentImg}
+                  alt={profumo.nome}
+                  brand={profumo.brand}
+                  famiglia={profumo.famiglia_olfattiva}
+                  concentrazione={profumo.concentrazione}
+                  size="xl"
+                  className="w-full !h-72"
+                />
               </div>
 
-              {profumo.naso && (
-                <div className="flex items-center gap-2 text-xs text-[#B8A9C9]">
-                  <User style={{ color: aura.primary }} className="h-3.5 w-3.5 shrink-0" />
-                  <span>
-                    Naso: <strong className="text-[#F6EFE4]">{profumo.naso}</strong>
-                  </span>
+              <div className="sm:col-span-7 space-y-5">
+                <div>
+                  <p
+                    style={{ color: aura.primary }}
+                    className="font-mono text-xs font-bold uppercase tracking-[0.2em]"
+                  >
+                    {profumo.brand}
+                  </p>
+                  <h2 className="font-serif text-3xl sm:text-4xl text-[#F6EFE4] leading-tight mt-1">
+                    {profumo.nome}
+                  </h2>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#B8A9C9]">
+                    {profumo.famiglia_olfattiva && (
+                      <span
+                        style={{ borderColor: `${aura.primary}40` }}
+                        className="inline-flex items-center gap-1 rounded-full border bg-[#0E0A16] px-3 py-1 font-mono text-[11px] text-[#F6EFE4]"
+                      >
+                        <Droplets style={{ color: aura.primary }} className="h-3 w-3" />
+                        {profumo.famiglia_olfattiva}
+                      </span>
+                    )}
+                    {profumo.concentrazione && (
+                      <span className="rounded-full border border-white/10 bg-[#0E0A16] px-3 py-1 font-mono text-[11px]">
+                        {profumo.concentrazione}
+                      </span>
+                    )}
+                    {profumo.anno_lancio && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#0E0A16] px-3 py-1 font-mono text-[11px]">
+                        <Calendar className="h-3 w-3" />
+                        {profumo.anno_lancio}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              <div
-                style={{ borderColor: `${aura.primary}30` }}
-                className="rounded-2xl border bg-[#0E0A16]/90 p-4 space-y-3"
-              >
-                <p
-                  style={{ color: aura.primary }}
-                  className="font-mono text-[10px] font-bold uppercase tracking-widest"
+                {profumo.naso && (
+                  <div className="flex items-center gap-2 text-xs text-[#B8A9C9]">
+                    <User style={{ color: aura.primary }} className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Naso: <strong className="text-[#F6EFE4]">{profumo.naso}</strong>
+                    </span>
+                  </div>
+                )}
+
+                <div
+                  style={{ borderColor: `${aura.primary}30` }}
+                  className="rounded-2xl border bg-[#0E0A16]/90 p-4 space-y-3"
                 >
-                  Piramide Olfattiva
-                </p>
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <span className="font-mono text-[10px] uppercase text-[#B8A9C9] block">
-                      Testa
-                    </span>
-                    <p className="text-[#F6EFE4]">{profumo.note_testa || '—'}</p>
-                  </div>
-                  <div className="border-t border-white/5 pt-2">
-                    <span className="font-mono text-[10px] uppercase text-[#B8A9C9] block">
-                      Cuore
-                    </span>
-                    <p className="text-[#F6EFE4]">{profumo.note_cuore || '—'}</p>
-                  </div>
-                  <div className="border-t border-white/5 pt-2">
-                    <span className="font-mono text-[10px] uppercase text-[#B8A9C9] block">
-                      Fondo
-                    </span>
-                    <p className="text-[#F6EFE4]">{profumo.note_fondo || '—'}</p>
+                  <p
+                    style={{ color: aura.primary }}
+                    className="font-mono text-[10px] font-bold uppercase tracking-widest"
+                  >
+                    Piramide Olfattiva
+                  </p>
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <span className="font-mono text-[10px] uppercase text-[#B8A9C9] block">
+                        Testa
+                      </span>
+                      <p className="text-[#F6EFE4]">{profumo.note_testa || '—'}</p>
+                    </div>
+                    <div className="border-t border-white/5 pt-2">
+                      <span className="font-mono text-[10px] uppercase text-[#B8A9C9] block">
+                        Cuore
+                      </span>
+                      <p className="text-[#F6EFE4]">{profumo.note_cuore || '—'}</p>
+                    </div>
+                    <div className="border-t border-white/5 pt-2">
+                      <span className="font-mono text-[10px] uppercase text-[#B8A9C9] block">
+                        Fondo
+                      </span>
+                      <p className="text-[#F6EFE4]">{profumo.note_fondo || '—'}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {profumo.prezzo_stimato_euro && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 bg-[#0E0A16] px-3.5 py-1.5 font-mono text-xs text-purple-200">
-                  <Tag className="h-3.5 w-3.5" />
-                  <span>{profumo.prezzo_stimato_euro}</span>
-                </div>
-              )}
+                {profumo.prezzo_stimato_euro && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 bg-[#0E0A16] px-3.5 py-1.5 font-mono text-xs text-purple-200">
+                    <Tag className="h-3.5 w-3.5" />
+                    <span>{profumo.prezzo_stimato_euro}</span>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Anatomia degli Accordi del Singolo Flacone */}
+            <PerfumeChord profumo={profumo} />
           </div>
         ) : (
           /* MODALITÀ MODIFICA & ARRICCHIMENTO DA URL */
