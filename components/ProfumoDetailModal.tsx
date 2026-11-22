@@ -15,6 +15,7 @@ import {
   Link2,
   Sliders,
   Loader2,
+  BookmarkCheck,
 } from 'lucide-react';
 import { supabase, Profumo, PURE_FAMILIES } from '@/lib/supabase';
 import { BottlePedestal } from './BottleImage';
@@ -27,6 +28,15 @@ interface ProfumoDetailModalProps {
   onClose: () => void;
   onUpdated?: (updated: Profumo) => void;
   onDeleted?: (deletedId: string) => void;
+  onIndossoRegistered?: () => void;
+}
+
+function getCurrentMoment(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'Mattina';
+  if (h >= 12 && h < 18) return 'Pomeriggio';
+  if (h >= 18 && h < 23) return 'Sera';
+  return 'Notte';
 }
 
 export function ProfumoDetailModal({
@@ -34,6 +44,7 @@ export function ProfumoDetailModal({
   onClose,
   onUpdated,
   onDeleted,
+  onIndossoRegistered,
 }: ProfumoDetailModalProps) {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -42,6 +53,7 @@ export function ProfumoDetailModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [loggingWear, setLoggingWear] = useState(false);
 
   const [brand, setBrand] = useState('');
   const [nome, setNome] = useState('');
@@ -93,7 +105,6 @@ export function ProfumoDetailModal({
     }
   }, [profumo]);
 
-  // Rielabora l'anteprima quando cambia sorgente o sensibilità
   useEffect(() => {
     if (!rawImageSource) return;
     let cancelled = false;
@@ -124,7 +135,6 @@ export function ProfumoDetailModal({
     };
   }, [rawImageSource, tolerance, showToast]);
 
-  // Supporto incolla immagine dagli appunti (Ctrl+V / Cmd+V) quando lo studio è aperto
   useEffect(() => {
     if (!profumo || !bottleStudioOpen) return;
     const onPaste = (e: ClipboardEvent) => {
@@ -155,6 +165,27 @@ export function ProfumoDetailModal({
     processedPreview ||
     (isEditing ? immagineUrl : profumo.url_foto_vetrina || profumo.immagine_url);
 
+  async function handleQuickWear() {
+    if (!profumo || isPreview || loggingWear) return;
+    setLoggingWear(true);
+    try {
+      const { error } = await supabase.from('indossi').insert([
+        {
+          profumo_id: profumo.id,
+          momento_giornata: getCurrentMoment(),
+        },
+      ]);
+      if (error) throw error;
+      showToast(`Indosso registrato: ${profumo.nome}.`);
+      if (onIndossoRegistered) onIndossoRegistered();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore registrazione indosso.';
+      showToast(msg, 'error');
+    } finally {
+      setLoggingWear(false);
+    }
+  }
+
   async function handleConfirmIsolatedBottle() {
     if (!processedBlob || !profumo) return;
     setUploadingBottle(true);
@@ -165,7 +196,6 @@ export function ProfumoDetailModal({
 
       setImmagineUrl(publicUrl);
 
-      // Se la scheda è già salvata su Supabase, aggiorna immediatamente il record
       if (!isPreview) {
         const { data, error } = await supabase
           .from('profumi')
@@ -178,7 +208,6 @@ export function ProfumoDetailModal({
         if (onUpdated && data) onUpdated(data as Profumo);
       }
 
-      // Arricchisce anche l'eventuale record corrispondente in ultranicchia_import
       await supabase
         .from('ultranicchia_import')
         .update({ immagine_url: publicUrl })
@@ -293,7 +322,7 @@ export function ProfumoDetailModal({
         />
 
         {/* Top Bar */}
-        <div className="relative z-10 flex items-center justify-between gap-3 pb-4 border-b border-white/10">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <span
               style={{
@@ -312,9 +341,21 @@ export function ProfumoDetailModal({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!isEditing ? (
               <>
+                {!isPreview && (
+                  <button
+                    type="button"
+                    onClick={handleQuickWear}
+                    disabled={loggingWear}
+                    style={{ backgroundColor: aura.primary }}
+                    className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold text-[#08060C] transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    <BookmarkCheck className="h-3.5 w-3.5" />
+                    <span>{loggingWear ? 'Salvataggio...' : 'Indossa ora'}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setBottleStudioOpen((v) => !v)}
