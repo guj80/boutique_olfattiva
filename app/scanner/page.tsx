@@ -10,16 +10,20 @@ import {
   RefreshCw,
   Image as ImageIcon,
   Search,
-  FlaskConical,
   UserCheck,
   Library,
   Compass,
+  Sliders,
+  Check,
+  Loader2,
 } from 'lucide-react';
 import { supabase, Profumo } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api-fetch';
 import { PageHeader } from '@/components/Logo';
+import { BottlePedestal } from '@/components/BottleImage';
 import { useAura, resolveAura } from '@/components/AuraProvider';
 import { useToast } from '@/components/Toast';
+import { processBottleImage, uploadProcessedBottle } from '@/lib/bottle-pipeline';
 
 type CatalogHit = {
   id: string | number;
@@ -44,12 +48,59 @@ const PURE_FAMILIES = [
   'Muschiata',
 ] as const;
 
+function slugifyFilePart(value: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
+async function lookupExistingBottleUrl(brand: string, nome: string): Promise<string | null> {
+  if (!brand.trim() || !nome.trim()) return null;
+  try {
+    const brandFolder = slugifyFilePart(brand);
+    const nomePrefix = `${slugifyFilePart(nome)}-`;
+    if (brandFolder && nomePrefix.length > 1) {
+      const { data: files } = await supabase.storage.from('flaconi').list(brandFolder, {
+        limit: 5,
+        search: slugifyFilePart(nome),
+        sortBy: { column: 'created_at', order: 'desc' },
+      });
+      const match = (files || []).find((f) => f.name.startsWith(nomePrefix));
+      if (match) {
+        const { data: pub } = supabase.storage
+          .from('flaconi')
+          .getPublicUrl(`${brandFolder}/${match.name}`);
+        if (pub?.publicUrl) return pub.publicUrl;
+      }
+    }
+
+    const { data: ultraMatch } = await supabase
+      .from('ultranicchia_import')
+      .select('immagine_url')
+      .ilike('brand', brand.trim())
+      .ilike('nome', nome.trim())
+      .not('immagine_url', 'is', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (ultraMatch?.immagine_url) return String(ultraMatch.immagine_url);
+  } catch {
+    // fallback silenzioso
+  }
+  return null;
+}
+
 export default function ScannerPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'name' | 'photo' | 'url'>('name');
 
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const bottleFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [inputUrl, setInputUrl] = useState('');
   const [inputName, setInputName] = useState('');
@@ -64,6 +115,15 @@ export default function ScannerPage() {
 
   const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
+
+  // Studio Isola Flacone nella bozza dello Scanner
+  const [bottleStudioOpen, setBottleStudioOpen] = useState(false);
+  const [rawBottleSource, setRawBottleSource] = useState<File | string | null>(null);
+  const [bottleUrlInput, setBottleUrlInput] = useState('');
+  const [tolerance, setTolerance] = useState(36);
+  const [processedPreview, setProcessedPreview] = useState<string | null>(null);
+  const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
+  const [processingBottle, setProcessingBottle] = useState(false);
 
   const { aura, setCustomAura } = useAura();
   const { showToast } = useToast();
@@ -92,6 +152,57 @@ export default function ScannerPage() {
       ctrl.abort();
     };
   }, [inputName, mode]);
+
+  // Elaborazione isolamento flacone in tempo reale nella bozza
+  useEffect(() => {
+    if (!rawBottleSource) return;
+    let cancelled = false;
+
+    async function runIsolation() {
+      setProcessingBottle(true);
+      try {
+        const res = await processBottleImage(rawBottleSource!, { tolerance });
+        if (!cancelled) {
+          setProcessedPreview(res.previewDataUrl);
+          setProcessedBlob(res.blob);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Errore elaborazione flacone.';
+          showToast(msg, 'error');
+          setRawBottleSource(null);
+        }
+      } finally {
+        if (!cancelled) setProcessingBottle(false);
+      }
+    }
+
+    const timer = setTimeout(runIsolation, 120);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [rawBottleSource, tolerance, showToast]);
+
+  // Supporto Ctrl+V / Cmd+V nello studio flacone della bozza
+  useEffect(() => {
+    if (!draft || !bottleStudioOpen) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            setRawBottleSource(file);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [draft, bottleStudioOpen]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -150,6 +261,10 @@ export default function ScannerPage() {
 
     setExtracting(true);
     setDraft(null);
+    setBottleStudioOpen(false);
+    setRawBottleSource(null);
+    setProcessedPreview(null);
+    setProcessedBlob(null);
 
     try {
       const payload: Record<string, any> = {};
@@ -173,17 +288,26 @@ export default function ScannerPage() {
         throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
-      // MAI salvare la foto scattata al momento come url_foto_vetrina:
-      // usiamo solo l'immagine ufficiale trovata sul web oppure null (silhouette vettoriale).
+      const extractedBrand = String(data.brand || '').trim();
+      const extractedName = String(data.nome || '').trim();
+
+      // 1) Controlla prima se esiste già un flacone PNG isolato nello Storage 'flaconi'
+      const storedBottle = await lookupExistingBottleUrl(extractedBrand, extractedName);
+
+      // 2) Altrimenti, se l'estrazione ha trovato un'immagine ufficiale web, avvia subito l'isolamento
       const officialPhoto =
         typeof data.url_foto_vetrina === 'string' &&
         data.url_foto_vetrina.startsWith('http')
           ? data.url_foto_vetrina
           : null;
 
+      if (!storedBottle && officialPhoto) {
+        setRawBottleSource(officialPhoto);
+      }
+
       const extractedDraft: Partial<Profumo> = {
-        nome: data.nome || '',
-        brand: data.brand || '',
+        nome: extractedName,
+        brand: extractedBrand,
         concentrazione: data.concentrazione || 'Eau de Parfum',
         famiglia_olfattiva: data.famiglia_olfattiva || 'Legnosa',
         naso: data.naso || '',
@@ -200,7 +324,7 @@ export default function ScannerPage() {
         voto_scia: Number(data.voto_scia) || 8,
         voto_proiezione: Number(data.voto_proiezione) || 8,
         voto_complessita: Number(data.voto_complessita) || 8,
-        url_foto_vetrina: officialPhoto,
+        url_foto_vetrina: storedBottle || null,
         note_mouche: '',
         note_pelle: '',
       };
@@ -228,6 +352,20 @@ export default function ScannerPage() {
 
     setSavingTarget(destination);
     try {
+      const cleanBrand = draft.brand.trim();
+      const cleanNome = draft.nome.trim();
+      let finalBottleUrl = draft.url_foto_vetrina || null;
+
+      // Se c'è un flacone isolato pronto nella bozza, caricalo subito nel bucket Storage 'flaconi'
+      if (processedBlob) {
+        finalBottleUrl = await uploadProcessedBottle(processedBlob, cleanBrand, cleanNome);
+        await supabase
+          .from('ultranicchia_import')
+          .update({ immagine_url: finalBottleUrl })
+          .ilike('brand', cleanBrand)
+          .ilike('nome', cleanNome);
+      }
+
       const unifiedNotes =
         draft.note_olfattive ||
         [draft.note_testa, draft.note_cuore, draft.note_fondo]
@@ -235,8 +373,8 @@ export default function ScannerPage() {
           .join(', ');
 
       const fullPayload: Record<string, any> = {
-        nome: draft.nome.trim(),
-        brand: draft.brand.trim(),
+        nome: cleanNome,
+        brand: cleanBrand,
         concentrazione: (draft.concentrazione || '').trim(),
         famiglia_olfattiva: draft.famiglia_olfattiva || 'Legnosa',
         naso: draft.naso && draft.naso.trim() ? draft.naso.trim() : null,
@@ -253,7 +391,7 @@ export default function ScannerPage() {
         voto_scia: Number(draft.voto_scia) || 8,
         voto_proiezione: Number(draft.voto_proiezione) || 8,
         voto_complessita: Number(draft.voto_complessita) || 8,
-        url_foto_vetrina: draft.url_foto_vetrina || null,
+        url_foto_vetrina: finalBottleUrl,
         stato: destination,
         note_mouche: draft.note_mouche || null,
         note_pelle: draft.note_pelle || null,
@@ -269,6 +407,7 @@ export default function ScannerPage() {
             famiglia_olfattiva: fullPayload.famiglia_olfattiva,
             naso: fullPayload.naso,
             note_olfattive: fullPayload.note_olfattive,
+            url_foto_vetrina: finalBottleUrl,
             stato: destination,
           },
         ]);
@@ -278,7 +417,7 @@ export default function ScannerPage() {
       showToast(
         destination === 'radar'
           ? 'Creazione inviata al Testing Radar.'
-          : "Creazione custodita nella Collezione."
+          : 'Creazione custodita nella Collezione.'
       );
       router.push(destination === 'radar' ? '/collezione?vista=radar' : '/collezione');
     } catch (err: any) {
@@ -287,6 +426,8 @@ export default function ScannerPage() {
       setSavingTarget(null);
     }
   }
+
+  const draftPreviewImg = processedPreview || draft?.url_foto_vetrina || null;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 sm:px-8 py-8 pb-36">
@@ -516,19 +657,18 @@ export default function ScannerPage() {
           style={{ borderColor: `${aura.primary}45` }}
           className="mt-6 rounded-[28px] border bg-[#1E1428]/95 p-6 space-y-5 shadow-2xl"
         >
-          <div className="flex items-center justify-between gap-4 pb-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#140D1C] border border-white/10">
-                {draft.url_foto_vetrina ? (
-                  <img
-                    src={draft.url_foto_vetrina}
-                    alt=""
-                    className="h-full w-full object-contain p-1.5"
-                  />
-                ) : (
-                  <FlaskConical style={{ color: aura.primary }} className="h-5 w-5" />
-                )}
-              </div>
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+            <div className="flex items-center gap-4">
+              <BottlePedestal
+                src={draftPreviewImg}
+                alt={draft.nome || 'Creazione'}
+                brand={draft.brand}
+                famiglia={draft.famiglia_olfattiva}
+                concentrazione={draft.concentrazione}
+                size="sm"
+                bare={true}
+                className="h-20 w-16 shrink-0"
+              />
               <div>
                 <span
                   style={{ color: aura.primary }}
@@ -541,7 +681,118 @@ export default function ScannerPage() {
                 </h2>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setBottleStudioOpen((v) => !v)}
+              style={{ borderColor: `${aura.primary}45`, color: aura.primary }}
+              className="flex items-center gap-1.5 rounded-full border bg-[#140D1C] px-4 py-2 text-xs font-semibold transition hover:opacity-90"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              <span>Isola flacone</span>
+            </button>
           </div>
+
+          {bottleStudioOpen && (
+            <div
+              style={{ borderColor: `${aura.primary}50` }}
+              className="rounded-2xl border bg-[#140D1C] p-4 space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  style={{ color: aura.primary }}
+                  className="font-mono text-[10px] font-bold uppercase tracking-widest"
+                >
+                  Studio Flacone Puro (PNG trasparente)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBottleStudioOpen(false)}
+                  className="font-mono text-[10px] text-[#B8A9C9] hover:text-white"
+                >
+                  Chiudi
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  ref={bottleFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setRawBottleSource(f);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => bottleFileInputRef.current?.click()}
+                  style={{ borderColor: `${aura.primary}45` }}
+                  className="flex items-center justify-center gap-2 rounded-xl border bg-[#1E1428] px-3.5 py-2.5 text-xs font-semibold text-[#F6EFE4] hover:border-white/40 transition"
+                >
+                  <Camera className="h-4 w-4" />
+                  <span>Carica foto o incolla (Ctrl+V)</span>
+                </button>
+
+                <div className="flex gap-1.5">
+                  <div className="relative flex-1">
+                    <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#B8A9C9]" />
+                    <input
+                      type="url"
+                      value={bottleUrlInput}
+                      onChange={(e) => setBottleUrlInput(e.target.value)}
+                      placeholder="Incolla link immagine..."
+                      style={{ borderColor: `${aura.primary}40` }}
+                      className="w-full rounded-xl border bg-[#1E1428] pl-8 pr-2.5 py-2 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (bottleUrlInput.trim()) setRawBottleSource(bottleUrlInput.trim());
+                    }}
+                    style={{ backgroundColor: aura.primary }}
+                    className="rounded-xl px-3 py-2 text-xs font-bold text-[#140D1C]"
+                  >
+                    Isola
+                  </button>
+                </div>
+              </div>
+
+              {rawBottleSource && (
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                    <Sliders className="h-3.5 w-3.5 text-[#B8A9C9]" />
+                    <span className="font-mono text-[10px] uppercase text-[#B8A9C9]">
+                      Sensibilità sfondo: {tolerance}
+                    </span>
+                    <input
+                      type="range"
+                      min={12}
+                      max={75}
+                      value={tolerance}
+                      onChange={(e) => setTolerance(Number(e.target.value))}
+                      className="flex-1 accent-amber-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-[#B8A9C9]">
+                    {processingBottle ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Elaborazione...</span>
+                      </>
+                    ) : processedBlob ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-300 font-mono text-[11px]">
+                        <Check className="h-3.5 w-3.5" />
+                        Flacone pronto per il salvataggio
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -708,7 +959,7 @@ export default function ScannerPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  disabled={savingTarget !== null}
+                  disabled={savingTarget !== null || processingBottle}
                   onClick={() => saveWithDestination('radar')}
                   style={{ borderColor: aura.primary, color: aura.primary }}
                   className="flex items-center justify-center gap-2 rounded-full border bg-[#140D1C] px-5 py-2.5 text-xs font-bold transition hover:bg-white/5 disabled:opacity-50"
@@ -723,7 +974,7 @@ export default function ScannerPage() {
 
                 <button
                   type="button"
-                  disabled={savingTarget !== null}
+                  disabled={savingTarget !== null || processingBottle}
                   onClick={() => saveWithDestination('collezione')}
                   style={{ backgroundColor: aura.primary }}
                   className="flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold text-[#140D1C] transition hover:opacity-90 disabled:opacity-50"
