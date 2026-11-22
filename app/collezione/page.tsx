@@ -24,6 +24,7 @@ import {
   isRadarProfumo,
 } from '@/lib/supabase';
 import { normalizeFamily } from '@/lib/families';
+import { suggestNotes } from '@/lib/dictionary';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
@@ -57,11 +58,12 @@ export default function CollezionePage() {
   const [scoutMode, setScoutMode] = useState<ScoutMode>('trittico');
   const [scoutFamily, setScoutFamily] = useState('Qualsiasi');
   const [lastResolvedFamily, setLastResolvedFamily] = useState<string | null>(null);
-  const [ultraFreeQuery, setUltraFreeQuery] = useState('');
   const [includeNotes, setIncludeNotes] = useState<string[]>([]);
   const [currentIncludeInput, setCurrentIncludeInput] = useState('');
+  const [includeFocused, setIncludeFocused] = useState(false);
   const [excludeNotes, setExcludeNotes] = useState<string[]>([]);
   const [currentExcludeInput, setCurrentExcludeInput] = useState('');
+  const [excludeFocused, setExcludeFocused] = useState(false);
   const [scoutResults, setScoutResults] = useState<ScoutProposal[]>([]);
   const [seenScoutKeys, setSeenScoutKeys] = useState<string[]>([]);
   const [scoutingLoading, setScoutingLoading] = useState(false);
@@ -70,6 +72,22 @@ export default function CollezionePage() {
 
   const { aura, setAuraFromProfumo, setCustomAura } = useAura();
   const { showToast } = useToast();
+
+  const includeSuggestions = useMemo(
+    () =>
+      suggestNotes(currentIncludeInput).filter(
+        (s) => !includeNotes.some((n) => n.toLowerCase() === s.toLowerCase())
+      ),
+    [currentIncludeInput, includeNotes]
+  );
+
+  const excludeSuggestions = useMemo(
+    () =>
+      suggestNotes(currentExcludeInput).filter(
+        (s) => !excludeNotes.some((n) => n.toLowerCase() === s.toLowerCase())
+      ),
+    [currentExcludeInput, excludeNotes]
+  );
 
   useEffect(() => {
     const isRadar = vistaParam === 'radar';
@@ -97,20 +115,20 @@ export default function CollezionePage() {
     }
   }
 
-  function handleAddIncludeNote() {
-    const val = currentIncludeInput.trim();
+  function addIncludeNote(rawVal: string) {
+    const val = rawVal.trim();
     if (!val) return;
     if (!includeNotes.some((n) => n.toLowerCase() === val.toLowerCase())) {
-      setIncludeNotes([...includeNotes, val]);
+      setIncludeNotes((prev) => [...prev, val]);
     }
     setCurrentIncludeInput('');
   }
 
-  function handleAddExcludeNote() {
-    const val = currentExcludeInput.trim();
+  function addExcludeNote(rawVal: string) {
+    const val = rawVal.trim();
     if (!val) return;
     if (!excludeNotes.some((n) => n.toLowerCase() === val.toLowerCase())) {
-      setExcludeNotes([...excludeNotes, val]);
+      setExcludeNotes((prev) => [...prev, val]);
     }
     setCurrentExcludeInput('');
   }
@@ -118,16 +136,40 @@ export default function CollezionePage() {
   async function handleRunScout() {
     setScoutingLoading(true);
     setScoutResults([]);
+    setIncludeFocused(false);
+    setExcludeFocused(false);
     try {
+      // Se l'utente ha digitato una nota nell'input ma non ha premuto "+", la includiamo automaticamente
+      const pendingInclude = currentIncludeInput.trim();
+      const effectiveInclude =
+        pendingInclude &&
+        !includeNotes.some((n) => n.toLowerCase() === pendingInclude.toLowerCase())
+          ? [...includeNotes, pendingInclude]
+          : includeNotes;
+      if (pendingInclude) {
+        setIncludeNotes(effectiveInclude);
+        setCurrentIncludeInput('');
+      }
+
+      const pendingExclude = currentExcludeInput.trim();
+      const effectiveExclude =
+        pendingExclude &&
+        !excludeNotes.some((n) => n.toLowerCase() === pendingExclude.toLowerCase())
+          ? [...excludeNotes, pendingExclude]
+          : excludeNotes;
+      if (pendingExclude) {
+        setExcludeNotes(effectiveExclude);
+        setCurrentExcludeInput('');
+      }
+
       const ownedKeys = ownedListForPrompt(profumi);
       const response = await collectProposals(
         {
           mode: scoutMode,
           scoutFamily,
           lastFamily: lastResolvedFamily,
-          freeQuery: scoutMode === 'ultranicchia' ? ultraFreeQuery : '',
-          includeNotes,
-          excludeNotes,
+          includeNotes: effectiveInclude,
+          excludeNotes: effectiveExclude,
         },
         ownedKeys,
         seenScoutKeys
@@ -141,7 +183,7 @@ export default function CollezionePage() {
         const newKeys = response.proposals.map((p) => makeScoutPairKey(p.brand, p.nome));
         setSeenScoutKeys((prev) => Array.from(new Set([...prev, ...newKeys])).slice(-60));
       } else {
-        showToast('Nessuna creazione trovata con questi parametri.', 'error');
+        showToast('Nessuna creazione trovata con questi filtri esatti.', 'error');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Errore durante la ricerca.';
@@ -390,35 +432,9 @@ export default function CollezionePage() {
 
           <p className="text-xs text-[#B8A9C9]">
             {scoutMode === 'ultranicchia'
-              ? 'Ricerca libera tra maison radicali, nasi indipendenti e materie prime non convenzionali.'
+              ? 'Maison radicali e materie prime non convenzionali.'
               : 'Tre interpretazioni della stessa direzione olfattiva: Designer · Nicchia · Artistico.'}
           </p>
-
-          {/* Campo di ricerca libera dedicato all'Ultra-Nicchia */}
-          {scoutMode === 'ultranicchia' && (
-            <div>
-              <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
-                Materia prima, accordo, naso o maison
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B8A9C9]" />
-                <input
-                  type="text"
-                  value={ultraFreeQuery}
-                  onChange={(e) => setUltraFreeQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleRunScout();
-                    }
-                  }}
-                  placeholder="Es. sangue, neve, benzina, cera, castoreo, Toskovat, Jimmy Bodin..."
-                  style={{ borderColor: `${aura.primary}40` }}
-                  className="w-full rounded-[14px] bg-[#161024] border pl-10 pr-4 py-2.5 text-xs text-[#F6EFE4] placeholder:text-[#B8A9C9]/45 focus:outline-none"
-                />
-              </div>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
@@ -440,7 +456,8 @@ export default function CollezionePage() {
               </select>
             </div>
 
-            <div>
+            {/* NOTE DA INCLUDERE CON AUTOCOMPLETE ISTANTANEO + INPUT LIBERO */}
+            <div className="relative">
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
                 Note da Includere
               </label>
@@ -448,26 +465,57 @@ export default function CollezionePage() {
                 <input
                   type="text"
                   value={currentIncludeInput}
-                  onChange={(e) => setCurrentIncludeInput(e.target.value)}
+                  onFocus={() => setIncludeFocused(true)}
+                  onBlur={() => setTimeout(() => setIncludeFocused(false), 160)}
+                  onChange={(e) => {
+                    setCurrentIncludeInput(e.target.value);
+                    setIncludeFocused(true);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      handleAddIncludeNote();
+                      addIncludeNote(currentIncludeInput);
                     }
                   }}
-                  placeholder="Es. Iris, Cuoio, Incenso..."
+                  placeholder={
+                    scoutMode === 'ultranicchia'
+                      ? 'Es. Sangue, Neve, Castoreo, Benzina...'
+                      : 'Es. Iris, Cuoio, Patchouli...'
+                  }
                   style={{ borderColor: `${aura.primary}40` }}
                   className="flex-1 rounded-[14px] bg-[#161024] border p-2.5 text-[#F6EFE4] placeholder:text-[#B8A9C9]/40 focus:outline-none"
                 />
                 <button
                   type="button"
-                  onClick={handleAddIncludeNote}
+                  onClick={() => addIncludeNote(currentIncludeInput)}
                   style={{ backgroundColor: aura.primary }}
                   className="px-3.5 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
                 >
                   +
                 </button>
               </div>
+
+              {includeFocused && includeSuggestions.length > 0 && (
+                <div
+                  style={{ borderColor: `${aura.primary}50` }}
+                  className="absolute left-0 right-11 top-[66px] z-30 rounded-[14px] border bg-[#0E0A16] py-1.5 shadow-2xl"
+                >
+                  {includeSuggestions.map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        addIncludeNote(sug);
+                      }}
+                      className="block w-full px-3.5 py-1.5 text-left text-xs text-[#F6EFE4] hover:bg-white/10 transition"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {includeNotes.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {includeNotes.map((note, idx) => (
@@ -492,7 +540,8 @@ export default function CollezionePage() {
               )}
             </div>
 
-            <div>
+            {/* NOTE DA ESCLUDERE CON AUTOCOMPLETE ISTANTANEO + INPUT LIBERO */}
+            <div className="relative">
               <label className="block font-mono text-[10px] uppercase text-[#B8A9C9] mb-1.5">
                 Note da Escludere
               </label>
@@ -500,11 +549,16 @@ export default function CollezionePage() {
                 <input
                   type="text"
                   value={currentExcludeInput}
-                  onChange={(e) => setCurrentExcludeInput(e.target.value)}
+                  onFocus={() => setExcludeFocused(true)}
+                  onBlur={() => setTimeout(() => setExcludeFocused(false), 160)}
+                  onChange={(e) => {
+                    setCurrentExcludeInput(e.target.value);
+                    setExcludeFocused(true);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      handleAddExcludeNote();
+                      addExcludeNote(currentExcludeInput);
                     }
                   }}
                   placeholder="Es. Vaniglia, Muschio..."
@@ -513,13 +567,35 @@ export default function CollezionePage() {
                 />
                 <button
                   type="button"
-                  onClick={handleAddExcludeNote}
+                  onClick={() => addExcludeNote(currentExcludeInput)}
                   style={{ backgroundColor: aura.primary }}
                   className="px-3.5 py-2 rounded-[14px] text-[#08060C] font-bold transition hover:opacity-90"
                 >
                   +
                 </button>
               </div>
+
+              {excludeFocused && excludeSuggestions.length > 0 && (
+                <div
+                  style={{ borderColor: `${aura.primary}50` }}
+                  className="absolute left-0 right-11 top-[66px] z-30 rounded-[14px] border bg-[#0E0A16] py-1.5 shadow-2xl"
+                >
+                  {excludeSuggestions.map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        addExcludeNote(sug);
+                      }}
+                      className="block w-full px-3.5 py-1.5 text-left text-xs text-[#F6EFE4] hover:bg-white/10 transition"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {excludeNotes.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {excludeNotes.map((note, idx) => (
