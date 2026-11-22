@@ -68,7 +68,6 @@ export function ProfumoDetailModal({
   const [prezzoStimato, setPrezzoStimato] = useState('');
   const [immagineUrl, setImmagineUrl] = useState('');
 
-  // Stati Studio Isolamento Flacone
   const [bottleStudioOpen, setBottleStudioOpen] = useState(false);
   const [rawImageSource, setRawImageSource] = useState<File | string | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -163,7 +162,24 @@ export function ProfumoDetailModal({
   );
   const currentImg =
     processedPreview ||
-    (isEditing ? immagineUrl : profumo.url_foto_vetrina || profumo.immagine_url);
+    immagineUrl ||
+    profumo.url_foto_vetrina ||
+    profumo.immagine_url;
+
+  async function syncBottleToStorage(
+    blob: Blob,
+    targetBrand: string,
+    targetNome: string
+  ): Promise<string> {
+    const publicUrl = await uploadProcessedBottle(blob, targetBrand, targetNome);
+    // Aggiorna sempre anche ultranicchia_import se esiste corrispondenza
+    await supabase
+      .from('ultranicchia_import')
+      .update({ immagine_url: publicUrl })
+      .ilike('brand', targetBrand)
+      .ilike('nome', targetNome);
+    return publicUrl;
+  }
 
   async function handleQuickWear() {
     if (!profumo || isPreview || loggingWear) return;
@@ -192,7 +208,7 @@ export function ProfumoDetailModal({
     try {
       const cleanBrand = (isEditing ? brand : profumo.brand) || 'Maison';
       const cleanNome = (isEditing ? nome : profumo.nome) || 'Creazione';
-      const publicUrl = await uploadProcessedBottle(processedBlob, cleanBrand, cleanNome);
+      const publicUrl = await syncBottleToStorage(processedBlob, cleanBrand, cleanNome);
 
       setImmagineUrl(publicUrl);
 
@@ -208,17 +224,11 @@ export function ProfumoDetailModal({
         if (onUpdated && data) onUpdated(data as Profumo);
       }
 
-      await supabase
-        .from('ultranicchia_import')
-        .update({ immagine_url: publicUrl })
-        .ilike('brand', cleanBrand)
-        .ilike('nome', cleanNome);
-
       setBottleStudioOpen(false);
       setRawImageSource(null);
       setProcessedPreview(null);
       setProcessedBlob(null);
-      showToast('Flacone salvato in archivio.');
+      showToast('Flacone salvato nel bucket Storage.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Errore salvataggio flacone.';
       showToast(msg, 'error');
@@ -236,6 +246,23 @@ export function ProfumoDetailModal({
 
     setSaving(true);
     try {
+      let finalBottleUrl = immagineUrl.trim() || null;
+
+      // Se l'utente aveva appena isolato un flacone nello studio e ha cliccato direttamente "Salva",
+      // carichiamo prima il PNG sul bucket Storage 'flaconi'
+      if (processedBlob) {
+        finalBottleUrl = await syncBottleToStorage(
+          processedBlob,
+          brand.trim(),
+          nome.trim()
+        );
+        setImmagineUrl(finalBottleUrl);
+        setProcessedBlob(null);
+        setProcessedPreview(null);
+        setRawImageSource(null);
+        setBottleStudioOpen(false);
+      }
+
       const payload = {
         brand: brand.trim(),
         nome: nome.trim(),
@@ -248,7 +275,7 @@ export function ProfumoDetailModal({
         note_fondo: noteFondo.trim() || null,
         stato,
         prezzo_stimato_euro: stato === 'radar' ? prezzoStimato.trim() || null : null,
-        url_foto_vetrina: immagineUrl.trim() || null,
+        url_foto_vetrina: finalBottleUrl,
       };
 
       if (isPreview) {
@@ -621,7 +648,6 @@ export function ProfumoDetailModal({
                 </div>
               )}
 
-              {/* Piramide Olfattiva */}
               <div
                 style={{ borderColor: `${aura.primary}30` }}
                 className="rounded-2xl border bg-[#0E0A16]/90 p-4 space-y-3"
@@ -663,7 +689,6 @@ export function ProfumoDetailModal({
             </div>
           </div>
         ) : (
-          /* MODALITÀ MODIFICA / SALVATAGGIO */
           <div className="relative z-10 mt-6 space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
