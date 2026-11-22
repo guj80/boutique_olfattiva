@@ -180,12 +180,12 @@ export function buildOlfactiveGraph(
     .map(([id, entry]) => {
       let bestFamily = 'Legnosa';
       let bestVotes = -1;
-      for (const [fam, votes] of entry.familyVotes.entries()) {
+      Array.from(entry.familyVotes.entries()).forEach(([fam, votes]) => {
         if (votes > bestVotes) {
           bestVotes = votes;
           bestFamily = fam;
         }
-      }
+      });
       return {
         id,
         label: entry.label,
@@ -211,10 +211,9 @@ export function buildOlfactiveGraph(
   const perfumeById = new Map(pool.map((p) => [p.id, p]));
   const N = pool.length;
 
-  // Co-occorrenza tra note + Lift: P(A,B) / (P(A) * P(B))
   const pairMap = new Map<string, { a: NoteNode; b: NoteNode; perfumeIds: Set<string> }>();
 
-  for (const [perfumeId, keys] of perfumeNotesMap.entries()) {
+  Array.from(perfumeNotesMap.entries()).forEach(([perfumeId, keys]) => {
     const activeKeys = keys.filter((k) => nodeById.has(k)).sort();
     for (let i = 0; i < activeKeys.length; i++) {
       for (let j = i + 1; j < activeKeys.length; j++) {
@@ -229,7 +228,7 @@ export function buildOlfactiveGraph(
         pair.perfumeIds.add(perfumeId);
       }
     }
-  }
+  });
 
   const links: NoteLink[] = Array.from(pairMap.entries())
     .map(([id, pair]) => {
@@ -255,13 +254,13 @@ export function buildOlfactiveGraph(
     })
     .sort((a, b) => b.weight - a.weight);
 
-  // Matrice macro delle Famiglie (per la vista "Accordi / Sinergie")
   const famPairMap = new Map<string, { f1: string; f2: string; perfumeIds: Set<string> }>();
   const famCountMap = new Map<string, number>();
 
-  for (const [perfumeId, fams] of perfumeFamiliesMap.entries()) {
-    const sorted = [...new Set(fams)].sort();
-    for (const f of sorted) {
+  Array.from(perfumeFamiliesMap.entries()).forEach(([perfumeId, fams]) => {
+    const sorted = Array.from(new Set(fams)).sort();
+    for (let k = 0; k < sorted.length; k++) {
+      const f = sorted[k];
       famCountMap.set(f, (famCountMap.get(f) || 0) + 1);
     }
     for (let i = 0; i < sorted.length; i++) {
@@ -275,7 +274,7 @@ export function buildOlfactiveGraph(
         entry.perfumeIds.add(perfumeId);
       }
     }
-  }
+  });
 
   const familyLinks: NoteLink[] = Array.from(famPairMap.entries())
     .map(([id, item]) => {
@@ -304,7 +303,8 @@ export function buildOlfactiveGraph(
     .sort((a, b) => b.weight - a.weight);
 
   const famStatsMap = new Map<string, { notes: number; totalMentions: number }>();
-  for (const node of allNodes) {
+  for (let i = 0; i < allNodes.length; i++) {
+    const node = allNodes[i];
     const cur = famStatsMap.get(node.family) || { notes: 0, totalMentions: 0 };
     cur.notes += 1;
     cur.totalMentions += node.count;
@@ -319,9 +319,9 @@ export function buildOlfactiveGraph(
 
   return {
     nodes: allNodes,
-    links,
-    familyLinks,
-    families,
+    links: links,
+    familyLinks: familyLinks,
+    families: families,
     totalPerfumes: pool.length,
   };
 }
