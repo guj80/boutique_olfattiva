@@ -21,7 +21,7 @@ const MAX_QUERY_LEN = 160;
 const MAX_URL_LEN = 2048;
 const MAX_IMAGE_B64_CHARS = 7_000_000;
 const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'];
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 5;
 
 type DbRecord = Record<string, any>;
 
@@ -41,7 +41,7 @@ IDENTIFICAZIONE E CONCENTRAZIONI
 DATI
 - Note: in italiano, ingredienti singoli separati da virgola, da 3 a 7 per livello, senza "note di" e senza ripetizioni.
 - "famiglia_olfattiva": UNA parola tra Agrumata, Aromatica, Marina, Floreale, Fruttata, Verde, Speziata, Legnosa, Ambrata, Gourmand, Cuoiata, Muschiata.
-- "prezzo_stimato_euro": solo prezzi di listino ufficiali in euro se presenti nelle fonti o noti con certezza, nel formato "50ml: €145" oppure "50ml: €195 • 100ml: €280". Se non conosci il prezzo ufficiale con certezza assoluta, lascia "". Non inventare MAI prezzi o formati di comodo.
+- "prezzo_stimato_euro": lascia SEMPRE "" a meno che il prezzo esatto in euro non sia scritto esplicitamente nel tag <pagina>. Non stimare né ricordare mai prezzi.
 - "formato_ml": il formato standard principale della Maison in ml (es. 50 per Lorenzo Pazzaglia, Nasomatto, Orto Parisi; 100 per la maggior parte degli altri), oppure null se incerto.
 - "anno_lancio": anno di uscita se noto, altrimenti null.
 - "naso": profumiere/i creatore/i dichiarati dalla Maison, altrimenti "".
@@ -864,7 +864,10 @@ export async function POST(req: Request) {
         const normT = cleanNotes(dbRecord.top_notes);
         const normC = cleanNotes(dbRecord.middle_notes);
         const normF = cleanNotes(dbRecord.base_notes);
-        const isFiftyMlBrand = /pazzaglia|nasomatto|orto parisi|francesca bianchi/i.test(cleanB);
+        const isFiftyMlBrand =
+          /pazzaglia|nasomatto|orto parisi|francesca bianchi|meo fusciuni|filippo sorcinelli|mendittorosa|pekji/i.test(
+            cleanB
+          );
 
         return NextResponse.json({
           nome: cleanN,
@@ -1099,17 +1102,26 @@ ${JSON.stringify(parsed)}`,
       cleanNotes(parsed.note_cuore) || cleanNotes(dbRecord && dbRecord.middle_notes);
     const normFondo = cleanNotes(parsed.note_fondo) || cleanNotes(dbRecord && dbRecord.base_notes);
 
-    const prezzo = sanitizePrezzo(parsed.prezzo_stimato_euro);
+    // Prezzo consentito SOLO se letto da una pagina reale (mode === 'url'), mai stimato dall'AI
+    const prezzo =
+      mode === 'url' && pageText
+        ? sanitizePrezzo(parsed.prezzo_stimato_euro)
+        : { text: '', formats: [] as number[] };
+
     const formatoAi = Number(parsed.formato_ml);
-    const isFiftyMlBrand = /pazzaglia|nasomatto|orto parisi|francesca bianchi/i.test(brand);
+    const isFiftyMlBrand =
+      /pazzaglia|nasomatto|orto parisi|francesca bianchi|meo fusciuni|filippo sorcinelli|mendittorosa|pekji/i.test(
+        brand
+      );
     const defaultFormat = isFiftyMlBrand ? 50 : 100;
 
-    const formato =
-      Number.isFinite(formatoAi) && formatoAi >= 25 && formatoAi <= 500
-        ? formatoAi
-        : prezzo.formats.length > 0
-        ? prezzo.formats[0]
-        : defaultFormat;
+    const formato = isFiftyMlBrand
+      ? 50
+      : Number.isFinite(formatoAi) && formatoAi >= 25 && formatoAi <= 500
+      ? formatoAi
+      : prezzo.formats.length > 0
+      ? prezzo.formats[0]
+      : defaultFormat;
 
     if (!foundImage && imageJob) {
       foundImage = await withTimeout(
@@ -1161,9 +1173,9 @@ ${JSON.stringify(parsed)}`,
         dbRecord && dbRecord.main_accords
       ),
       note_testa: normTesta,
-      note_cuore: normCuore,
-      note_fondo: normFondo,
-      note_olfattive: [normTesta, normCuore, normFondo].filter(Boolean).join(', '),
+      note_cuore: normC,
+      note_fondo: normF,
+      note_olfattive: [normTesta, normC, normF].filter(Boolean).join(', '),
       descrizione_ai: toText(parsed.descrizione_ai, 500),
       prezzo_stimato_euro: prezzo.text,
       formato_ml: formato,
