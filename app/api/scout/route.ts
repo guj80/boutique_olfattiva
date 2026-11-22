@@ -35,6 +35,7 @@ interface CandidatePerfume {
   fonte: 'catalogo' | 'ultranicchia';
   motivo: string;
   url_foto_vetrina: string | null;
+  sourcePageUrl?: string | null;
 }
 
 const DESIGNER_BRANDS: string[] = [
@@ -206,10 +207,6 @@ function cleanNoteField(raw?: string | null): string | null {
   return formatted.trim() ? formatted : null;
 }
 
-/**
- * Estrae una lista di singole note normalizzate (IT + EN) dalla piramide di un profumo
- * e verifica il match a livello di nota reale (non sottostringa casuale).
- */
 function buildNoteHaystack(
   testa?: string | null,
   cuore?: string | null,
@@ -234,7 +231,6 @@ function tokenMatchesVariant(
 ): boolean {
   const v = normalizeKey(variant);
   if (!v) return false;
-  // Match esatto su una nota o presenza come parola intera all'interno di una nota composta (es. "iris fiorentino" contiene "iris")
   const paddedVariant = ` ${v} `;
   for (let i = 0; i < haystack.tokens.length; i++) {
     const paddedToken = ` ${haystack.tokens[i]} `;
@@ -245,11 +241,6 @@ function tokenMatchesVariant(
   return false;
 }
 
-/**
- * Verifica rigorosa:
- * - NESSUNA delle note escluse deve comparire.
- * - TUTTE le note incluse (logica AND) devono comparire nella piramide del profumo.
- */
 function matchesStrictNotesFilter(
   haystack: { tokens: string[]; fullText: string },
   includeGroups: string[][],
@@ -284,7 +275,45 @@ function getSupabaseServer() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-async function enrichReasonsWithAI(
+/**
+ * Risoluzione rapida on-demand (0 token AI) per le sole 3 proposte estratte:
+ * se è già salvata un'immagine nello Storage la mantiene; altrimenti tenta un lookup
+ * leggero sulla pagina sorgente con timeout stretto (2.2s) prima di lasciare campo
+ * al flacone scultoreo generativo.
+ */
+async function resolveCandidateImage(candidate: CandidatePerfume): Promise<string | null> {
+  if (candidate.url_foto_vetrina) return candidate.url_foto_vetrina;
+  if (!candidate.sourcePageUrl) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2200);
+  try {
+    const res = await fetch(candidate.sourcePageUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        Accept: 'text/html',
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const ogMatch =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const found = ogMatch?.[1]?.trim() || null;
+    if (!found || !found.startsWith('http')) return null;
+    // Scarta loghi generici del sito
+    if (/logo|icon|avatar|placeholder/i.test(found)) return null;
+    return found;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function enrichCandidates(
   candidates: CandidatePerfume[],
   contextHint: string
 ): Promise<CandidatePerfume[]> {
@@ -302,19 +331,22 @@ async function enrichReasonsWithAI(
     return notes ? `Accordo costruito su ${notes}.` : `Selezione ${c.categoria.toLowerCase()}.`;
   };
 
-  try {
-    const listText = candidates
-      .map(
-        (c, idx) =>
-          `${idx + 1}. [${c.categoria}] ${c.brand} — ${c.nome} | Testa: ${
-            c.note_testa || '-'
-          } | Cuore: ${c.note_cuore || '-'} | Fondo: ${c.note_fondo || '-'}`
-      )
-      .join('\n');
+  // Eseguiamo in parallelo l'arricchimento editoriale e il lookup rapido immagini sui soli 3 candidati
+  const [aiReasons, resolvedImages] = await Promise.all([
+    (async (): Promise<string[]> => {
+      try {
+        const listText = candidates
+          .map(
+            (c, idx) =>
+              `${idx + 1}. [${c.categoria}] ${c.brand} — ${c.nome} | Testa: ${
+                c.note_testa || '-'
+              } | Cuore: ${c.note_cuore || '-'} | Fondo: ${c.note_fondo || '-'}`
+          )
+          .join('\n');
 
-    const prompt = `Sei il curatore di Atelier LG. Scrivi una nota editoriale asciutta e tecnica in italiano (1 frase breve, max 120 caratteri, zero enfasi pubblicitaria) per ciascuna di queste ${candidates.length} fragranze reali${
-      contextHint ? ` (${contextHint})` : ''
-    }:
+        const prompt = `Sei il curatore di Atelier LG. Scrivi una nota editoriale asciutta e tecnica in italiano (1 frase breve, max 120 caratteri, zero enfasi pubblicitaria) per ciascuna di queste ${candidates.length} fragranze reali${
+          contextHint ? ` (${contextHint})` : ''
+        }:
 
 ${listText}
 
@@ -323,29 +355,33 @@ Restituisci SOLO JSON valido:
   "motivi": ["frase 1", "frase 2", "frase 3"]
 }`;
 
-    const { text } = await callGeminiWithFallback([{ text: prompt }], {
-      jsonMode: true,
-      temperature: 0.4,
-      timeoutMs: 6500,
-      deadline: Date.now() + 9000,
-    });
+        const { text } = await callGeminiWithFallback([{ text: prompt }], {
+          jsonMode: true,
+          temperature: 0.4,
+          timeoutMs: 6500,
+          deadline: Date.now() + 9000,
+        });
 
-    const parsed = extractJsonFromAiText<{ motivi?: unknown }>(text);
-    const motivi = Array.isArray(parsed?.motivi) ? parsed.motivi : [];
+        const parsed = extractJsonFromAiText<{ motivi?: unknown }>(text);
+        return Array.isArray(parsed?.motivi)
+          ? parsed.motivi.map((m) => (typeof m === 'string' ? m.trim() : ''))
+          : [];
+      } catch {
+        return [];
+      }
+    })(),
+    Promise.all(candidates.map((c) => resolveCandidateImage(c))),
+  ]);
 
-    return candidates.map((c, idx) => {
-      const m = typeof motivi[idx] === 'string' ? motivi[idx].trim() : '';
-      return {
-        ...c,
-        motivo: m.length >= 8 ? m.slice(0, 160) : fallbackReason(c),
-      };
-    });
-  } catch {
-    return candidates.map((c) => ({
-      ...c,
-      motivo: fallbackReason(c),
-    }));
-  }
+  return candidates.map((c, idx) => {
+    const m = aiReasons[idx] || '';
+    const { sourcePageUrl: _omit, ...publicCandidate } = c;
+    return {
+      ...publicCandidate,
+      url_foto_vetrina: resolvedImages[idx] || c.url_foto_vetrina || null,
+      motivo: m.length >= 8 ? m.slice(0, 160) : fallbackReason(c),
+    };
+  });
 }
 
 export async function POST(req: Request) {
@@ -381,7 +417,6 @@ export async function POST(req: Request) {
     ? body.excludeNotes.map((n) => String(n).trim()).filter(Boolean).slice(0, 8)
     : [];
 
-  // Per ogni nota inserita generiamo tutte le varianti IT + EN
   const includeGroups = includeNotes
     .map((n) => getNoteSearchVariants(n))
     .filter((g) => g.length > 0);
@@ -395,12 +430,12 @@ export async function POST(req: Request) {
   ]);
 
   try {
-    // RAMO 1: ULTRA-NICCHIA (ultranicchia_import — 385 righe)
+    // RAMO 1: ULTRA-NICCHIA (ultranicchia_import)
     if (mode === 'ultranicchia') {
       const { data: ultraRows, error: ultraErr } = await supabase
         .from('ultranicchia_import')
         .select(
-          'brand, nome, concentrazione, famiglia_originale, famiglia_tags, naso, note_testa, note_cuore, note_fondo, dati_completi'
+          'brand, nome, concentrazione, famiglia_originale, famiglia_tags, naso, note_testa, note_cuore, note_fondo, dati_completi, immagine_url'
         );
 
       if (ultraErr) throw ultraErr;
@@ -437,6 +472,7 @@ export async function POST(req: Request) {
         }
 
         const completenessBonus = row.dati_completi ? 12 : 0;
+        const imageBonus = row.immagine_url ? 15 : 0;
 
         ultraPool.push({
           item: {
@@ -451,9 +487,9 @@ export async function POST(req: Request) {
             categoria: 'Ultra-Nicchia',
             fonte: 'ultranicchia',
             motivo: '',
-            url_foto_vetrina: null,
+            url_foto_vetrina: row.immagine_url ? String(row.immagine_url).trim() : null,
           },
-          score: completenessBonus + Math.random() * 25,
+          score: completenessBonus + imageBonus + Math.random() * 25,
         });
       }
 
@@ -470,7 +506,7 @@ export async function POST(req: Request) {
         .filter(Boolean)
         .join(', ');
 
-      const enriched = await enrichReasonsWithAI(picked, hint);
+      const enriched = await enrichCandidates(picked, hint);
 
       return NextResponse.json({
         proposals: enriched,
@@ -482,10 +518,10 @@ export async function POST(req: Request) {
     // RAMO 2: IL TRITTICO (1 Designer · 1 Nicchia · 1 Artistico dal catalogo perfumes)
     let catalogQuery = supabase
       .from('perfumes')
-      .select('brand, name, concentration, main_accords, top_notes, middle_notes, base_notes, perfumers');
+      .select(
+        'brand, name, concentration, main_accords, top_notes, middle_notes, base_notes, perfumers, url'
+      );
 
-    // Spingiamo il filtro delle note incluse direttamente nella query SQL su Supabase
-    // così su 59.000 righe estraiamo subito i profumi che contengono davvero quelle materie prime!
     if (includeGroups.length > 0) {
       for (let i = 0; i < includeGroups.length; i++) {
         const variants = includeGroups[i]
@@ -506,7 +542,6 @@ export async function POST(req: Request) {
       }
       catalogQuery = catalogQuery.limit(1200);
     } else {
-      // Senza filtro note specifico, campioniamo tra i brand delle 3 fasce
       const sampledBrands = shuffle([
         ...shuffle(DESIGNER_BRANDS).slice(0, 14),
         ...shuffle(NICHE_BRANDS).slice(0, 16),
@@ -568,6 +603,7 @@ export async function POST(req: Request) {
           fonte: 'catalogo' as const,
           motivo: '',
           url_foto_vetrina: null,
+          sourcePageUrl: row.url ? String(row.url).trim() : null,
         },
         score: (hasFam ? 45 : 10) + Math.random() * 25,
       };
@@ -601,7 +637,6 @@ export async function POST(req: Request) {
     pickOne(nichePool);
     pickOne(artisticPool);
 
-    // Riempie fino a 3 solo usando candidati CHE HANNO GIA SUPERATO TUTTI I FILTRI
     for (const pool of [artisticPool, nichePool, designerPool]) {
       if (trittico.length >= 3) break;
       for (let i = 0; i < pool.length; i++) {
@@ -622,7 +657,7 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join(', ');
 
-    const enriched = await enrichReasonsWithAI(trittico, hint);
+    const enriched = await enrichCandidates(trittico, hint);
 
     return NextResponse.json({
       proposals: enriched,
