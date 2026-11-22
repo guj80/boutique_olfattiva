@@ -116,7 +116,6 @@ export default function ScannerPage() {
   const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
 
-  // Studio Isola Flacone nella bozza dello Scanner
   const [bottleStudioOpen, setBottleStudioOpen] = useState(false);
   const [rawBottleSource, setRawBottleSource] = useState<File | string | null>(null);
   const [bottleUrlInput, setBottleUrlInput] = useState('');
@@ -144,7 +143,7 @@ export default function ScannerPage() {
         const data = await res.json();
         setSuggestions(Array.isArray(data.results) ? data.results : []);
       } catch {
-        // richiesta annullata o rete assente
+        // richiesta annullata
       }
     }, 250);
     return () => {
@@ -153,7 +152,6 @@ export default function ScannerPage() {
     };
   }, [inputName, mode]);
 
-  // Elaborazione isolamento flacone in tempo reale nella bozza
   useEffect(() => {
     if (!rawBottleSource) return;
     let cancelled = false;
@@ -184,7 +182,6 @@ export default function ScannerPage() {
     };
   }, [rawBottleSource, tolerance, showToast]);
 
-  // Supporto Ctrl+V / Cmd+V nello studio flacone della bozza
   useEffect(() => {
     if (!draft || !bottleStudioOpen) return;
     const onPaste = (e: ClipboardEvent) => {
@@ -213,7 +210,8 @@ export default function ScannerPage() {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxDim = 1200;
+        // 768px ottimizza la velocità di lettura etichetta su rete mobile senza saturare memoria o quota
+        const maxDim = 768;
         let w = img.width;
         let h = img.height;
 
@@ -230,7 +228,7 @@ export default function ScannerPage() {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, w, h);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.84);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
           setImagePreview(compressedDataUrl);
           setImageMime('image/jpeg');
         }
@@ -288,14 +286,20 @@ export default function ScannerPage() {
         throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
+      // La foto scattata per la lettura dell'etichetta viene immediatamente scartata dalla memoria
+      if (mode === 'photo') {
+        setImagePreview(null);
+      }
+
       const extractedBrand = String(data.brand || '').trim();
       const extractedName = String(data.nome || '').trim();
 
-      // 1) Controlla prima se esiste già un flacone PNG isolato nello Storage 'flaconi'
+      // Cerca prima nello Storage 'flaconi' se hai già isolato questo flacone
       const storedBottle = await lookupExistingBottleUrl(extractedBrand, extractedName);
 
-      // 2) Altrimenti, se l'estrazione ha trovato un'immagine ufficiale web, avvia subito l'isolamento
+      // Solo in modalità URL/Ricerca (mai da foto scattata) tenta eventuale foto ufficiale web
       const officialPhoto =
+        mode !== 'photo' &&
         typeof data.url_foto_vetrina === 'string' &&
         data.url_foto_vetrina.startsWith('http')
           ? data.url_foto_vetrina
@@ -356,7 +360,6 @@ export default function ScannerPage() {
       const cleanNome = draft.nome.trim();
       let finalBottleUrl = draft.url_foto_vetrina || null;
 
-      // Se c'è un flacone isolato pronto nella bozza, caricalo subito nel bucket Storage 'flaconi'
       if (processedBlob) {
         finalBottleUrl = await uploadProcessedBottle(processedBlob, cleanBrand, cleanNome);
         await supabase
@@ -577,7 +580,7 @@ export default function ScannerPage() {
                 >
                   <Camera style={{ color: aura.primary }} className="h-6 w-6" />
                   <span className="text-sm font-semibold text-[#F6EFE4]">
-                    Inquadra Etichetta (Solo Lettura)
+                    Scatta foto
                   </span>
                 </button>
                 <button
@@ -596,12 +599,12 @@ export default function ScannerPage() {
                 <div className="flex items-center gap-4">
                   <img
                     src={imagePreview}
-                    alt="Anteprima lettura"
+                    alt="Anteprima etichetta"
                     className="h-16 w-16 rounded-xl object-contain bg-transparent p-1"
                   />
                   <div>
                     <p className="text-sm font-semibold text-[#F6EFE4]">
-                      Immagine pronta per lettura OCR (non verrà salvata)
+                      Etichetta acquisita
                     </p>
                     <button
                       type="button"
@@ -617,9 +620,10 @@ export default function ScannerPage() {
                   onClick={() => handleExtract()}
                   disabled={extracting}
                   style={{ backgroundColor: aura.primary }}
-                  className="rounded-full px-6 py-3 text-xs font-bold text-[#140D1C]"
+                  className="flex items-center gap-2 rounded-full px-6 py-3 text-xs font-bold text-[#140D1C]"
                 >
-                  {extracting ? 'Analisi...' : 'Avvia Riconoscimento'}
+                  {extracting && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                  <span>{extracting ? 'Lettura...' : 'Identifica'}</span>
                 </button>
               </div>
             )}
@@ -785,7 +789,7 @@ export default function ScannerPage() {
                     ) : processedBlob ? (
                       <span className="inline-flex items-center gap-1 text-emerald-300 font-mono text-[11px]">
                         <Check className="h-3.5 w-3.5" />
-                        Flacone pronto per il salvataggio
+                        Flacone pronto
                       </span>
                     ) : null}
                   </div>
@@ -905,7 +909,7 @@ export default function ScannerPage() {
                   onChange={(e) =>
                     setDraft({ ...draft, prezzo_stimato_euro: e.target.value })
                   }
-                  placeholder="Es. 50ml: €145 (vuoto se incerto)"
+                  placeholder="Es. 50ml: €145"
                   className="w-full rounded-[14px] border border-white/10 bg-[#140D1C] px-3 py-2 text-xs text-[#F6EFE4]"
                 />
               </div>
