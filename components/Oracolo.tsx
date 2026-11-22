@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   AlertTriangle,
-  BookmarkPlus,
   Compass,
   Globe,
   Layers,
@@ -623,22 +622,13 @@ export function Oracolo() {
                       >
                         CM
                       </span>
-                      <div className="min-w-0 space-y-1.5">
+                      <div className="min-w-0">
                         <div
                           style={{ borderColor: `${aura.primary}25` }}
                           className="whitespace-pre-wrap break-words rounded-2xl rounded-tl-md border bg-[#161024] px-4 py-3 text-sm leading-relaxed text-[#F6EFE4]"
                         >
                           {message.content}
                         </div>
-                        <button
-                          type="button"
-                          disabled
-                          title="Presto disponibile"
-                          className="inline-flex cursor-not-allowed items-center gap-1.5 px-1 font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9] opacity-40"
-                        >
-                          <BookmarkPlus className="h-3 w-3" />
-                          Salva come nota
-                        </button>
                       </div>
                     </motion.div>
                   )
