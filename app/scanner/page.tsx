@@ -31,6 +31,7 @@ type CatalogHit = {
   brand: string;
   release_year?: number | string | null;
   concentration?: string | null;
+  source?: 'ultranicchia' | 'catalogo';
 };
 
 const PURE_FAMILIES = [
@@ -111,6 +112,7 @@ export default function ScannerPage() {
   const [savingTarget, setSavingTarget] = useState<'collezione' | 'radar' | null>(null);
 
   const [draft, setDraft] = useState<Partial<Profumo> | null>(null);
+  const [detectedVariants, setDetectedVariants] = useState<string[]>([]);
   const [modelSource, setModelSource] = useState<string>('');
 
   const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
@@ -129,7 +131,7 @@ export default function ScannerPage() {
 
   useEffect(() => {
     const q = inputName.trim();
-    if (mode !== 'name' || q.length < 3) {
+    if (mode !== 'name' || q.length < 2) {
       setSuggestions([]);
       return;
     }
@@ -145,7 +147,7 @@ export default function ScannerPage() {
       } catch {
         // richiesta annullata
       }
-    }, 250);
+    }, 220);
     return () => {
       clearTimeout(timer);
       ctrl.abort();
@@ -210,7 +212,6 @@ export default function ScannerPage() {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        // 768px ottimizza la velocità di lettura etichetta su rete mobile senza saturare memoria o quota
         const maxDim = 768;
         let w = img.width;
         let h = img.height;
@@ -241,32 +242,35 @@ export default function ScannerPage() {
     e.target.value = '';
   }
 
-  async function handleExtract(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-
-    if (mode === 'url' && !inputUrl.trim()) {
-      showToast('Inserisci un link ufficiale valido.', 'error');
-      return;
-    }
-    if (mode === 'name' && !inputName.trim()) {
-      showToast('Inserisci Maison e Nome della creazione.', 'error');
-      return;
-    }
-    if (mode === 'photo' && !imagePreview) {
-      showToast("Scatta una foto o seleziona un'immagine.", 'error');
-      return;
+  async function runExtraction(overridePayload?: Record<string, any>) {
+    if (!overridePayload) {
+      if (mode === 'url' && !inputUrl.trim()) {
+        showToast('Inserisci un link ufficiale valido.', 'error');
+        return;
+      }
+      if (mode === 'name' && !inputName.trim()) {
+        showToast('Inserisci Maison e Nome della creazione.', 'error');
+        return;
+      }
+      if (mode === 'photo' && !imagePreview) {
+        showToast("Scatta una foto o seleziona un'immagine.", 'error');
+        return;
+      }
     }
 
     setExtracting(true);
     setDraft(null);
+    setDetectedVariants([]);
     setBottleStudioOpen(false);
     setRawBottleSource(null);
     setProcessedPreview(null);
     setProcessedBlob(null);
 
     try {
-      const payload: Record<string, any> = {};
-      if (mode === 'url') {
+      let payload: Record<string, any> = {};
+      if (overridePayload) {
+        payload = overridePayload;
+      } else if (mode === 'url') {
         payload.url = inputUrl.trim();
       } else if (mode === 'name') {
         payload.queryName = inputName.trim();
@@ -286,18 +290,15 @@ export default function ScannerPage() {
         throw new Error(data.error || "Errore durante l'estrazione dei dati.");
       }
 
-      // La foto scattata per la lettura dell'etichetta viene immediatamente scartata dalla memoria
-      if (mode === 'photo') {
+      if (mode === 'photo' && !overridePayload) {
         setImagePreview(null);
       }
 
       const extractedBrand = String(data.brand || '').trim();
       const extractedName = String(data.nome || '').trim();
 
-      // Cerca prima nello Storage 'flaconi' se hai già isolato questo flacone
       const storedBottle = await lookupExistingBottleUrl(extractedBrand, extractedName);
 
-      // Solo in modalità URL/Ricerca (mai da foto scattata) tenta eventuale foto ufficiale web
       const officialPhoto =
         mode !== 'photo' &&
         typeof data.url_foto_vetrina === 'string' &&
@@ -333,6 +334,9 @@ export default function ScannerPage() {
         note_pelle: '',
       };
 
+      setDetectedVariants(
+        Array.isArray(data.varianti_rilevate) ? data.varianti_rilevate.map(String) : []
+      );
       setModelSource(data._modelUsed || 'verified-engine');
       setDraft(extractedDraft);
       setCustomAura(resolveAura(extractedDraft.famiglia_olfattiva, extractedDraft.nome));
@@ -346,6 +350,42 @@ export default function ScannerPage() {
     } finally {
       setExtracting(false);
     }
+  }
+
+  function handleExtract(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    void runExtraction();
+  }
+
+  function handleSelectCatalogHit(hit: CatalogHit) {
+    const label = hit.concentration
+      ? `${hit.brand} ${hit.name} (${hit.concentration})`
+      : `${hit.brand} ${hit.name}`;
+    setInputName(label);
+    setSuggestions([]);
+    setShowSuggest(false);
+    void runExtraction({
+      brand: hit.brand,
+      nome: hit.name,
+      concentration: hit.concentration || '',
+      fromCatalogPick: true,
+    });
+  }
+
+  function handleSwitchVariant(variantLabel: string) {
+    if (!draft?.brand || !draft?.nome) return;
+    const isConcOnly = /^(eau de |extrait|parfum|elixir|intense)/i.test(variantLabel.trim());
+    void runExtraction(
+      isConcOnly
+        ? {
+            brand: draft.brand,
+            nome: draft.nome,
+            concentration: variantLabel,
+          }
+        : {
+            queryName: `${draft.brand} ${variantLabel}`,
+          }
+    );
   }
 
   async function saveWithDestination(destination: 'collezione' | 'radar') {
@@ -517,18 +557,29 @@ export default function ScannerPage() {
                           type="button"
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            setInputName(`${s.brand} ${s.name}`);
-                            setSuggestions([]);
-                            setShowSuggest(false);
+                            handleSelectCatalogHit(s);
                           }}
                           className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-white/5"
                         >
-                          <span className="min-w-0 truncate text-sm text-[#F6EFE4]">
-                            {s.name}
-                            <span className="text-[#B8A9C9]"> — {s.brand}</span>
-                          </span>
+                          <div className="min-w-0 flex items-center gap-2">
+                            <span className="truncate text-sm text-[#F6EFE4]">
+                              {s.name}
+                              <span className="text-[#B8A9C9]"> — {s.brand}</span>
+                            </span>
+                            {s.concentration && (
+                              <span
+                                style={{
+                                  borderColor: `${aura.primary}40`,
+                                  color: aura.primary,
+                                }}
+                                className="shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+                              >
+                                {s.concentration}
+                              </span>
+                            )}
+                          </div>
                           <span className="shrink-0 font-mono text-[10px] text-[#B8A9C9]">
-                            {s.release_year || ''}
+                            {s.release_year || (s.source === 'ultranicchia' ? 'Ultra-Nicchia' : '')}
                           </span>
                         </button>
                       </li>
@@ -696,6 +747,26 @@ export default function ScannerPage() {
               <span>Isola flacone</span>
             </button>
           </div>
+
+          {detectedVariants.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-[#140D1C]/80 px-4 py-3">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
+                Altre concentrazioni/versioni:
+              </span>
+              {detectedVariants.map((variant) => (
+                <button
+                  key={variant}
+                  type="button"
+                  disabled={extracting}
+                  onClick={() => handleSwitchVariant(variant)}
+                  style={{ borderColor: `${aura.primary}50`, color: aura.primary }}
+                  className="rounded-full border bg-[#1E1428] px-3 py-1 text-xs font-semibold transition hover:bg-white/5 disabled:opacity-50"
+                >
+                  Passa a {variant}
+                </button>
+              ))}
+            </div>
+          )}
 
           {bottleStudioOpen && (
             <div
