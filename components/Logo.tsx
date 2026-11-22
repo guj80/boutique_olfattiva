@@ -14,27 +14,24 @@ import { useAura } from './AuraProvider';
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  /** Se true, attiva un sottile bagliore ambientale legato all'aura attiva */
   glow?: boolean;
 }
 
 const SIZE_CLASSES: Record<NonNullable<LogoProps['size']>, string> = {
-  sm: 'h-8 w-8',
-  md: 'h-11 w-11',
-  lg: 'h-14 w-14',
-  xl: 'h-44 w-44 sm:h-52 sm:w-52',
+  sm: 'h-9 w-8',
+  md: 'h-12 w-10',
+  lg: 'h-16 w-14',
+  xl: 'h-48 w-40 sm:h-56 sm:w-48',
 };
 
 /**
- * Monogramma vettoriale ufficiale Atelier LG.
- * Riproduce fedelmente le geometrie sfaccettate del flacone-monogramma
- * adattando il gradiente interno alle variabili CSS dell'Aura attiva.
+ * Monogramma vettoriale ufficiale Atelier LG (coordinate originali SVG).
+ * Finitura platino-argento satinato su sfondo 100% trasparente:
+ * si armonizza con qualsiasi Aura senza alcun bordo o riquadro nero.
  */
 export function Logo({ className = '', size = 'md', glow = false }: LogoProps) {
   const uid = useId().replace(/:/g, '');
-  const gradMainId = `lg-grad-${uid}`;
-  const gradCapId = `lg-cap-${uid}`;
-  const sheenId = `lg-sheen-${uid}`;
+  const gradId = `lg-platinum-${uid}`;
 
   return (
     <div
@@ -45,109 +42,51 @@ export function Logo({ className = '', size = 'md', glow = false }: LogoProps) {
           aria-hidden="true"
           style={{
             background:
-              'radial-gradient(circle, color-mix(in srgb, var(--aura-1) 42%, transparent) 0%, transparent 70%)',
+              'radial-gradient(circle, color-mix(in srgb, var(--aura-1) 38%, transparent) 0%, transparent 72%)',
           }}
           className="pointer-events-none absolute -inset-2 rounded-full blur-md"
         />
       )}
 
       <svg
-        viewBox="0 0 200 220"
+        viewBox="220 205 1216 1455"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         role="img"
         aria-label="Atelier LG"
-        className="relative h-full w-full overflow-visible"
+        className="relative h-full w-full overflow-visible drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
       >
         <defs>
-          {/* Gradiente principale del corpo flacone/monogramma: Aura 1 -> Champagne -> Aura 2 */}
-          <linearGradient id={gradMainId} x1="30" y1="58" x2="170" y2="205" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" style={{ stopColor: 'var(--aura-1)' }} />
-            <stop
-              offset="52%"
-              style={{
-                stopColor: 'color-mix(in srgb, var(--aura-1) 58%, #F6EFE4)',
-              }}
-            />
-            <stop
-              offset="100%"
-              style={{
-                stopColor: 'color-mix(in srgb, var(--aura-2) 72%, var(--aura-1))',
-              }}
-            />
-          </linearGradient>
-
-          {/* Gradiente del tappo asimmetrico: luminosita' pura di Aura 1 + avorio */}
-          <linearGradient id={gradCapId} x1="60" y1="14" x2="148" y2="54" gradientUnits="userSpaceOnUse">
-            <stop
-              offset="0%"
-              style={{
-                stopColor: 'color-mix(in srgb, var(--aura-1) 75%, #F6EFE4)',
-              }}
-            />
-            <stop offset="100%" style={{ stopColor: 'var(--aura-1)' }} />
-          </linearGradient>
-
-          {/* Riflesso interno sottile sui tagli geometrici */}
-          <linearGradient id={sheenId} x1="100" y1="14" x2="100" y2="205" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.28" />
-            <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.04" />
-            <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.14" />
+          <linearGradient
+            id={gradId}
+            gradientUnits="userSpaceOnUse"
+            x1="300"
+            y1="200"
+            x2="1300"
+            y2="1650"
+          >
+            <stop offset="0" stopColor="#F7F9FA" />
+            <stop offset="0.45" stopColor="#B7C2CB" />
+            <stop offset="0.7" stopColor="#EEF2F4" />
+            <stop offset="1" stopColor="#7F8D98" />
           </linearGradient>
         </defs>
 
-        {/* 1. Tappo inclinato superiore (poligono cavo con taglio interno) */}
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M61 28 L145 14 L132 46 L124 44 L131 24 L76 33 L103 44 L91 49 L61 28 Z"
-          fill={`url(#${gradCapId})`}
-        />
-        <path
-          fillRule="evenodd"
-          clipRule="evenodd"
-          d="M61 28 L145 14 L132 46 L124 44 L131 24 L76 33 L103 44 L91 49 L61 28 Z"
-          fill={`url(#${sheenId})`}
-        />
-
-        {/* 2. Colletto / atomizzatore sottile */}
-        <polygon points="87,51 118,51 87,59" fill={`url(#${gradCapId})`} />
-
-        {/* 3. Spalla sinistra sfaccettata */}
-        <polygon
-          points="54,67 54,82 40,95 57,178 30,93"
-          fill={`url(#${gradMainId})`}
-          opacity="0.92"
-        />
-
-        {/* 4. Spalla destra sfaccettata */}
-        <polygon
-          points="146,67 170,93 143,178 160,95 146,82"
-          fill={`url(#${gradMainId})`}
-          opacity="0.92"
-        />
-
-        {/* 5. Lettera L strutturale (asta verticale + base orizzontale) */}
-        <polygon
-          points="64,67 79,67 79,179 134,179 144,193 64,193"
-          fill={`url(#${gradMainId})`}
-        />
-
-        {/* 6. Lettera G incastrata con taglio diagonale */}
-        <polygon
-          points="89,67 141,67 127,81 104,81 104,132 146,184 146,133 128,133 116,120 159,120 159,195 148,195 89,137"
-          fill={`url(#${gradMainId})`}
-        />
-
-        {/* Velatura speculare su corpo L + G */}
-        <polygon
-          points="64,67 79,67 79,179 134,179 144,193 64,193"
-          fill={`url(#${sheenId})`}
-        />
-        <polygon
-          points="89,67 141,67 127,81 104,81 104,132 146,184 146,133 128,133 116,120 159,120 159,195 148,195 89,137"
-          fill={`url(#${sheenId})`}
-        />
+        <g fill={`url(#${gradId})`}>
+          {/* Tappo geometrico superiore */}
+          <polygon points="477,343 1184,220 1003,519 1030,343" />
+          <polygon points="477,343 625,452 877,518 587,519" />
+          {/* Colletto atomizzatore */}
+          <polygon points="680,552 926,553 680,620" />
+          {/* Spalla sinistra */}
+          <polygon points="459,675 238,823 459,1520 459,1175 372,865 459,805" />
+          {/* Spalla destra */}
+          <polygon points="1197,675 1418,823 1197,1520 1197,1175 1284,865 1197,805" />
+          {/* Lettera L */}
+          <polygon points="517,667 623,667 623,1531 940,1531 1060,1640 517,1640" />
+          {/* Lettera G */}
+          <polygon points="680,667 1143,667 1048,747 786,747 786,1183 1033,1400 1033,1163 890,1163 987,1056 1143,1056 1143,1638 680,1230" />
+        </g>
       </svg>
     </div>
   );
@@ -157,11 +96,8 @@ interface PageHeaderProps {
   title: string;
   subtitle?: string;
   rightSlot?: React.ReactNode;
-  /** Numero di creazioni mostrato nella pillola contatore */
   count?: number;
-  /** Etichetta personalizzata del conteggio (default: CREAZIONE / CREAZIONI) */
   countLabel?: string;
-  /** 'editorial' (default: impianto asimmetrico di sala regia) | 'compact' (barra snella per gallerie/tool) */
   variant?: 'editorial' | 'compact';
 }
 
@@ -198,7 +134,7 @@ export function PageHeader({
 
   return (
     <>
-      {/* Barra glassmorphism sticky: emerge quando si scorre */}
+      {/* Barra glassmorphism sticky allo scroll */}
       <motion.div
         style={{
           opacity: prefersReducedMotion ? barOpacityStep : barOpacity,
@@ -211,7 +147,7 @@ export function PageHeader({
         <div
           aria-hidden="true"
           style={{ borderColor: `${aura.primary}28` }}
-          className="absolute inset-0 border-b bg-[#08060C]/75 backdrop-blur-xl"
+          className="absolute inset-0 border-b bg-[#08060C]/80 backdrop-blur-xl"
         />
         <div className="relative mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-8">
           <Link
@@ -226,71 +162,59 @@ export function PageHeader({
                 {title}
               </span>
               {subtitle && (
-                <span
-                  style={{ color: aura.primary }}
-                  className="hidden sm:inline font-mono text-[9px] uppercase tracking-[0.22em] opacity-80"
-                >
+                <span className="hidden sm:inline font-mono text-[9px] uppercase tracking-[0.22em] text-[#F6EFE4]/70">
                   {subtitle}
                 </span>
               )}
             </div>
           </Link>
 
-          <div className="flex items-center gap-3 shrink-0">
-            {countText && (
-              <span
-                style={{ color: aura.primary, borderColor: `${aura.primary}35` }}
-                className="rounded-full border bg-[#0E0A16]/90 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em]"
-              >
-                {countText}
-              </span>
-            )}
-          </div>
+          {countText && (
+            <span
+              style={{ borderColor: `${aura.primary}45` }}
+              className="shrink-0 rounded-full border bg-[#0E0A16]/90 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#F6EFE4]"
+            >
+              {countText}
+            </span>
+          )}
         </div>
       </motion.div>
 
-      {/* Header principale: impianto editoriale asimmetrico, zero ingombro verticale inutile */}
+      {/* Header principale senza scatole nere intorno al logo */}
       <motion.header
         style={
           prefersReducedMotion
-            ? { opacity: headerOpacityStep, borderColor: `${aura.primary}28` }
-            : { opacity: headerOpacity, y: headerY, borderColor: `${aura.primary}28` }
+            ? { opacity: headerOpacityStep, borderColor: `${aura.primary}25` }
+            : { opacity: headerOpacity, y: headerY, borderColor: `${aura.primary}25` }
         }
         className={`relative border-b ${isCompact ? 'pb-4' : 'pb-6'}`}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          {/* Blocco sinistro: Monogramma + Gerarchia tipografica */}
           <div className="flex items-center gap-4 sm:gap-5 min-w-0">
             <Link
               href="/"
               title="Torna all'Atelier"
-              className="group relative flex items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0E0A16]/90 p-2.5 shadow-lg transition-transform duration-300 hover:scale-105 active:scale-95 motion-reduce:transition-none"
-              style={{
-                boxShadow: `0 8px 28px -10px color-mix(in srgb, var(--aura-1) 45%, transparent)`,
-              }}
+              className="group relative flex items-center justify-center transition-transform duration-300 hover:scale-105 active:scale-95 motion-reduce:transition-none"
             >
-              <Logo size={isCompact ? 'sm' : 'md'} glow />
+              <Logo size={isCompact ? 'md' : 'lg'} glow />
             </Link>
 
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 {subtitle && (
-                  <span
-                    style={{ color: aura.primary }}
-                    className="font-mono text-[10px] font-bold uppercase tracking-[0.24em]"
-                  >
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-[#F6EFE4]/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
                     {subtitle}
                   </span>
                 )}
                 {subtitle && countText && (
-                  <span className="text-white/20 text-[10px]" aria-hidden="true">
+                  <span className="text-[#F6EFE4]/40 text-[10px]" aria-hidden="true">
                     •
                   </span>
                 )}
                 {countText && (
                   <span
-                    style={{ borderColor: `${aura.primary}40`, color: '#F6EFE4' }}
-                    className="inline-flex items-center rounded-full border bg-[#0E0A16] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+                    style={{ borderColor: `${aura.primary}45` }}
+                    className="inline-flex items-center rounded-full border bg-[#08060C]/75 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#F6EFE4] backdrop-blur-sm"
                   >
                     {countText}
                   </span>
@@ -298,7 +222,7 @@ export function PageHeader({
               </div>
 
               <h1
-                className={`font-serif tracking-tight text-[#F6EFE4] leading-[1.05] ${
+                className={`font-serif tracking-tight text-[#F6EFE4] leading-[1.05] drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] ${
                   isCompact ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'
                 }`}
               >
@@ -307,7 +231,6 @@ export function PageHeader({
             </div>
           </div>
 
-          {/* Blocco destro: Azioni contestuali allineate alla base del titolo */}
           {rightSlot && (
             <div className="flex items-center justify-start sm:justify-end shrink-0">
               {rightSlot}
