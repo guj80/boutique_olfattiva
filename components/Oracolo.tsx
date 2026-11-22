@@ -3,7 +3,20 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, BookmarkPlus, RefreshCw, Send, Wand2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookmarkPlus,
+  Compass,
+  Globe,
+  Layers,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Send,
+  Sparkles,
+  Wand2,
+  X,
+} from 'lucide-react';
 import {
   supabase,
   isCollezioneProfumo,
@@ -16,7 +29,7 @@ import { SCENT_AXES, computeScentDNA } from '@/lib/scent-dna';
 import { useAura } from './AuraProvider';
 
 /* ------------------------------------------------------------------ */
-/* Tipi                                                                */
+/* Tipi & Costanti                                                     */
 /* ------------------------------------------------------------------ */
 
 interface ChatMessage {
@@ -34,6 +47,14 @@ interface OracoloContextPayload {
   weather?: string;
 }
 
+interface QuickChip {
+  id: string;
+  label: string;
+  prompt: string;
+  mode: 'send' | 'prefill';
+  icon: 'sparkles' | 'layers' | 'compass' | 'globe' | 'search';
+}
+
 const MAX_INPUT_LENGTH = 1000;
 const MAX_HISTORY = 20;
 const CONTEXT_MAX_AGE_MS = 5 * 60 * 1000;
@@ -42,10 +63,42 @@ const REQUEST_TIMEOUT_MS = 28000;
 /** Altezza indicativa della dock (16px dal fondo + ~66px di pillola) + 24px di respiro */
 const FAB_BOTTOM_OFFSET_PX = 82 + 24;
 
-const SUGGESTIONS = [
-  'Cosa mi consigli di indossare ora?',
-  'Quali famiglie mancano alla mia collezione?',
-  'Come posso fare layering con i miei profumi?',
+const QUICK_CHIPS: QuickChip[] = [
+  {
+    id: 'wear-now',
+    label: 'Cosa indosso adesso?',
+    prompt: 'Cosa mi consigli di indossare ora considerando ultimi indossi e momento della giornata?',
+    mode: 'send',
+    icon: 'sparkles',
+  },
+  {
+    id: 'layering',
+    label: 'Idea layering',
+    prompt: 'Proponimi un layering equilibrato combinando due profumi della mia collezione.',
+    mode: 'send',
+    icon: 'layers',
+  },
+  {
+    id: 'dna-gaps',
+    label: 'Gap nel mio Scent DNA',
+    prompt: 'Analizza il mio Scent DNA: quali famiglie mancano e quale profumo del Radar dovrei testare?',
+    mode: 'send',
+    icon: 'compass',
+  },
+  {
+    id: 'verify-pyramid',
+    label: 'Verifica piramide…',
+    prompt: 'Verifica piramide olfattiva, naso e concentrazione di ',
+    mode: 'prefill',
+    icon: 'search',
+  },
+  {
+    id: 'official-site',
+    label: 'Sito ufficiale maison…',
+    prompt: 'Qual è il sito ufficiale della maison ',
+    mode: 'prefill',
+    icon: 'globe',
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -149,6 +202,22 @@ function readErrorMessage(data: unknown): string | null {
   return null;
 }
 
+function renderChipIcon(kind: QuickChip['icon'], color: string) {
+  const props = { className: 'h-3.5 w-3.5 shrink-0', style: { color } };
+  switch (kind) {
+    case 'sparkles':
+      return <Sparkles {...props} />;
+    case 'layers':
+      return <Layers {...props} />;
+    case 'compass':
+      return <Compass {...props} />;
+    case 'globe':
+      return <Globe {...props} />;
+    case 'search':
+      return <Search {...props} />;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Componente                                                          */
 /* ------------------------------------------------------------------ */
@@ -173,6 +242,7 @@ export function Oracolo() {
   const hiddenByMe = useRef(false);
   const endRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   messagesRef.current = messages;
 
@@ -192,7 +262,6 @@ export function Oracolo() {
     setOpen(true);
   }, [setHideDock]);
 
-  // Cleanup su unmount: la dock non resta mai nascosta per colpa nostra
   useEffect(() => {
     return () => {
       if (hiddenByMe.current) {
@@ -202,12 +271,10 @@ export function Oracolo() {
     };
   }, [setHideDock]);
 
-  // Se si finisce su login/signup il foglio si chiude
   useEffect(() => {
     if (isAuthRoute && open) closeSheet();
   }, [isAuthRoute, open, closeSheet]);
 
-  // Escape + blocco scroll della pagina sotto il foglio
   useEffect(() => {
     if (!open) return;
 
@@ -341,6 +408,34 @@ export function Oracolo() {
     [thinking, requestReply]
   );
 
+  const handleChipClick = useCallback(
+    (chip: QuickChip) => {
+      if (thinking) return;
+      if (chip.mode === 'send') {
+        sendMessage(chip.prompt);
+      } else {
+        setDraft(chip.prompt);
+        window.requestAnimationFrame(() => {
+          const el = inputRef.current;
+          if (el) {
+            el.focus();
+            el.setSelectionRange(chip.prompt.length, chip.prompt.length);
+          }
+        });
+      }
+    },
+    [thinking, sendMessage]
+  );
+
+  const resetConversation = useCallback(() => {
+    requestId.current += 1;
+    setThinking(false);
+    setError(null);
+    setMessages([]);
+    setDraft('');
+    contextRef.current = null;
+  }, []);
+
   const retry = useCallback(() => {
     if (thinking) return;
     const history = messagesRef.current;
@@ -348,7 +443,6 @@ export function Oracolo() {
     void requestReply(history);
   }, [thinking, requestReply]);
 
-  // Invalida eventuali risposte in volo allo smontaggio
   useEffect(() => {
     return () => {
       requestId.current += 1;
@@ -448,37 +542,55 @@ export function Oracolo() {
                   Consulente olfattiva
                 </p>
               </div>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                onClick={closeSheet}
-                aria-label="Chiudi CAMILLA"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#0E0A16] text-[#B8A9C9] transition hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {messages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={resetConversation}
+                    aria-label="Nuova conversazione"
+                    title="Nuova conversazione"
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#0E0A16] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9] transition hover:text-white"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Nuova</span>
+                  </button>
+                )}
+                <button
+                  ref={closeButtonRef}
+                  type="button"
+                  onClick={closeSheet}
+                  aria-label="Chiudi CAMILLA"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#0E0A16] text-[#B8A9C9] transition hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </header>
 
             {/* Messaggi */}
             <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
               <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
                 {messages.length === 0 && !thinking && (
-                  <div className="space-y-5 py-8 text-center">
-                    <p className="font-serif text-3xl text-[#F6EFE4]">Chiedi a CAMILLA</p>
-                    <p className="mx-auto max-w-sm text-sm leading-relaxed text-[#B8A9C9]">
-                      Conosce la tua collezione, il tuo diario e il tuo DNA olfattivo. Chiedile
-                      cosa indossare, come abbinare i tuoi profumi o cosa manca.
-                    </p>
-                    <div className="flex flex-col items-center gap-2">
-                      {SUGGESTIONS.map((suggestion) => (
+                  <div className="space-y-6 py-8 text-center">
+                    <div className="space-y-2">
+                      <p className="font-serif text-3xl text-[#F6EFE4]">Chiedi a CAMILLA</p>
+                      <p className="mx-auto max-w-md text-sm leading-relaxed text-[#B8A9C9]">
+                        Analizza collezione, diario e Scent DNA, oppure verifica piramidi
+                        olfattive e siti ufficiali delle maison.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {QUICK_CHIPS.map((chip) => (
                         <button
-                          key={suggestion}
+                          key={chip.id}
                           type="button"
-                          onClick={() => sendMessage(suggestion)}
-                          style={{ borderColor: `${aura.primary}40` }}
-                          className="rounded-full border bg-[#0E0A16] px-4 py-2 text-xs text-[#F6EFE4] transition hover:bg-white/5"
+                          onClick={() => handleChipClick(chip)}
+                          style={{ borderColor: `${aura.primary}45` }}
+                          className="inline-flex items-center gap-2 rounded-full border bg-[#0E0A16] px-4 py-2.5 text-xs font-medium text-[#F6EFE4] transition hover:bg-white/[0.06] active:scale-[0.98]"
                         >
-                          {suggestion}
+                          {renderChipIcon(chip.icon, aura.primary)}
+                          <span>{chip.label}</span>
                         </button>
                       ))}
                     </div>
@@ -585,7 +697,7 @@ export function Oracolo() {
               </div>
             </div>
 
-            {/* Input */}
+            {/* Barra chip rapidi + Input */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -595,34 +707,55 @@ export function Oracolo() {
                 borderColor: `${aura.primary}30`,
                 paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
               }}
-              className="border-t bg-[#08060C]/90 px-4 pt-3 backdrop-blur-xl sm:px-6"
+              className="border-t bg-[#08060C]/90 px-4 pt-2.5 backdrop-blur-xl sm:px-6"
             >
-              <div className="mx-auto flex w-full max-w-2xl items-center gap-2">
-                <input
-                  type="text"
-                  value={draft}
-                  maxLength={MAX_INPUT_LENGTH}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      sendMessage(draft);
-                    }
-                  }}
-                  placeholder="Chiedi qualcosa a CAMILLA…"
-                  aria-label="Scrivi un messaggio a CAMILLA"
-                  style={{ borderColor: `${aura.primary}40` }}
-                  className="min-w-0 flex-1 rounded-full border bg-[#161024] px-5 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={!canSend}
-                  aria-label="Invia"
-                  style={{ backgroundColor: aura.primary }}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 disabled:opacity-40"
-                >
-                  <Send className="h-4 w-4" />
-                </button>
+              <div className="mx-auto w-full max-w-2xl space-y-2.5">
+                {messages.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                    {QUICK_CHIPS.map((chip) => (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        disabled={thinking}
+                        onClick={() => handleChipClick(chip)}
+                        style={{ borderColor: `${aura.primary}35` }}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-1 text-[11px] text-[#B8A9C9] transition hover:text-[#F6EFE4] disabled:opacity-40"
+                      >
+                        {renderChipIcon(chip.icon, aura.primary)}
+                        <span>{chip.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={draft}
+                    maxLength={MAX_INPUT_LENGTH}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        sendMessage(draft);
+                      }
+                    }}
+                    placeholder="Chiedi qualcosa a CAMILLA…"
+                    aria-label="Scrivi un messaggio a CAMILLA"
+                    style={{ borderColor: `${aura.primary}40` }}
+                    className="min-w-0 flex-1 rounded-full border bg-[#161024] px-5 py-3 text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/50 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!canSend}
+                    aria-label="Invia"
+                    style={{ backgroundColor: aura.primary }}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#08060C] transition hover:opacity-90 disabled:opacity-40"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </form>
           </motion.div>
