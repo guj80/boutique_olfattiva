@@ -356,6 +356,8 @@ export default function CollezionePage() {
     <main className="mx-auto w-full max-w-6xl px-4 sm:px-8 py-8 pb-36 space-y-8">
       <PageHeader
         title={pageTitle}
+        subtitle={activeTab === 'radar' ? 'Esplorazione' : 'Archivio'}
+        variant="compact"
         rightSlot={headerRightActions}
         count={loading ? undefined : tabCount}
       />
