@@ -24,7 +24,7 @@ function hashString(str: string): number {
 
 function getConcentrationCode(conc?: string | null): string {
   const c = (conc || '').toLowerCase();
-  if (c.includes('extrait') || c.includes('parfum') && !c.includes('eau')) return 'EXTRAIT';
+  if (c.includes('extrait') || (c.includes('parfum') && !c.includes('eau'))) return 'EXTRAIT';
   if (c.includes('attar') || c.includes('oil') || c.includes('olio')) return 'ATTAR';
   if (c.includes('intense')) return 'EDP INTENSE';
   if (c.includes('eau de parfum') || c === 'edp') return 'EDP';
@@ -67,7 +67,6 @@ function SculpturalBottleSvg({
     const concCode = getConcentrationCode(concentrazione);
     const monogram = getBrandMonogram(brand, alt);
 
-    // 3 silhouette architettoniche determinate da concentrazione / seed
     const isHeavyExtrait =
       concCode === 'EXTRAIT' || concCode === 'ATTAR' || seed % 3 === 0;
     const isMonolith = !isHeavyExtrait && seed % 3 === 1;
@@ -78,7 +77,6 @@ function SculpturalBottleSvg({
 
   const { palette, concCode, monogram, isHeavyExtrait, isMonolith, uid } = design;
 
-  // Geometria del corpo vetro e del tappo in base alla silhouette
   const body = isHeavyExtrait
     ? { x: 34, y: 66, w: 92, h: 112, rx: 14, capX: 58, capY: 28, capW: 44, capH: 30, capRx: 6 }
     : isMonolith
@@ -115,7 +113,6 @@ function SculpturalBottleSvg({
         </linearGradient>
       </defs>
 
-      {/* Tappo scultoreo */}
       <rect
         x={body.capX}
         y={body.capY}
@@ -127,7 +124,6 @@ function SculpturalBottleSvg({
         strokeWidth="1"
       />
 
-      {/* Collo / Ghiera atomizzatore */}
       <rect
         x={68}
         y={body.capY + body.capH}
@@ -138,7 +134,6 @@ function SculpturalBottleSvg({
         strokeWidth="0.8"
       />
 
-      {/* Corpo in vetro */}
       <rect
         x={body.x}
         y={body.y}
@@ -150,7 +145,6 @@ function SculpturalBottleSvg({
         strokeWidth="1.2"
       />
 
-      {/* Liquido / Jus colorato sulla famiglia olfattiva */}
       <rect
         x={body.x + 5}
         y={juiceY}
@@ -160,7 +154,6 @@ function SculpturalBottleSvg({
         fill={`url(#${uid}-juice)`}
       />
 
-      {/* Riflesso verticale spigolo vetro */}
       <rect
         x={body.x + 8}
         y={body.y + 8}
@@ -171,7 +164,6 @@ function SculpturalBottleSvg({
         opacity="0.16"
       />
 
-      {/* Fondo vetro spesso */}
       <rect
         x={body.x + 4}
         y={body.y + body.h - 10}
@@ -182,7 +174,6 @@ function SculpturalBottleSvg({
         opacity="0.12"
       />
 
-      {/* Etichetta centrale */}
       <rect
         x={body.x + 14}
         y={body.y + Math.round(body.h * 0.28)}
@@ -196,7 +187,6 @@ function SculpturalBottleSvg({
         strokeWidth="0.9"
       />
 
-      {/* Monogramma Maison */}
       <text
         x="80"
         y={body.y + Math.round(body.h * 0.48)}
@@ -209,7 +199,6 @@ function SculpturalBottleSvg({
         {monogram}
       </text>
 
-      {/* Concentrazione */}
       <text
         x="80"
         y={body.y + Math.round(body.h * 0.61)}
@@ -280,8 +269,9 @@ interface BottlePedestalProps {
   brand?: string | null;
   famiglia?: string | null;
   concentrazione?: string | null;
-  size?: 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   showSigil?: boolean;
+  bare?: boolean;
   className?: string;
 }
 
@@ -292,13 +282,29 @@ export function BottlePedestal({
   famiglia,
   concentrazione,
   size = 'lg',
+  bare = false,
   className = '',
 }: BottlePedestalProps) {
+  if (bare) {
+    return (
+      <div className={`relative flex items-center justify-center overflow-hidden ${className}`}>
+        <BottleImage
+          src={src}
+          alt={alt}
+          brand={brand}
+          famiglia={famiglia}
+          concentrazione={concentrazione}
+          size={size}
+          className="h-full w-full"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`relative flex items-center justify-center overflow-hidden rounded-3xl p-4 ${className}`}
     >
-      {/* Bagliore uniforme dietro il flacone */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-4 rounded-full opacity-35 blur-2xl"
@@ -315,7 +321,6 @@ export function BottlePedestal({
         className="relative z-10 h-full w-full"
       />
 
-      {/* Ombra di contatto uniforme alla base del flacone */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute bottom-2 h-3 w-24 rounded-full bg-black/75 blur-md"
