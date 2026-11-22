@@ -5,7 +5,6 @@ import {
   Search,
   X,
   Pin,
-  Sparkles,
   Layers,
   Disc,
   Compass,
@@ -34,12 +33,16 @@ interface ArcSegment {
   id: string;
   label: string;
   family: string;
+  dominantTier: 0 | 1 | 2;
   color: string;
   startAngle: number;
   endAngle: number;
   midAngle: number;
   count: number;
 }
+
+const TIER_COLORS = ['#E6B422', '#E0689A', '#8A6A4F'];
+const TIER_NAMES = ['Testa', 'Cuore', 'Fondo'];
 
 function polarToCartesian(cx: number, cy: number, r: number, angleRad: number) {
   return {
@@ -114,6 +117,13 @@ function getFamilyColor(family: string): string {
   return resolveAura(family).primary;
 }
 
+function getDominantTier(node: NoteNode): 0 | 1 | 2 {
+  const { testa, cuore, fondo } = node.layers;
+  if (testa >= cuore && testa >= fondo) return 0;
+  if (cuore >= testa && cuore >= fondo) return 1;
+  return 2;
+}
+
 export function AccordWheel({
   profumi,
   indossi,
@@ -127,6 +137,7 @@ export function AccordWheel({
   const [searchQuery, setSearchQuery] = useState('');
   const [minWeight, setMinWeight] = useState<number>(2);
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
+  const [selectedTier, setSelectedTier] = useState<0 | 1 | 2 | null>(null);
 
   const [hoveredLink, setHoveredLink] = useState<NoteLink | null>(null);
   const [pinnedLink, setPinnedLink] = useState<NoteLink | null>(null);
@@ -151,7 +162,6 @@ export function AccordWheel({
     return (profumi || []).filter((p) => wornIds.has(p.id)).length;
   }, [profumi, indossi]);
 
-  // Calcola soglia massima dinamica sullo slider
   const maxAvailableWeight = useMemo(() => {
     const sourceLinks = mode === 'accordi' ? graph.familyLinks : graph.links;
     if (sourceLinks.length === 0) return 4;
@@ -161,7 +171,6 @@ export function AccordWheel({
 
   const effectiveMinWeight = Math.min(minWeight, maxAvailableWeight);
 
-  // Links filtrati per soglia e famiglia selezionata
   const visibleLinks = useMemo(() => {
     const base = mode === 'accordi' ? graph.familyLinks : graph.links;
     const q = searchQuery.trim().toLowerCase();
@@ -184,15 +193,18 @@ export function AccordWheel({
     }
 
     if (metric === 'lift') {
-      filtered = filtered.slice().sort((a, b) => b.lift - a.lift || b.weight - a.weight);
+      filtered = filtered
+        .slice()
+        .sort((a, b) => b.lift - a.lift || b.weight - a.weight);
     } else {
-      filtered = filtered.slice().sort((a, b) => b.weight - a.weight || b.lift - a.lift);
+      filtered = filtered
+        .slice()
+        .sort((a, b) => b.weight - a.weight || b.lift - a.lift);
     }
 
     return filtered.slice(0, mode === 'accordi' ? 48 : 95);
   }, [graph, mode, effectiveMinWeight, selectedFamily, searchQuery, metric]);
 
-  // Costruzione archi radiali per vista Note o Accordi
   const { nodeArcs, familyGroupArcs, nodeById } = useMemo(() => {
     const nodesMap = new Map<string, NoteNode>();
     for (let i = 0; i < graph.nodes.length; i++) {
@@ -212,6 +224,7 @@ export function AccordWheel({
           id: f.family,
           label: f.family,
           family: f.family,
+          dominantTier: 1,
           color: getFamilyColor(f.family),
           startAngle: cursor,
           endAngle: cursor + span,
@@ -234,7 +247,6 @@ export function AccordWheel({
     const nodeGap = 0.012;
     const familyGap = 0.035;
 
-    // Conta cambi di famiglia per lo spazio extra tra gruppi
     let famTransitions = 0;
     for (let i = 1; i < nodes.length; i++) {
       if (nodes[i].family !== nodes[i - 1].family) famTransitions++;
@@ -263,6 +275,7 @@ export function AccordWheel({
         id: n.id,
         label: n.label,
         family: n.family,
+        dominantTier: getDominantTier(n),
         color: getFamilyColor(n.family),
         startAngle,
         endAngle,
@@ -288,6 +301,7 @@ export function AccordWheel({
           id: fam,
           label: fam,
           family: fam,
+          dominantTier: 1,
           color: getFamilyColor(fam),
           startAngle: g.start,
           endAngle: g.end,
@@ -308,49 +322,8 @@ export function AccordWheel({
     return map;
   }, [nodeArcs]);
 
-  // Dati per i 3 anelli concentrici della Piramide
-  const pyramidRings = useMemo(() => {
-    const layers: Array<{ key: 'testa' | 'cuore' | 'fondo'; label: string }> = [
-      { key: 'testa', label: 'Testa' },
-      { key: 'cuore', label: 'Cuore' },
-      { key: 'fondo', label: 'Fondo' },
-    ];
-
-    return layers.map((layerObj) => {
-      const topNotes = graph.nodes
-        .filter((n) => n.layers[layerObj.key] > 0)
-        .slice()
-        .sort((a, b) => b.layers[layerObj.key] - a.layers[layerObj.key])
-        .slice(0, 14);
-
-      const total =
-        topNotes.reduce((acc, n) => acc + n.layers[layerObj.key], 0) || 1;
-      const gap = 0.024;
-      const usable = Math.PI * 2 - gap * topNotes.length;
-      let cursor = -Math.PI / 2;
-
-      const segments = topNotes.map((n) => {
-        const val = n.layers[layerObj.key];
-        const span = Math.max(0.05, (val / total) * usable);
-        const seg = {
-          node: n,
-          value: val,
-          color: getFamilyColor(n.family),
-          startAngle: cursor,
-          endAngle: cursor + span,
-          midAngle: cursor + span / 2,
-        };
-        cursor += span + gap;
-        return seg;
-      });
-
-      return { ...layerObj, segments };
-    });
-  }, [graph.nodes]);
-
   const activeLink = hoveredLink || pinnedLink;
 
-  // Calcola lista creazioni da mostrare nel pannello ispettore a destra
   const inspectedPerfumes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
@@ -411,7 +384,7 @@ export function AccordWheel({
         right: activeLink.targetLabel,
         badge:
           metric === 'lift'
-            ? `Affinità ${activeLink.lift}× · ${activeLink.weight} creazioni`
+            ? `${activeLink.lift}× · ${activeLink.weight} creazioni`
             : `${activeLink.weight} ${
                 activeLink.weight === 1 ? 'creazione' : 'creazioni'
               }`,
@@ -431,13 +404,13 @@ export function AccordWheel({
       return {
         left: `“${searchQuery.trim()}”`,
         right: selectedFamily || 'Tutte le famiglie',
-        badge: `${inspectedPerfumes.length} risultati`,
+        badge: `${inspectedPerfumes.length} creazioni`,
       };
     }
     if (selectedFamily) {
       return {
         left: selectedFamily,
-        right: 'Famiglia isolata',
+        right: 'Famiglia',
         badge: `${inspectedPerfumes.length} creazioni`,
       };
     }
@@ -445,13 +418,13 @@ export function AccordWheel({
       return {
         left: visibleLinks[0].sourceLabel,
         right: visibleLinks[0].targetLabel,
-        badge: `Accordo guida · ${visibleLinks[0].weight} creazioni`,
+        badge: `${visibleLinks[0].weight} creazioni`,
       };
     }
     return {
-      left: 'Nessun accordo',
-      right: 'Soglia troppo alta',
-      badge: 'Riduci il filtro',
+      left: 'Nessun legame',
+      right: 'Soglia',
+      badge: 'Riduci filtro',
     };
   }, [
     activeLink,
@@ -477,6 +450,7 @@ export function AccordWheel({
     setPinnedLink(null);
     setHoveredLink(null);
     setPinnedNodeId(null);
+    setSelectedTier(null);
     if (next === 'accordi') {
       setMinWeight(1);
     } else {
@@ -488,23 +462,24 @@ export function AccordWheel({
     setPinnedLink(null);
     setHoveredLink(null);
     setPinnedNodeId(null);
+    setSelectedTier(null);
   };
 
   const CX = 260;
   const CY = 260;
-  const OUTER_R = 202;
-  const INNER_R = 186;
-  const CHORD_R = 183;
+  const OUTER_R = 204;
+  const MID_R = 190;
+  const INNER_R = 176;
+  const CHORD_R = mode === 'piramide' ? 173 : 183;
 
   return (
     <section className="rounded-[28px] border border-white/10 bg-[#08060C]/95 p-5 sm:p-8 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.85)]">
       {/* Barra superiore: 3 Viste + Selettore Perimetro */}
       <div className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
-          {/* Switcher delle 3 Ruote */}
           <div
             role="tablist"
-            aria-label="Modalità Atlante Olfattivo"
+            aria-label="Atlante Olfattivo"
             className="inline-flex flex-wrap items-center gap-1.5 rounded-full border border-white/10 bg-[#0E0A16] p-1"
           >
             <button
@@ -553,24 +528,21 @@ export function AccordWheel({
             </button>
           </div>
 
-          <div>
+          <div className="flex flex-wrap items-baseline gap-3">
             <h2 className="font-serif text-3xl sm:text-4xl tracking-tight text-[#F6EFE4]">
-              {mode === 'note' && 'Ruota delle Note'}
-              {mode === 'accordi' && 'Sinergie tra Famiglie'}
-              {mode === 'piramide' && 'Piramide Concentrica'}
+              {mode === 'note' && 'Note'}
+              {mode === 'accordi' && 'Accordi'}
+              {mode === 'piramide' && 'Piramide'}
             </h2>
-            <p className="mt-1 max-w-xl text-xs sm:text-sm leading-relaxed text-[#B8A9C9]/85">
-              {mode === 'note' &&
-                'Ogni filo collega due materie prime presenti nella stessa creazione. Tocca o scorri su un legame per isolare i flaconi.'}
-              {mode === 'accordi' &&
-                'Mappa macroscopica degli intrecci tra le famiglie olfattive della tua collezione.'}
-              {mode === 'piramide' &&
-                'Distribuzione radiale dal primo impatto (Testa, anello esterno) alla persistenza (Fondo, anello interno).'}
-            </p>
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#B8A9C9]/70">
+              {mode === 'note' && `${graph.nodes.length} materie prime · ${visibleLinks.length} legami`}
+              {mode === 'accordi' && `${graph.families.length} famiglie · ${visibleLinks.length} sinergie`}
+              {mode === 'piramide' && 'Testa · Cuore · Fondo'}
+            </span>
           </div>
         </div>
 
-        {/* Toggle Perimetro (Tutta la collezione vs Indossati) */}
+        {/* Toggle Perimetro */}
         <div className="flex items-center self-start lg:self-end rounded-full border border-white/10 bg-[#0E0A16] p-1">
           <button
             type="button"
@@ -611,9 +583,8 @@ export function AccordWheel({
 
       {/* Griglia Principale: 7 col Ruota + 5 col Ispettore */}
       <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-6">
-        {/* COLONNA SINISTRA: Barra Ricerca + Ruota SVG */}
+        {/* COLONNA SINISTRA: Ricerca + Ruota SVG */}
         <div className="flex flex-col items-center lg:col-span-7">
-          {/* Barra di ricerca */}
           <div className="relative mb-5 w-full max-w-md">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#B8A9C9]/60" />
             <input
@@ -623,7 +594,7 @@ export function AccordWheel({
                 setSearchQuery(e.target.value);
                 setPinnedLink(null);
               }}
-              placeholder="Cerca materia prima (es. bergamotto, iris, oud...)"
+              placeholder="Cerca nota (es. bergamotto, iris, oud...)"
               className="w-full rounded-full border border-white/10 bg-[#0E0A16] pl-11 pr-10 py-2.5 text-xs sm:text-sm text-[#F6EFE4] placeholder:text-[#B8A9C9]/40 focus:border-white/30 focus:outline-none"
             />
             {searchQuery && (
@@ -647,371 +618,315 @@ export function AccordWheel({
                 if (e.target === e.currentTarget) clearSelection();
               }}
             >
-              {/* VISTA 1 & 2: RUOTA DELLE NOTE O ACCORDI */}
-              {mode !== 'piramide' && (
-                <>
-                  {/* Fili / Nastri interni */}
-                  <g>
-                    {visibleLinks.map((link) => {
-                      const sArc = arcById.get(link.sourceId);
-                      const tArc = arcById.get(link.targetId);
-                      if (!sArc || !tArc) return null;
+              {/* Fili / Nastri interni */}
+              <g>
+                {visibleLinks.map((link) => {
+                  const sArc = arcById.get(link.sourceId);
+                  const tArc = arcById.get(link.targetId);
+                  if (!sArc || !tArc) return null;
 
-                      const isSelected = activeLink?.id === link.id;
-                      const isNodeHighlighted =
-                        pinnedNodeId &&
-                        (link.sourceId === pinnedNodeId ||
-                          link.targetId === pinnedNodeId);
-                      const isDimmed =
-                        (activeLink && !isSelected) ||
-                        (pinnedNodeId && !isNodeHighlighted);
+                  const isSelected = activeLink?.id === link.id;
+                  const isNodeHighlighted =
+                    pinnedNodeId &&
+                    (link.sourceId === pinnedNodeId ||
+                      link.targetId === pinnedNodeId);
+                  const isTierMatch =
+                    selectedTier === null ||
+                    sArc.dominantTier === selectedTier ||
+                    tArc.dominantTier === selectedTier;
+                  const isDimmed =
+                    (activeLink && !isSelected) ||
+                    (pinnedNodeId && !isNodeHighlighted) ||
+                    !isTierMatch;
 
-                      if (mode === 'accordi') {
-                        const halfW = Math.min(
-                          0.09,
-                          0.015 + (link.weight / Math.max(1, maxAvailableWeight)) * 0.055
-                        );
-                        const d = describeRibbon(
-                          CX,
-                          CY,
-                          CHORD_R,
-                          sArc.midAngle - halfW,
-                          sArc.midAngle + halfW,
-                          tArc.midAngle - halfW,
-                          tArc.midAngle + halfW
-                        );
-
-                        return (
-                          <path
-                            key={link.id}
-                            d={d}
-                            fill={isSelected ? '#FFFFFF' : sArc.color}
-                            fillOpacity={
-                              isSelected ? 0.92 : isDimmed ? 0.07 : 0.42
-                            }
-                            stroke={isSelected ? '#FFFFFF' : 'none'}
-                            strokeWidth={isSelected ? 1 : 0}
-                            className="cursor-pointer transition-opacity duration-200"
-                            onMouseEnter={() => setHoveredLink(link)}
-                            onMouseLeave={() => setHoveredLink(null)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPinnedNodeId(null);
-                              setPinnedLink((prev) =>
-                                prev?.id === link.id ? null : link
-                              );
-                            }}
-                          />
-                        );
-                      }
-
-                      const d = describeHairlineChord(
-                        CX,
-                        CY,
-                        CHORD_R,
-                        sArc.midAngle,
-                        tArc.midAngle
-                      );
-
-                      const strokeW = isSelected
-                        ? 2.6
-                        : Math.min(2.2, 0.75 + link.weight * 0.35);
-
-                      return (
-                        <g key={link.id}>
-                          {/* Hit area invisibile più ampia per tap su mobile */}
-                          <path
-                            d={d}
-                            fill="none"
-                            stroke="transparent"
-                            strokeWidth={12}
-                            className="cursor-pointer"
-                            onMouseEnter={() => setHoveredLink(link)}
-                            onMouseLeave={() => setHoveredLink(null)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPinnedNodeId(null);
-                              setPinnedLink((prev) =>
-                                prev?.id === link.id ? null : link
-                              );
-                            }}
-                          />
-                          <path
-                            d={d}
-                            fill="none"
-                            stroke={isSelected ? '#FFFFFF' : sArc.color}
-                            strokeWidth={strokeW}
-                            strokeOpacity={
-                              isSelected
-                                ? 0.98
-                                : isNodeHighlighted
-                                ? 0.85
-                                : isDimmed
-                                ? 0.08
-                                : 0.45
-                            }
-                            className="pointer-events-none transition-opacity duration-200"
-                          />
-                        </g>
-                      );
-                    })}
-                  </g>
-
-                  {/* Archi esterni */}
-                  <g>
-                    {nodeArcs.map((arc) => {
-                      const isActive =
-                        hoveredArcId === arc.id ||
-                        pinnedNodeId === arc.id ||
-                        activeLink?.sourceId === arc.id ||
-                        activeLink?.targetId === arc.id;
-
-                      const isFilteredOut =
-                        selectedFamily !== null &&
-                        arc.family !== selectedFamily;
-
-                      return (
-                        <path
-                          key={arc.id}
-                          d={describeArc(
-                            CX,
-                            CY,
-                            OUTER_R,
-                            INNER_R,
-                            arc.startAngle,
-                            arc.endAngle
-                          )}
-                          fill={arc.color}
-                          fillOpacity={
-                            isFilteredOut ? 0.18 : isActive ? 1 : 0.84
-                          }
-                          stroke={isActive ? '#FFFFFF' : 'none'}
-                          strokeWidth={isActive ? 1.2 : 0}
-                          className="cursor-pointer transition-opacity duration-200"
-                          onMouseEnter={() => setHoveredArcId(arc.id)}
-                          onMouseLeave={() => setHoveredArcId(null)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (mode === 'accordi') {
-                              setSelectedFamily((prev) =>
-                                prev === arc.family ? null : arc.family
-                              );
-                            } else {
-                              setPinnedLink(null);
-                              setPinnedNodeId((prev) =>
-                                prev === arc.id ? null : arc.id
-                              );
-                            }
-                          }}
-                        />
-                      );
-                    })}
-                  </g>
-
-                  {/* Etichette radiali delle Famiglie lungo il perimetro */}
-                  <g className="pointer-events-none">
-                    {familyGroupArcs.map((grp) => {
-                      if (grp.endAngle - grp.startAngle < 0.14) return null;
-                      const pos = polarToCartesian(
-                        CX,
-                        CY,
-                        OUTER_R + 18,
-                        grp.midAngle
-                      );
-                      const isLeft = Math.cos(grp.midAngle) < -0.15;
-                      const isRight = Math.cos(grp.midAngle) > 0.15;
-
-                      return (
-                        <text
-                          key={grp.id}
-                          x={pos.x}
-                          y={pos.y}
-                          textAnchor={
-                            isLeft ? 'end' : isRight ? 'start' : 'middle'
-                          }
-                          dominantBaseline="middle"
-                          className="fill-[#B8A9C9] font-mono text-[8.5px] font-bold uppercase tracking-[0.14em]"
-                        >
-                          {grp.label}
-                        </text>
-                      );
-                    })}
-                  </g>
-
-                  {/* Readout Centrale (Nota A × Nota B) */}
-                  <g
-                    className="cursor-pointer"
-                    onClick={clearSelection}
-                  >
-                    <circle
-                      cx={CX}
-                      cy={CY}
-                      r={74}
-                      fill="#050308"
-                      fillOpacity={0.72}
-                    />
-                    <text
-                      x={CX}
-                      y={CY - 6}
-                      textAnchor="middle"
-                      className="fill-[#F6EFE4] font-serif text-[15px] tracking-tight"
-                    >
-                      {inspectorTitle.left}
-                      <tspan className="fill-[#B8A9C9]/70"> × </tspan>
-                      {inspectorTitle.right}
-                    </text>
-                    <text
-                      x={CX}
-                      y={CY + 14}
-                      textAnchor="middle"
-                      className="fill-[#B8A9C9] font-mono text-[8.5px] uppercase tracking-[0.18em]"
-                    >
-                      {inspectorTitle.badge}
-                    </text>
-                  </g>
-                </>
-              )}
-
-              {/* VISTA 3: PIRAMIDE CONCENTRICA (TESTA · CUORE · FONDO) */}
-              {mode === 'piramide' && (
-                <g>
-                  {pyramidRings.map((ring, idx) => {
-                    const radii = [
-                      { out: 204, inn: 174 }, // Testa (esterno)
-                      { out: 164, inn: 134 }, // Cuore (medio)
-                      { out: 124, inn: 94 }, // Fondo (interno)
-                    ][idx];
+                  if (mode === 'accordi') {
+                    const halfW = Math.min(
+                      0.09,
+                      0.015 +
+                        (link.weight / Math.max(1, maxAvailableWeight)) * 0.055
+                    );
+                    const d = describeRibbon(
+                      CX,
+                      CY,
+                      CHORD_R,
+                      sArc.midAngle - halfW,
+                      sArc.midAngle + halfW,
+                      tArc.midAngle - halfW,
+                      tArc.midAngle + halfW
+                    );
 
                     return (
-                      <g key={ring.key}>
-                        {ring.segments.map((seg) => {
-                          const isSelected = pinnedNodeId === seg.node.id;
-                          const isDimmed =
-                            selectedFamily !== null &&
-                            seg.node.family !== selectedFamily;
-
-                          return (
-                            <path
-                              key={`${ring.key}-${seg.node.id}`}
-                              d={describeArc(
-                                CX,
-                                CY,
-                                radii.out,
-                                radii.inn,
-                                seg.startAngle,
-                                seg.endAngle
-                              )}
-                              fill={seg.color}
-                              fillOpacity={
-                                isDimmed ? 0.16 : isSelected ? 1 : 0.85
-                              }
-                              stroke={isSelected ? '#FFFFFF' : '#08060C'}
-                              strokeWidth={isSelected ? 1.5 : 0.8}
-                              className="cursor-pointer transition-opacity duration-200"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setPinnedNodeId((prev) =>
-                                  prev === seg.node.id ? null : seg.node.id
-                                );
-                              }}
-                            />
+                      <path
+                        key={link.id}
+                        d={d}
+                        fill={isSelected ? '#FFFFFF' : sArc.color}
+                        fillOpacity={isSelected ? 0.92 : isDimmed ? 0.07 : 0.42}
+                        stroke={isSelected ? '#FFFFFF' : 'none'}
+                        strokeWidth={isSelected ? 1 : 0}
+                        className="cursor-pointer transition-opacity duration-200"
+                        onMouseEnter={() => setHoveredLink(link)}
+                        onMouseLeave={() => setHoveredLink(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPinnedNodeId(null);
+                          setPinnedLink((prev) =>
+                            prev?.id === link.id ? null : link
                           );
-                        })}
-                      </g>
+                        }}
+                      />
+                    );
+                  }
+
+                  const d = describeHairlineChord(
+                    CX,
+                    CY,
+                    CHORD_R,
+                    sArc.midAngle,
+                    tArc.midAngle
+                  );
+
+                  const strokeColor =
+                    mode === 'piramide'
+                      ? TIER_COLORS[sArc.dominantTier]
+                      : sArc.color;
+
+                  const strokeW = isSelected
+                    ? 2.6
+                    : Math.min(2.2, 0.75 + link.weight * 0.35);
+
+                  return (
+                    <g key={link.id}>
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={12}
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoveredLink(link)}
+                        onMouseLeave={() => setHoveredLink(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPinnedNodeId(null);
+                          setPinnedLink((prev) =>
+                            prev?.id === link.id ? null : link
+                          );
+                        }}
+                      />
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke={isSelected ? '#FFFFFF' : strokeColor}
+                        strokeWidth={strokeW}
+                        strokeOpacity={
+                          isSelected
+                            ? 0.98
+                            : isNodeHighlighted
+                            ? 0.85
+                            : isDimmed
+                            ? 0.07
+                            : 0.48
+                        }
+                        className="pointer-events-none transition-opacity duration-200"
+                      />
+                    </g>
+                  );
+                })}
+              </g>
+
+              {/* In modalità Piramide: Anello interno Piramide (Testa/Cuore/Fondo) + Anello esterno Famiglia */}
+              {mode === 'piramide' && (
+                <g>
+                  {nodeArcs.map((arc) => {
+                    const isActive =
+                      hoveredArcId === arc.id ||
+                      pinnedNodeId === arc.id ||
+                      activeLink?.sourceId === arc.id ||
+                      activeLink?.targetId === arc.id;
+                    const isTierDimmed =
+                      selectedTier !== null &&
+                      arc.dominantTier !== selectedTier;
+
+                    return (
+                      <path
+                        key={`tier-band-${arc.id}`}
+                        d={describeArc(
+                          CX,
+                          CY,
+                          MID_R - 2,
+                          INNER_R,
+                          arc.startAngle,
+                          arc.endAngle
+                        )}
+                        fill={TIER_COLORS[arc.dominantTier]}
+                        fillOpacity={
+                          isTierDimmed ? 0.16 : isActive ? 1 : 0.85
+                        }
+                        className="cursor-pointer transition-opacity duration-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTier((prev) =>
+                            prev === arc.dominantTier ? null : arc.dominantTier
+                          );
+                        }}
+                      />
                     );
                   })}
-
-                  {/* Centro Piramide */}
-                  <g onClick={clearSelection} className="cursor-pointer">
-                    <circle cx={CX} cy={CY} r={78} fill="#08060C" />
-                    <text
-                      x={CX}
-                      y={CY - 8}
-                      textAnchor="middle"
-                      className="fill-[#F6EFE4] font-serif text-[16px]"
-                    >
-                      {pinnedNodeId
-                        ? nodeById.get(pinnedNodeId)?.label || 'Nota'
-                        : 'Testa · Cuore · Fondo'}
-                    </text>
-                    <text
-                      x={CX}
-                      y={CY + 13}
-                      textAnchor="middle"
-                      className="fill-[#B8A9C9] font-mono text-[8.5px] uppercase tracking-[0.18em]"
-                    >
-                      {pinnedNodeId
-                        ? `${inspectedPerfumes.length} flaconi`
-                        : 'Tocca un arco per isolare'}
-                    </text>
-                  </g>
                 </g>
               )}
+
+              {/* Anello esterno principale (Famiglia / Nota) */}
+              <g>
+                {nodeArcs.map((arc) => {
+                  const isActive =
+                    hoveredArcId === arc.id ||
+                    pinnedNodeId === arc.id ||
+                    activeLink?.sourceId === arc.id ||
+                    activeLink?.targetId === arc.id;
+
+                  const isFilteredOut =
+                    (selectedFamily !== null &&
+                      arc.family !== selectedFamily) ||
+                    (mode === 'piramide' &&
+                      selectedTier !== null &&
+                      arc.dominantTier !== selectedTier);
+
+                  const rOut = OUTER_R;
+                  const rIn = mode === 'piramide' ? MID_R : 186;
+
+                  return (
+                    <path
+                      key={arc.id}
+                      d={describeArc(
+                        CX,
+                        CY,
+                        rOut,
+                        rIn,
+                        arc.startAngle,
+                        arc.endAngle
+                      )}
+                      fill={arc.color}
+                      fillOpacity={isFilteredOut ? 0.18 : isActive ? 1 : 0.85}
+                      stroke={isActive ? '#FFFFFF' : 'none'}
+                      strokeWidth={isActive ? 1.2 : 0}
+                      className="cursor-pointer transition-opacity duration-200"
+                      onMouseEnter={() => setHoveredArcId(arc.id)}
+                      onMouseLeave={() => setHoveredArcId(null)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (mode === 'accordi') {
+                          setSelectedFamily((prev) =>
+                            prev === arc.family ? null : arc.family
+                          );
+                        } else {
+                          setPinnedLink(null);
+                          setPinnedNodeId((prev) =>
+                            prev === arc.id ? null : arc.id
+                          );
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </g>
+
+              {/* Etichette radiali delle Famiglie */}
+              <g className="pointer-events-none">
+                {familyGroupArcs.map((grp) => {
+                  if (grp.endAngle - grp.startAngle < 0.14) return null;
+                  const pos = polarToCartesian(
+                    CX,
+                    CY,
+                    OUTER_R + 18,
+                    grp.midAngle
+                  );
+                  const isLeft = Math.cos(grp.midAngle) < -0.15;
+                  const isRight = Math.cos(grp.midAngle) > 0.15;
+
+                  return (
+                    <text
+                      key={grp.id}
+                      x={pos.x}
+                      y={pos.y}
+                      textAnchor={
+                        isLeft ? 'end' : isRight ? 'start' : 'middle'
+                      }
+                      dominantBaseline="middle"
+                      className="fill-[#B8A9C9] font-mono text-[8.5px] font-bold uppercase tracking-[0.14em]"
+                    >
+                      {grp.label}
+                    </text>
+                  );
+                })}
+              </g>
+
+              {/* Readout Centrale */}
+              <g className="cursor-pointer" onClick={clearSelection}>
+                <circle
+                  cx={CX}
+                  cy={CY}
+                  r={74}
+                  fill="#050308"
+                  fillOpacity={0.75}
+                />
+                <text
+                  x={CX}
+                  y={CY - 6}
+                  textAnchor="middle"
+                  className="fill-[#F6EFE4] font-serif text-[15px] tracking-tight"
+                >
+                  {inspectorTitle.left}
+                  <tspan className="fill-[#B8A9C9]/70"> × </tspan>
+                  {inspectorTitle.right}
+                </text>
+                <text
+                  x={CX}
+                  y={CY + 14}
+                  textAnchor="middle"
+                  className="fill-[#B8A9C9] font-mono text-[8.5px] uppercase tracking-[0.18em]"
+                >
+                  {inspectorTitle.badge}
+                </text>
+              </g>
             </svg>
           </div>
+
+          {/* Legenda compatta strati in vista Piramide */}
+          {mode === 'piramide' && (
+            <div className="mt-2 flex items-center gap-4 font-mono text-[10px] text-[#B8A9C9]">
+              {TIER_NAMES.map((lbl, idx) => (
+                <button
+                  key={lbl}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTier((prev) =>
+                      prev === (idx as 0 | 1 | 2) ? null : (idx as 0 | 1 | 2)
+                    )
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 transition ${
+                    selectedTier === idx
+                      ? 'bg-white/10 text-white'
+                      : 'opacity-80 hover:opacity-100'
+                  }`}
+                >
+                  <span
+                    style={{ backgroundColor: TIER_COLORS[idx] }}
+                    className="h-2 w-2 rounded-full"
+                  />
+                  <span>{lbl}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* COLONNA DESTRA: Pannello Ispettore (Controlli + Istogramma + Lista Flaconi) */}
+        {/* COLONNA DESTRA: Pannello Ispettore */}
         <div className="flex flex-col justify-between space-y-6 border-t border-white/10 pt-6 lg:col-span-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           <div className="space-y-6">
-            {/* Controllo 1: Slider soglia (Note/Accordi) oppure Filtro Strato (Piramide) */}
-            {mode !== 'piramide' ? (
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#B8A9C9]">
-                    Creazioni minime condivise
-                  </span>
-                  <span className="font-mono text-xs font-bold text-[#F6EFE4]">
-                    {effectiveMinWeight}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={maxAvailableWeight}
-                  value={effectiveMinWeight}
-                  onChange={(e) => {
-                    setMinWeight(Number(e.target.value));
-                    setPinnedLink(null);
-                  }}
-                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-[#EEF2F4]"
-                />
-
-                {/* Toggle Ordinamento: Frequenza vs Affinità Lift */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#B8A9C9]/70">
-                    Ordinamento legami
-                  </span>
-                  <div className="inline-flex rounded-full border border-white/10 bg-[#0E0A16] p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setMetric('count')}
-                      className={`rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase transition ${
-                        metric === 'count'
-                          ? 'bg-[#EEF2F4] text-[#050308] font-bold'
-                          : 'text-[#B8A9C9]'
-                      }`}
-                    >
-                      Frequenza
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMetric('lift')}
-                      className={`rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase transition ${
-                        metric === 'lift'
-                          ? 'bg-[#EEF2F4] text-[#050308] font-bold'
-                          : 'text-[#B8A9C9]'
-                      }`}
-                    >
-                      Affinità Lift
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
+            {/* Filtro strato Piramide (solo nella vista Piramide) */}
+            {mode === 'piramide' && (
               <div className="space-y-2">
                 <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#B8A9C9]">
-                  Anello Piramide
+                  Strato Piramide
                 </span>
                 <div className="grid grid-cols-4 gap-1.5 rounded-full border border-white/10 bg-[#0E0A16] p-1">
                   {(
@@ -1039,11 +954,64 @@ export function AccordWheel({
               </div>
             )}
 
-            {/* Controllo 2: Mini-Istogramma Famiglie Olfattive */}
+            {/* Slider Soglia Minima + Ordinamento */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#B8A9C9]">
+                  Soglia minima
+                </span>
+                <span className="font-mono text-xs font-bold text-[#F6EFE4]">
+                  {effectiveMinWeight}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={maxAvailableWeight}
+                value={effectiveMinWeight}
+                onChange={(e) => {
+                  setMinWeight(Number(e.target.value));
+                  setPinnedLink(null);
+                }}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-[#EEF2F4]"
+              />
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#B8A9C9]/70">
+                  Metrica
+                </span>
+                <div className="inline-flex rounded-full border border-white/10 bg-[#0E0A16] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setMetric('count')}
+                    className={`rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase transition ${
+                      metric === 'count'
+                        ? 'bg-[#EEF2F4] text-[#050308] font-bold'
+                        : 'text-[#B8A9C9]'
+                    }`}
+                  >
+                    Frequenza
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetric('lift')}
+                    className={`rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase transition ${
+                      metric === 'lift'
+                        ? 'bg-[#EEF2F4] text-[#050308] font-bold'
+                        : 'text-[#B8A9C9]'
+                    }`}
+                  >
+                    Lift
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mini-Istogramma Famiglie */}
             <div className="space-y-2.5 border-t border-white/10 pt-5">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#B8A9C9]">
-                  Famiglie Olfattive
+                  Famiglie
                 </span>
                 {selectedFamily ? (
                   <button
@@ -1051,11 +1019,11 @@ export function AccordWheel({
                     onClick={() => setSelectedFamily(null)}
                     className="font-mono text-[10px] text-[#EEF2F4] underline underline-offset-2"
                   >
-                    Mostra tutte
+                    Tutte
                   </button>
                 ) : (
                   <span className="font-mono text-[10px] text-[#B8A9C9]/70">
-                    {graph.families.length} attive
+                    {graph.families.length}
                   </span>
                 )}
               </div>
@@ -1073,7 +1041,7 @@ export function AccordWheel({
                     <button
                       key={fam.family}
                       type="button"
-                      title={`${fam.family} (${fam.notesCount} note)`}
+                      title={fam.family}
                       onClick={() =>
                         setSelectedFamily((prev) =>
                           prev === fam.family ? null : fam.family
@@ -1094,20 +1062,20 @@ export function AccordWheel({
                   );
                 })}
               </div>
-              <p className="font-mono text-[10px] text-[#B8A9C9]">
-                {selectedFamily
-                  ? `Filtro attivo: ${selectedFamily}`
-                  : 'Tutte le famiglie olfattive'}
-              </p>
+              {selectedFamily && (
+                <p className="font-mono text-[10px] text-[#EEF2F4]">
+                  {selectedFamily}
+                </p>
+              )}
             </div>
 
-            {/* Controllo 3: Lista Creazioni Condivise */}
+            {/* Lista Creazioni Abbinate */}
             <div className="space-y-3 border-t border-white/10 pt-5">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#B8A9C9]">
-                  Creazioni Abbinate
+                  Creazioni
                 </span>
-                {(pinnedLink || pinnedNodeId) && (
+                {(pinnedLink || pinnedNodeId || selectedTier !== null) && (
                   <button
                     type="button"
                     onClick={clearSelection}
@@ -1132,7 +1100,7 @@ export function AccordWheel({
 
               {inspectedPerfumes.length === 0 ? (
                 <p className="rounded-2xl border border-white/10 bg-[#0E0A16] px-4 py-3 text-xs text-[#B8A9C9]/75">
-                  Nessuna creazione corrisponde ai filtri combinati.
+                  Nessuna creazione corrispondente.
                 </p>
               ) : (
                 <ul className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
@@ -1164,11 +1132,6 @@ export function AccordWheel({
                 </ul>
               )}
             </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 pt-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#B8A9C9]/55">
-            <Sparkles className="h-3 w-3" />
-            <span>Tocca un filo o una barretta per bloccare l’analisi</span>
           </div>
         </div>
       </div>
