@@ -16,10 +16,8 @@ export default function DiarioPage() {
   const [indossi, setIndossi] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modale Scheda Dettaglio Condivisa
   const [selectedDetailProfumo, setSelectedDetailProfumo] = useState<Profumo | null>(null);
 
-  // Form Registrazione Rapida Indosso
   const [selectedProfumoId, setSelectedProfumoId] = useState<string>('');
   const [wearData, setWearData] = useState<string>(getLocalIsoDate());
   const [wearMomento, setWearMomento] = useState<Momento>('Mattina');
@@ -111,7 +109,6 @@ export default function DiarioPage() {
     }
   }
 
-  // Statistiche analitiche calcolate sugli indossi
   const stats = useMemo(() => {
     const familyCounts: Record<string, number> = {};
     const momentoCounts: Record<string, number> = { Mattina: 0, Pomeriggio: 0, Sera: 0, Notte: 0 };
@@ -156,7 +153,9 @@ export default function DiarioPage() {
     <main className="mx-auto w-full max-w-4xl px-4 sm:px-8 py-8 pb-36 space-y-10">
       <PageHeader
         title="Diario Olfattivo"
-        subtitle="REGISTRO"
+        subtitle="Registro"
+        count={loading ? undefined : indossi.length}
+        countLabel={indossi.length === 1 ? 'INDOSSO' : 'INDOSSI'}
       />
 
       {/* 1. FORM DI REGISTRAZIONE RAPIDA IN EVIDENZA */}
@@ -284,7 +283,6 @@ export default function DiarioPage() {
       {/* 2. ANALITICHE E GRAFICI OLFATTIVI */}
       {stats.totalIndossi > 0 && (
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {/* Ripartizione Famiglie Olfattive */}
           <div
             style={{ borderColor: `${aura.primary}40` }}
             className="rounded-[24px] border bg-[#0E0A16] p-5 space-y-4 shadow-xl"
@@ -316,7 +314,6 @@ export default function DiarioPage() {
             </div>
           </div>
 
-          {/* Breakdown Momenti della Giornata */}
           <div
             style={{ borderColor: `${aura.primary}40` }}
             className="rounded-[24px] border bg-[#0E0A16] p-5 space-y-4 shadow-xl"
