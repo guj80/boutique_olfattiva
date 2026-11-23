@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api-auth';
 import { callGeminiWithFallback } from '@/lib/gemini-engine';
+import { tavilySearch } from '@/lib/web-search';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-/* ------------------------------------------------------------------ */
-/* Tipi del payload                                                    */
-/* ------------------------------------------------------------------ */
 
 interface ChatTurn {
   role: 'user' | 'assistant';
@@ -23,10 +20,6 @@ interface OracoloContext {
   weather?: string;
 }
 
-/* ------------------------------------------------------------------ */
-/* Limiti                                                              */
-/* ------------------------------------------------------------------ */
-
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_MESSAGES = 20;
 const MAX_COLLECTION = 60;
@@ -39,7 +32,7 @@ const SYSTEM_PROMPT = [
   "Sei CAMILLA, la consulente olfattiva personale di Atelier LG. Conosci la collezione dell'utente, il suo Radar, il suo diario e il suo Scent DNA.",
   "Rispondi in italiano con tono autorevole, competente e asciutto (max 4-5 frasi salvo richieste tecniche dettagliate).",
   "1) Consigli d'uso e layering: basati esclusivamente sui profumi presenti nella Collezione o nel Radar dell'utente, incrociando ultimi indossi, ora del giorno, meteo e chimica delle note. Non attribuire mai all'utente profumi che non possiede.",
-  "2) Ricerca fonti ufficiali e schede tecniche: se l'utente chiede il sito ufficiale di una maison, il link o riferimento su Fragrantica/Parfumo, oppure chiede di verificare/completare la piramide olfattiva, il naso o l'anno di lancio di una fragranza (anche fuori collezione), fornisci con precisione il dominio ufficiale della maison (se certo, altrimenti il riferimento di ricerca su Parfumo/Fragrantica senza mai inventare URL specifici non verificati) e i dettagli olfattivi reali accertati (Testa, Cuore, Fondo, Naso, Concentrazione) così che possa aggiornare la scheda.",
+  "2) Ricerca fonti ufficiali e schede tecniche: se nel prompt è presente il blocco <ricerca_web_verificata>, usa ESCLUSIVAMENTE quei dati reali (URL ufficiali, piramide olfattiva, naso, concentrazione, anno di lancio) per rispondere. Non inventare mai URL, nasi o piramidi non presenti nelle fonti.",
 ].join(' ');
 
 const INJECTION_PATTERNS: RegExp[] = [
@@ -51,13 +44,12 @@ const INJECTION_PATTERNS: RegExp[] = [
   /prompt\s+di\s+sistema/i,
 ];
 
+const EXTERNAL_LOOKUP_PATTERN =
+  /(verifica|piramide|sito ufficiale|link|fragrantica|parfumo|naso di|chi ha creato|concentrazione|anno di lancio|note di\s)/i;
+
 function looksLikeInjection(text: string): boolean {
   return INJECTION_PATTERNS.some((re) => re.test(text));
 }
-
-/* ------------------------------------------------------------------ */
-/* Sanificazione                                                       */
-/* ------------------------------------------------------------------ */
 
 function cleanLine(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
@@ -135,15 +127,11 @@ function parseContext(value: unknown): OracoloContext | string {
   return { collection, radar, recentWears, scentDNA, currentTime, weather };
 }
 
-/* ------------------------------------------------------------------ */
-/* Prompt                                                              */
-/* ------------------------------------------------------------------ */
-
 function listBlock(items: string[], emptyLabel: string): string {
   return items.length > 0 ? items.map((item) => `  - ${item}`).join('\n') : `  ${emptyLabel}`;
 }
 
-function buildPrompt(turns: ChatTurn[], ctx: OracoloContext): string {
+function buildPrompt(turns: ChatTurn[], ctx: OracoloContext, webContext?: string | null): string {
   const dnaLines = Object.entries(ctx.scentDNA)
     .sort((a, b) => b[1] - a[1])
     .map(([label, pct]) => `${label} ${pct}%`)
@@ -162,11 +150,15 @@ function buildPrompt(turns: ChatTurn[], ctx: OracoloContext): string {
     ...(ctx.weather ? [`Meteo: ${ctx.weather}`] : []),
   ].join('\n');
 
+  const webBlock = webContext
+    ? `\n\n<ricerca_web_verificata>\n${webContext.slice(0, 4500)}\n</ricerca_web_verificata>`
+    : '';
+
   const transcript = turns
     .map((turn) => `${turn.role === 'user' ? 'Utente' : 'CAMILLA'}: ${turn.content}`)
     .join('\n');
 
-  return `${contextBlock}\n\nCONVERSAZIONE:\n${transcript}\n\nRispondi ora, come CAMILLA, all'ultimo messaggio dell'utente.`;
+  return `${contextBlock}${webBlock}\n\nCONVERSAZIONE:\n${transcript}\n\nRispondi ora, come CAMILLA, all'ultimo messaggio dell'utente.`;
 }
 
 function tidyReply(raw: string): string {
@@ -175,10 +167,6 @@ function tidyReply(raw: string): string {
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .trim();
 }
-
-/* ------------------------------------------------------------------ */
-/* Handler                                                             */
-/* ------------------------------------------------------------------ */
 
 export async function POST(req: Request) {
   const auth = await requireUser(req);
@@ -210,12 +198,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: context }, { status: 400 });
   }
 
+  // Se l'utente chiede verifica piramide / sito ufficiale / naso, interroga Tavily in tempo reale
+  const lastUserMsg = turns[turns.length - 1]?.content || '';
+  let webContext: string | null = null;
+  if (EXTERNAL_LOOKUP_PATTERN.test(lastUserMsg)) {
+    const tv = await tavilySearch(`${lastUserMsg} perfume`, {
+      maxResults: 4,
+      timeoutMs: 5500,
+    }).catch(() => null);
+    webContext = tv?.contextText || null;
+  }
+
   try {
-    const { text } = await callGeminiWithFallback([{ text: buildPrompt(turns, context) }], {
-      temperature: 0.55,
-      systemInstruction: SYSTEM_PROMPT,
-      deadline: Date.now() + 20000,
-    });
+    const { text } = await callGeminiWithFallback(
+      [{ text: buildPrompt(turns, context, webContext) }],
+      {
+        temperature: webContext ? 0.25 : 0.55,
+        systemInstruction: SYSTEM_PROMPT,
+        deadline: Date.now() + 20000,
+      }
+    );
 
     const reply = tidyReply(text);
     if (!reply) {
