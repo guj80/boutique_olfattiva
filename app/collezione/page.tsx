@@ -25,6 +25,7 @@ import {
 } from '@/lib/supabase';
 import { normalizeFamily } from '@/lib/families';
 import { suggestNotes } from '@/lib/dictionary';
+import { apiFetch } from '@/lib/api-fetch';
 import { PageHeader } from '@/components/Logo';
 import { BottlePedestal } from '@/components/BottleImage';
 import { ProfumoDetailModal } from '@/components/ProfumoDetailModal';
@@ -66,6 +67,7 @@ export default function CollezionePage() {
   const [scoutResults, setScoutResults] = useState<ScoutProposal[]>([]);
   const [seenScoutKeys, setSeenScoutKeys] = useState<string[]>([]);
   const [scoutingLoading, setScoutingLoading] = useState(false);
+  const [savingScoutKey, setSavingScoutKey] = useState<string | null>(null);
 
   const [selectedProfumo, setSelectedProfumo] = useState<Profumo | null>(null);
 
@@ -202,17 +204,61 @@ export default function CollezionePage() {
       return;
     }
 
+    setSavingScoutKey(pairKey);
     try {
+      let enriched: Record<string, any> = {};
+      try {
+        const extractRes = await apiFetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brand: item.brand,
+            nome: item.nome,
+            concentration: item.concentrazione || '',
+            queryName: `${item.brand} ${item.nome}`,
+          }),
+        });
+        if (extractRes.ok) {
+          const extData = await extractRes.json();
+          if (extData && !extData.error) {
+            enriched = extData;
+          }
+        }
+      } catch {
+        // Fallback silenzioso ai dati già estratti dal Trittico
+      }
+
+      const noteTesta = enriched.note_testa || item.note_testa || null;
+      const noteCuore = enriched.note_cuore || item.note_cuore || null;
+      const noteFondo = enriched.note_fondo || item.note_fondo || null;
+      const unifiedNotes =
+        enriched.note_olfattive ||
+        [noteTesta, noteCuore, noteFondo].filter(Boolean).join(', ') ||
+        null;
+
       const payload = {
-        brand: item.brand,
-        nome: item.nome,
-        concentrazione: item.concentrazione || null,
-        famiglia_olfattiva: normalizeFamily(item.famiglia_olfattiva),
-        naso: item.naso || null,
-        note_testa: item.note_testa || null,
-        note_cuore: item.note_cuore || null,
-        note_fondo: item.note_fondo || null,
-        url_foto_vetrina: item.url_foto_vetrina || null,
+        brand: enriched.brand || item.brand,
+        nome: enriched.nome || item.nome,
+        concentrazione: enriched.concentrazione || item.concentrazione || 'Eau de Parfum',
+        famiglia_olfattiva:
+          normalizeFamily(enriched.famiglia_olfattiva || item.famiglia_olfattiva) || 'Ambrata',
+        naso: enriched.naso || item.naso || null,
+        anno_lancio: enriched.anno_lancio ? Number(enriched.anno_lancio) || null : null,
+        note_testa: noteTesta,
+        note_cuore: noteCuore,
+        note_fondo: noteFondo,
+        note_olfattive: unifiedNotes,
+        prezzo_stimato_euro: enriched.prezzo_stimato_euro || null,
+        formato_ml: Number(enriched.formato_ml) || 100,
+        stagione_ideale: enriched.stagione_ideale || null,
+        occasione_ideale: enriched.occasione_ideale || null,
+        url_foto_vetrina:
+          (typeof enriched.url_foto_vetrina === 'string' &&
+          enriched.url_foto_vetrina.startsWith('http')
+            ? enriched.url_foto_vetrina
+            : null) ||
+          item.url_foto_vetrina ||
+          null,
         stato: 'radar',
       };
 
@@ -227,10 +273,12 @@ export default function CollezionePage() {
       setScoutResults((prev) =>
         prev.filter((r) => makeScoutPairKey(r.brand, r.nome) !== pairKey)
       );
-      showToast(`${item.nome} salvato nel Radar.`);
+      showToast(`${payload.nome} importato con scheda completa nel Radar.`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Errore salvataggio.';
       showToast(message, 'error');
+    } finally {
+      setSavingScoutKey(null);
     }
   }
 
@@ -656,81 +704,91 @@ export default function CollezionePage() {
               className="pt-6 border-t space-y-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {scoutResults.map((item, idx) => (
-                  <div
-                    key={`${item.brand}-${item.nome}-${idx}`}
-                    style={{ borderColor: `${aura.primary}45` }}
-                    className="group flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-4 shadow-xl"
-                  >
+                {scoutResults.map((item, idx) => {
+                  const pairKey = makeScoutPairKey(item.brand, item.nome);
+                  const isSavingThis = savingScoutKey === pairKey;
+
+                  return (
                     <div
-                      onClick={() => handlePreviewScoutItem(item)}
-                      className="space-y-2 cursor-pointer"
+                      key={`${item.brand}-${item.nome}-${idx}`}
+                      style={{ borderColor: `${aura.primary}45` }}
+                      className="group flex flex-col justify-between rounded-[22px] border bg-[#161024] p-4 space-y-4 shadow-xl"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          style={{ borderColor: `${aura.primary}35`, color: aura.primary }}
-                          className="inline-block font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E0A16] border"
-                        >
-                          {item.categoria}
-                        </span>
-                        {item.famiglia_olfattiva && (
-                          <span className="font-mono text-[9px] text-[#B8A9C9]">
-                            {item.famiglia_olfattiva}
+                      <div
+                        onClick={() => handlePreviewScoutItem(item)}
+                        className="space-y-2 cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            style={{ borderColor: `${aura.primary}35`, color: aura.primary }}
+                            className="inline-block font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E0A16] border"
+                          >
+                            {item.categoria}
                           </span>
+                          {item.famiglia_olfattiva && (
+                            <span className="font-mono text-[9px] text-[#B8A9C9]">
+                              {item.famiglia_olfattiva}
+                            </span>
+                          )}
+                        </div>
+
+                        <BottlePedestal
+                          src={item.url_foto_vetrina}
+                          alt={item.nome}
+                          brand={item.brand}
+                          famiglia={item.famiglia_olfattiva}
+                          concentrazione={item.concentrazione}
+                          size="md"
+                          className="w-full !h-36 my-1"
+                        />
+
+                        <p
+                          style={{ color: aura.primary }}
+                          className="font-mono text-[10px] uppercase tracking-wider truncate"
+                        >
+                          {item.brand}
+                        </p>
+                        <h5 className="font-serif text-lg text-[#F6EFE4] leading-tight group-hover:underline">
+                          {item.nome}
+                        </h5>
+                        {item.motivo && (
+                          <p className="text-xs leading-relaxed text-[#B8A9C9] pt-0.5">
+                            {item.motivo}
+                          </p>
                         )}
                       </div>
 
-                      <BottlePedestal
-                        src={item.url_foto_vetrina}
-                        alt={item.nome}
-                        brand={item.brand}
-                        famiglia={item.famiglia_olfattiva}
-                        concentrazione={item.concentrazione}
-                        size="md"
-                        className="w-full !h-36 my-1"
-                      />
-
-                      <p
-                        style={{ color: aura.primary }}
-                        className="font-mono text-[10px] uppercase tracking-wider truncate"
-                      >
-                        {item.brand}
-                      </p>
-                      <h5 className="font-serif text-lg text-[#F6EFE4] leading-tight group-hover:underline">
-                        {item.nome}
-                      </h5>
-                      {item.motivo && (
-                        <p className="text-xs leading-relaxed text-[#B8A9C9] pt-0.5">
-                          {item.motivo}
-                        </p>
-                      )}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handlePreviewScoutItem(item)}
+                          style={{ borderColor: `${aura.primary}40` }}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:opacity-85"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>Scheda</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingThis}
+                          onClick={() => handleSaveScoutToRadar(item)}
+                          style={{
+                            borderColor: `${aura.primary}60`,
+                            color: aura.primary,
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-bold transition hover:opacity-85 disabled:opacity-50"
+                        >
+                          {isSavingThis ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                          <span>{isSavingThis ? 'Import...' : 'Salva'}</span>
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handlePreviewScoutItem(item)}
-                        style={{ borderColor: `${aura.primary}40` }}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-semibold text-[#F6EFE4] transition hover:opacity-85"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>Scheda</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSaveScoutToRadar(item)}
-                        style={{
-                          borderColor: `${aura.primary}60`,
-                          color: aura.primary,
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-full border bg-[#0E0A16] px-3 py-2 text-xs font-bold transition hover:opacity-85"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        <span>Salva</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
