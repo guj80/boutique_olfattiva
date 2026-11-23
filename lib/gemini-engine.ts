@@ -1,6 +1,7 @@
 // lib/gemini-engine.ts
 // Motore AI multi-provider a cascata (Gemini -> Groq -> OpenRouter free router)
-// con structured output, header x-goog-api-key, deadline globale, join delle parts e logging [AtelierLG:AI].
+// con structured output, Google Search Grounding opzionale, blocco anti-allucinazione (onlyGemini),
+// header x-goog-api-key, deadline globale, join delle parts e logging [AtelierLG:AI].
 
 export type ProviderName = 'gemini' | 'groq' | 'openrouter';
 
@@ -21,6 +22,10 @@ export interface AICallOptions<T = unknown> {
   responseSchema?: Record<string, unknown>;
   validator?: (data: unknown) => data is T;
   systemInstruction?: string;
+  /** Attiva Google Search Grounding nativo su Gemini */
+  useGoogleSearch?: boolean;
+  /** Se true, esegue SOLO i modelli Gemini (blocca il fallback cieco su Groq/OpenRouter) */
+  onlyGemini?: boolean;
 }
 
 export interface AIResult<T = unknown> {
@@ -135,11 +140,23 @@ function extractTextFromParts(parts: AIPart[]): string {
 }
 
 function sanitizeJsonString(raw: string): string {
-  return raw
+  const cleaned = raw
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim();
+
+  if (cleaned.startsWith('{') || cleaned.startsWith('[')) {
+    return cleaned;
+  }
+
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (objMatch) return objMatch[0];
+
+  const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+  if (arrMatch) return arrMatch[0];
+
+  return cleaned;
 }
 
 async function fetchWithTimeout(
@@ -216,7 +233,8 @@ export async function callGeminiDirect(
     temperature: options.temperature ?? 0.6,
   };
 
-  if (options.jsonMode) {
+  // Con google_search attivo evitiamo responseMimeType/responseSchema per compatibilità API
+  if (options.jsonMode && !options.useGoogleSearch) {
     generationConfig.responseMimeType = 'application/json';
     if (options.responseSchema) {
       generationConfig.responseSchema = options.responseSchema;
@@ -227,6 +245,10 @@ export async function callGeminiDirect(
     contents: [{ role: 'user', parts }],
     generationConfig,
   };
+
+  if (options.useGoogleSearch) {
+    body.tools = [{ google_search: {} }];
+  }
 
   if (options.systemInstruction) {
     body.system_instruction = { parts: [{ text: options.systemInstruction }] };
@@ -404,7 +426,11 @@ export async function callAIWithFallback<T = unknown>(
   const globalDeadline = options.deadline ?? Date.now() + 25000;
   const errors: string[] = [];
 
-  for (const target of FALLBACK_CHAIN) {
+  const activeChain = options.onlyGemini
+    ? FALLBACK_CHAIN.filter((t) => t.provider === 'gemini')
+    : FALLBACK_CHAIN;
+
+  for (const target of activeChain) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const remaining = globalDeadline - Date.now();
       if (remaining <= 500) {
@@ -516,15 +542,7 @@ export const callGeminiWithFallback = callAIWithFallback;
 
 export function extractJsonFromAiText<T = unknown>(text: string): T {
   const cleaned = sanitizeJsonString(text);
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      return JSON.parse(match[0]) as T;
-    }
-    throw new Error('Formato JSON non riconosciuto nella risposta AI.');
-  }
+  return JSON.parse(cleaned) as T;
 }
 
 export async function callOpenRouterFree(
