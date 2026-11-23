@@ -115,6 +115,11 @@ export default function ScannerPage() {
   const [draft, setDraft] = useState<Partial<Profumo> | null>(null);
   const [detectedVariants, setDetectedVariants] = useState<string[]>([]);
   const [modelSource, setModelSource] = useState<string>('');
+  const [sourceLinks, setSourceLinks] = useState<{
+    official: string | null;
+    parfumo: string | null;
+    fragrantica: string | null;
+  }>({ official: null, parfumo: null, fragrantica: null });
 
   const [suggestions, setSuggestions] = useState<CatalogHit[]>([]);
   const [showSuggest, setShowSuggest] = useState(false);
@@ -262,6 +267,7 @@ export default function ScannerPage() {
     setExtracting(true);
     setDraft(null);
     setDetectedVariants([]);
+    setSourceLinks({ official: null, parfumo: null, fragrantica: null });
     setBottleStudioOpen(false);
     setRawBottleSource(null);
     setProcessedPreview(null);
@@ -345,6 +351,11 @@ export default function ScannerPage() {
         Array.isArray(data.varianti_rilevate) ? data.varianti_rilevate.map(String) : []
       );
       setModelSource(data._modelUsed || 'verified-engine');
+      setSourceLinks({
+        official: typeof data.url_sito_ufficiale === 'string' ? data.url_sito_ufficiale : null,
+        parfumo: typeof data.url_parfumo === 'string' ? data.url_parfumo : null,
+        fragrantica: typeof data.url_fragrantica === 'string' ? data.url_fragrantica : null,
+      });
       setDraft(extractedDraft);
       setCustomAura(resolveAura(extractedDraft.famiglia_olfattiva, extractedDraft.nome));
       showToast(
@@ -763,9 +774,12 @@ export default function ScannerPage() {
             </span>
             <div className="flex flex-wrap items-center gap-2">
               <a
-                href={`https://www.google.com/search?q=${encodeURIComponent(
-                  `${draft.brand || ''} ${draft.nome || ''} official website`
-                )}`}
+                href={
+                  sourceLinks.official ||
+                  `https://www.google.com/search?q=${encodeURIComponent(
+                    `${draft.brand || ''} ${draft.nome || ''} official website`
+                  )}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold text-[#F6EFE4] transition hover:border-white/40"
@@ -774,9 +788,12 @@ export default function ScannerPage() {
                 <ExternalLink className="h-2.5 w-2.5 opacity-75" />
               </a>
               <a
-                href={`https://www.parfumo.com/s_perfumes_x.php?in=1&filter=${encodeURIComponent(
-                  `${draft.brand || ''} ${draft.nome || ''}`
-                )}`}
+                href={
+                  sourceLinks.parfumo ||
+                  `https://www.parfumo.com/s_perfumes_x.php?in=1&filter=${encodeURIComponent(
+                    `${draft.brand || ''} ${draft.nome || ''}`
+                  )}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold text-[#F6EFE4] transition hover:border-white/40"
@@ -785,9 +802,12 @@ export default function ScannerPage() {
                 <ExternalLink className="h-2.5 w-2.5 opacity-75" />
               </a>
               <a
-                href={`https://www.fragrantica.com/search/?query=${encodeURIComponent(
-                  `${draft.brand || ''} ${draft.nome || ''}`
-                )}`}
+                href={
+                  sourceLinks.fragrantica ||
+                  `https://www.fragrantica.com/search/?query=${encodeURIComponent(
+                    `${draft.brand || ''} ${draft.nome || ''}`
+                  )}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold text-[#F6EFE4] transition hover:border-white/40"
