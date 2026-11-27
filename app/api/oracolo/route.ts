@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api-auth';
 import { callGeminiWithFallback } from '@/lib/gemini-engine';
 import { tavilySearch } from '@/lib/web-search';
+import { createClient } from '@supabase/supabase-js';
+import { findSimilar, type SimiliMode, type SimiliResult } from '@/lib/simili-engine';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -33,6 +35,7 @@ const SYSTEM_PROMPT = [
   "Rispondi in italiano con tono autorevole, competente e asciutto (max 4-5 frasi salvo richieste tecniche dettagliate).",
   "1) Consigli d'uso e layering: basati esclusivamente sui profumi presenti nella Collezione o nel Radar dell'utente, incrociando ultimi indossi, ora del giorno, meteo e chimica delle note. Non attribuire mai all'utente profumi che non possiede.",
   "2) Ricerca fonti ufficiali e schede tecniche: se nel prompt è presente il blocco <ricerca_web_verificata>, usa ESCLUSIVAMENTE quei dati reali (URL ufficiali, piramide olfattiva, naso, concentrazione, anno di lancio) per rispondere. Non inventare mai URL, nasi o piramidi non presenti nelle fonti.",
+  "3) Profumi simili: se nel prompt è presente il blocco <simili_verificati>, quelli sono gli UNICI profumi che puoi proporre, tutti reali e tratti dal catalogo, con motivazione già calcolata. Non aggiungerne altri, non inventare note, nasi o paragoni non presenti nel blocco. I risultati compaiono all'utente come schede sotto il tuo messaggio: non rielencarli uno per uno. In 3-4 frasi indica quale versione del profumo di partenza hai usato, spiega il filo che lega i risultati e suggerisci da quale iniziare. Se il blocco dice che non ci sono risultati o che il profumo non è stato trovato, dillo con franchezza e proponi di provare con un altro profumo, senza inventare alternative.",
 ].join(' ');
 
 const INJECTION_PATTERNS: RegExp[] = [
@@ -46,6 +49,101 @@ const INJECTION_PATTERNS: RegExp[] = [
 
 const EXTERNAL_LOOKUP_PATTERN =
   /(verifica|piramide|sito ufficiale|link|fragrantica|parfumo|naso di|chi ha creato|concentrazione|anno di lancio|note di\s)/i;
+
+const SIMILI_PATTERN =
+  /(simil|alternativ|piace|piaccion|piacer|stesso (stile|genere|tipo)|dello stesso|nella stessa|come .{2,40} ma |più strani|piu strani|strano|sorprendimi|più vicini|piu vicini|insolit|non banal)/i;
+
+interface SimiliIntent {
+  isSimilarRequest: boolean;
+  seeds: string[];
+  mode: SimiliMode;
+}
+
+const SIMILI_INTENT_SCHEMA: Record<string, unknown> = {
+  type: 'OBJECT',
+  properties: {
+    isSimilarRequest: { type: 'BOOLEAN' },
+    seeds: { type: 'ARRAY', items: { type: 'STRING' } },
+    mode: { type: 'STRING' },
+  },
+  required: ['isSimilarRequest', 'seeds', 'mode'],
+};
+
+function isSimiliIntent(data: unknown): data is SimiliIntent {
+  if (typeof data !== 'object' || data === null) return false;
+  const o = data as Record<string, unknown>;
+  return (
+    typeof o.isSimilarRequest === 'boolean' &&
+    Array.isArray(o.seeds) &&
+    o.seeds.every((x) => typeof x === 'string') &&
+    typeof o.mode === 'string'
+  );
+}
+
+async function extractSimiliIntent(turns: ChatTurn[]): Promise<SimiliIntent | null> {
+  const transcript = turns
+    .slice(-6)
+    .map((t) => `${t.role === 'user' ? 'Utente' : 'CAMILLA'}: ${t.content}`)
+    .join('\n');
+  const prompt = [
+    "Analizza la conversazione. Stabilisci se l'ULTIMO messaggio dell'utente chiede profumi simili o alternative a uno o più profumi precisi (anche in forma ipotetica: \"mi piace X, cos'altro potrebbe piacermi?\"), oppure chiede di rifare la ricerca precedente 'più vicina' o 'più strana'.",
+    'Rispondi solo in JSON: {"isSimilarRequest": boolean, "seeds": string[], "mode": "vicino" | "sorprendimi"}.',
+    "seeds: da 1 a 3 profumi di partenza scritti come \"Maison Nome\", ricavati dall'utente (anche dai messaggi precedenti se l'ultimo dice solo 'più strani' o 'più vicini'). Non inventare profumi non citati. Se non ce n'è nessuno, isSimilarRequest è false.",
+    "mode: \"sorprendimi\" se l'utente chiede qualcosa di sorprendente, strano, insolito, non banale o diverso; altrimenti \"vicino\".",
+    '',
+    'CONVERSAZIONE:',
+    transcript,
+  ].join('\n');
+
+  try {
+    const { data } = await callGeminiWithFallback<SimiliIntent>([{ text: prompt }], {
+      jsonMode: true,
+      responseSchema: SIMILI_INTENT_SCHEMA,
+      validator: isSimiliIntent,
+      temperature: 0,
+      timeoutMs: 6000,
+      maxRetries: 1,
+      deadline: Date.now() + 8000,
+    });
+    if (!data || !data.isSimilarRequest) return null;
+    const seeds = data.seeds
+      .map((x) => cleanLine(x, 70))
+      .filter((x): x is string => !!x)
+      .slice(0, 3);
+    if (seeds.length === 0) return null;
+    return {
+      isSimilarRequest: true,
+      seeds,
+      mode: data.mode === 'sorprendimi' ? 'sorprendimi' : 'vicino',
+    };
+  } catch {
+    return null;
+  }
+}
+
+function similiBlock(
+  intent: SimiliIntent,
+  found: { seeds: Array<{ brand: string | null; name: string | null; concentration?: string | null }>; notFound: string[]; results: SimiliResult[] }
+): string {
+  const used = found.seeds
+    .map((r) => `${r.brand} ${r.name}${r.concentration ? ` (${r.concentration})` : ''}`)
+    .join('; ');
+  const lines: string[] = [
+    `Modalità: ${intent.mode === 'sorprendimi' ? 'sorprendimi (stessa anima, struttura diversa)' : 'vicini'}`,
+    `Profumi di partenza trovati nel catalogo: ${used || 'nessuno'}`,
+  ];
+  if (found.notFound.length) lines.push(`Non trovati nel catalogo: ${found.notFound.join('; ')}`);
+  if (found.results.length === 0) {
+    lines.push('RISULTATI: nessun profumo del catalogo supera la soglia di somiglianza verificabile.');
+  } else {
+    found.results.forEach((r, i) => {
+      lines.push(
+        `${i + 1}. ${r.brand} – ${r.nome}${r.concentrazione ? ` (${r.concentrazione})` : ''}${r.anno ? `, ${r.anno}` : ''} | ${r.motivo}`
+      );
+    });
+  }
+  return lines.join('\n');
+}
 
 function looksLikeInjection(text: string): boolean {
   return INJECTION_PATTERNS.some((re) => re.test(text));
@@ -131,7 +229,12 @@ function listBlock(items: string[], emptyLabel: string): string {
   return items.length > 0 ? items.map((item) => `  - ${item}`).join('\n') : `  ${emptyLabel}`;
 }
 
-function buildPrompt(turns: ChatTurn[], ctx: OracoloContext, webContext?: string | null): string {
+function buildPrompt(
+  turns: ChatTurn[],
+  ctx: OracoloContext,
+  webContext?: string | null,
+  similiContext?: string | null
+): string {
   const dnaLines = Object.entries(ctx.scentDNA)
     .sort((a, b) => b[1] - a[1])
     .map(([label, pct]) => `${label} ${pct}%`)
@@ -154,11 +257,15 @@ function buildPrompt(turns: ChatTurn[], ctx: OracoloContext, webContext?: string
     ? `\n\n<ricerca_web_verificata>\n${webContext.slice(0, 4500)}\n</ricerca_web_verificata>`
     : '';
 
+  const similiBlk = similiContext
+    ? `\n\n<simili_verificati>\n${similiContext.slice(0, 3500)}\n</simili_verificati>`
+    : '';
+
   const transcript = turns
     .map((turn) => `${turn.role === 'user' ? 'Utente' : 'CAMILLA'}: ${turn.content}`)
     .join('\n');
 
-  return `${contextBlock}${webBlock}\n\nCONVERSAZIONE:\n${transcript}\n\nRispondi ora, come CAMILLA, all'ultimo messaggio dell'utente.`;
+  return `${contextBlock}${webBlock}${similiBlk}\n\nCONVERSAZIONE:\n${transcript}\n\nRispondi ora, come CAMILLA, all'ultimo messaggio dell'utente.`;
 }
 
 function tidyReply(raw: string): string {
@@ -209,11 +316,42 @@ export async function POST(req: Request) {
     webContext = tv?.contextText || null;
   }
 
+  // Profumi simili: solo da catalogo reale; l'AI racconta, non inventa
+  let similiContext: string | null = null;
+  let simili: SimiliResult[] | null = null;
+  let similiMeta: { seeds: string[]; mode: SimiliMode } | null = null;
+  if (SIMILI_PATTERN.test(lastUserMsg)) {
+    const intent = await extractSimiliIntent(turns);
+    if (intent) {
+      try {
+        const catalog = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          { auth: { persistSession: false, autoRefreshToken: false } }
+        );
+        const found = await findSimilar(catalog, intent.seeds, {
+          mode: intent.mode,
+          limit: 5,
+          ownedItems: [...context.collection, ...context.radar],
+        });
+        similiContext = similiBlock(intent, found);
+        simili = found.results;
+        similiMeta = {
+          seeds: found.seeds.map((r) => `${r.brand} ${r.name}`),
+          mode: intent.mode,
+        };
+      } catch {
+        similiContext =
+          'RISULTATI: il catalogo non è raggiungibile in questo momento; non proporre alternative.';
+      }
+    }
+  }
+
   try {
     const { text } = await callGeminiWithFallback(
-      [{ text: buildPrompt(turns, context, webContext) }],
+      [{ text: buildPrompt(turns, context, webContext, similiContext) }],
       {
-        temperature: webContext ? 0.25 : 0.55,
+        temperature: webContext || similiContext ? 0.25 : 0.55,
         systemInstruction: SYSTEM_PROMPT,
         deadline: Date.now() + 20000,
       }
@@ -227,7 +365,27 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({
+      reply,
+      ...(simili && simili.length > 0
+        ? {
+            simili: simili.map((r) => ({
+              brand: r.brand,
+              nome: r.nome,
+              concentrazione: r.concentrazione,
+              anno: r.anno,
+              naso: r.naso,
+              url: r.url,
+              famiglia_raw: r.famiglia_raw,
+              note_testa: r.note_testa,
+              note_cuore: r.note_cuore,
+              note_fondo: r.note_fondo,
+              motivo: r.motivo,
+            })),
+            similiMeta,
+          }
+        : {}),
+    });
   } catch {
     return NextResponse.json(
       { error: 'CAMILLA non è raggiungibile in questo momento. Riprova tra poco.' },
