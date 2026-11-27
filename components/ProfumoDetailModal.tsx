@@ -777,7 +777,7 @@ export function ProfumoDetailModal({
                   <SourceLinks
                     brand={profumo.brand}
                     nome={profumo.nome}
-                    urls={profumo}
+                    urls={profumo as unknown as StoredSourceUrls}
                     color={aura.primary}
                   />
                 </div>
