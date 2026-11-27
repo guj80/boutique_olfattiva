@@ -26,6 +26,9 @@ import {
 import { apiFetch } from '@/lib/api-fetch';
 import { SCENT_AXES, computeScentDNA } from '@/lib/scent-dna';
 import { useAura } from './AuraProvider';
+import { normalizeFamily } from '@/lib/families';
+import { formatPerfumeNote } from '@/lib/dictionary';
+import { SimiliCards, similiKey, similiUrls, type SimiliCardData } from './SimiliCards';
 
 /* ------------------------------------------------------------------ */
 /* Tipi & Costanti                                                     */
@@ -35,6 +38,35 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  simili?: SimiliCardData[];
+}
+
+function readSimili(value: unknown): SimiliCardData[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const out: SimiliCardData[] = [];
+  for (const raw of value.slice(0, 6)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const brand = str(r.brand);
+    const nome = str(r.nome);
+    const motivo = str(r.motivo);
+    if (!brand || !nome || !motivo) continue;
+    out.push({
+      brand,
+      nome,
+      motivo,
+      concentrazione: str(r.concentrazione),
+      anno: typeof r.anno === 'number' ? r.anno : null,
+      naso: str(r.naso),
+      url: str(r.url),
+      famiglia_raw: str(r.famiglia_raw),
+      note_testa: str(r.note_testa),
+      note_cuore: str(r.note_cuore),
+      note_fondo: str(r.note_fondo),
+    });
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 interface OracoloContextPayload {
@@ -233,6 +265,9 @@ export function Oracolo() {
   const [draft, setDraft] = useState('');
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addedKeys, setAddedKeys] = useState<Set<string>>(() => new Set());
+  const [addingKey, setAddingKey] = useState<string | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
 
   const messagesRef = useRef<ChatMessage[]>([]);
   const contextRef = useRef<{ at: number; data: OracoloContextPayload } | null>(null);
@@ -368,9 +403,13 @@ export function Oracolo() {
         if (rid !== requestId.current) return;
 
         idCounter.current += 1;
+        const simili =
+          data && typeof data === 'object'
+            ? readSimili((data as Record<string, unknown>).simili)
+            : undefined;
         setMessages((prev) => [
           ...prev,
-          { id: `a-${idCounter.current}`, role: 'assistant', content: reply.trim() },
+          { id: `a-${idCounter.current}`, role: 'assistant', content: reply.trim(), simili },
         ]);
       } catch (err) {
         if (rid !== requestId.current) return;
@@ -406,6 +445,52 @@ export function Oracolo() {
     },
     [thinking, requestReply]
   );
+
+  const addSimiliToRadar = useCallback(async (item: SimiliCardData) => {
+    const key = similiKey(item);
+    setAddingKey(key);
+    setFailedKey(null);
+    try {
+      const testa = formatPerfumeNote(item.note_testa);
+      const cuore = formatPerfumeNote(item.note_cuore);
+      const fondo = formatPerfumeNote(item.note_fondo);
+      const base: Record<string, unknown> = {
+        nome: item.nome,
+        brand: item.brand,
+        concentrazione: item.concentrazione || null,
+        famiglia_olfattiva: normalizeFamily(item.famiglia_raw) || 'Ambrata',
+        naso: item.naso || null,
+        note_testa: testa,
+        note_cuore: cuore,
+        note_fondo: fondo,
+        note_olfattive: [testa, cuore, fondo].filter(Boolean).join(', '),
+        stato: 'radar',
+      };
+      const links = similiUrls(item);
+      let { error: err } = await supabase.from('profumi').insert([{ ...base, ...links }]);
+      if (err && Object.keys(links).length > 0) {
+        ({ error: err } = await supabase.from('profumi').insert([base]));
+      }
+      if (err) {
+        ({ error: err } = await supabase.from('profumi').insert([
+          {
+            nome: base.nome,
+            brand: base.brand,
+            famiglia_olfattiva: base.famiglia_olfattiva,
+            note_olfattive: base.note_olfattive,
+            stato: 'radar',
+          },
+        ]));
+      }
+      if (err) throw err;
+      contextRef.current = null; // il contesto di CAMILLA va riletto
+      setAddedKeys((prev) => new Set(prev).add(key));
+    } catch {
+      setFailedKey(key);
+    } finally {
+      setAddingKey(null);
+    }
+  }, []);
 
   const handleChipClick = useCallback(
     (chip: QuickChip) => {
@@ -629,6 +714,22 @@ export function Oracolo() {
                         >
                           {message.content}
                         </div>
+                        {message.simili && (
+                          <SimiliCards
+                            items={message.simili}
+                            color={aura.primary}
+                            addedKeys={addedKeys}
+                            addingKey={addingKey}
+                            failedKey={failedKey}
+                            onAdd={addSimiliToRadar}
+                            onFollowUp={
+                              message.id === messages[messages.length - 1]?.id
+                                ? sendMessage
+                                : undefined
+                            }
+                            disabled={thinking}
+                          />
+                        )}
                       </div>
                     </motion.div>
                   )
