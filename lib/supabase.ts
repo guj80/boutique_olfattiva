@@ -58,6 +58,9 @@ export interface Profumo {
   note_cuore?: string | null;
   note_fondo?: string | null;
   info_fragrantica?: string | null;
+  url_sito_ufficiale?: string | null;
+  url_parfumo?: string | null;
+  url_fragrantica?: string | null;
   url_foto_vetrina?: string | null;
   immagine_url?: string | null; // Risolve l'errore TypeScript in collezione/page.tsx
   stato?: string | null;
