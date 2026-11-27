@@ -27,6 +27,8 @@ import { resolveAura } from './AuraProvider';
 import { useToast } from './Toast';
 import { processBottleImage, uploadProcessedBottle } from '@/lib/bottle-pipeline';
 import { PerfumeChord } from './PerfumeChord';
+import { SourceLinks } from './SourceLinks';
+import { classifyPastedUrl, pickStoredUrls, StoredSourceUrls } from '@/lib/source-links';
 
 interface ProfumoDetailModalProps {
   profumo: Profumo | null;
@@ -78,6 +80,7 @@ export function ProfumoDetailModal({
   // Arricchimento scheda da URL (Sito Ufficiale / Parfumo / Fragrantica)
   const [sourceUrlInput, setSourceUrlInput] = useState('');
   const [enrichingFromSource, setEnrichingFromSource] = useState(false);
+  const [foundUrls, setFoundUrls] = useState<StoredSourceUrls>({});
 
   // Studio Isolamento Flacone
   const [bottleStudioOpen, setBottleStudioOpen] = useState(false);
@@ -91,6 +94,7 @@ export function ProfumoDetailModal({
 
   useEffect(() => {
     if (profumo) {
+      setFoundUrls({});
       setBrand(profumo.brand || '');
       setNome(profumo.nome || '');
       setConcentrazione(profumo.concentrazione || '');
@@ -234,6 +238,16 @@ export function ProfumoDetailModal({
       if (data.note_cuore) setNoteCuore(String(data.note_cuore));
       if (data.note_fondo) setNoteFondo(String(data.note_fondo));
 
+      // Memorizza i link trovati (e quello incollato) per salvarli con la scheda
+      const incoming: StoredSourceUrls = {
+        url_sito_ufficiale: data.url_sito_ufficiale,
+        url_parfumo: data.url_parfumo,
+        url_fragrantica: data.url_fragrantica,
+      };
+      const pastedKind = link ? classifyPastedUrl(link) : null;
+      if (pastedKind && !incoming[pastedKind]) incoming[pastedKind] = link;
+      setFoundUrls((prev) => ({ ...prev, ...pickStoredUrls(incoming) }));
+
       showToast('Dati importati nei campi. Controlla e premi Salva Modifiche.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Errore importazione dati.';
@@ -338,12 +352,24 @@ export function ProfumoDetailModal({
         url_foto_vetrina: finalBottleUrl,
       };
 
+      const linkFields = pickStoredUrls(foundUrls);
+      const hasLinks = Object.keys(linkFields).length > 0;
+
       if (isPreview) {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('profumi')
-          .insert([payload])
+          .insert([{ ...payload, ...linkFields }])
           .select()
           .single();
+
+        // Colonne link non ancora presenti nel DB: salva comunque la scheda
+        if (error && hasLinks) {
+          ({ data, error } = await supabase
+            .from('profumi')
+            .insert([payload])
+            .select()
+            .single());
+        }
 
         if (error) throw error;
         showToast(`${nome.trim()} salvato nel Radar.`);
@@ -352,12 +378,21 @@ export function ProfumoDetailModal({
         return;
       }
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('profumi')
-        .update(payload)
+        .update({ ...payload, ...linkFields })
         .eq('id', profumo.id)
         .select()
         .single();
+
+      if (error && hasLinks) {
+        ({ data, error } = await supabase
+          .from('profumi')
+          .update(payload)
+          .eq('id', profumo.id)
+          .select()
+          .single());
+      }
 
       if (error) throw error;
 
@@ -739,6 +774,12 @@ export function ProfumoDetailModal({
                       <p className="text-[#F6EFE4]">{profumo.note_fondo || '—'}</p>
                     </div>
                   </div>
+                  <SourceLinks
+                    brand={profumo.brand}
+                    nome={profumo.nome}
+                    urls={profumo}
+                    color={aura.primary}
+                  />
                 </div>
 
                 {profumo.prezzo_stimato_euro && (
@@ -766,7 +807,7 @@ export function ProfumoDetailModal({
                 className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest"
               >
                 <Globe className="h-3.5 w-3.5" />
-                <span>Aggiorna scheda da URL (Sito Ufficiale, Parfumo, Fragrantica)</span>
+                <span>Aggiorna scheda da URL (Ricerca web, Parfumo, Fragrantica)</span>
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
