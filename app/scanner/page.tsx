@@ -458,7 +458,20 @@ export default function ScannerPage() {
         note_pelle: draft.note_pelle || null,
       };
 
-      const { error } = await supabase.from('profumi').insert([fullPayload]);
+      // Link alle fonti salvati con la scheda (restano visibili dopo la prima ricerca)
+      const linksPayload: Record<string, string> = {};
+      if (sourceLinks.official) linksPayload.url_sito_ufficiale = sourceLinks.official;
+      if (sourceLinks.parfumo) linksPayload.url_parfumo = sourceLinks.parfumo;
+      if (sourceLinks.fragrantica) linksPayload.url_fragrantica = sourceLinks.fragrantica;
+
+      let { error } = await supabase
+        .from('profumi')
+        .insert([{ ...fullPayload, ...linksPayload }]);
+
+      // Se le colonne dei link non esistono ancora nel DB, salva comunque la scheda
+      if (error && Object.keys(linksPayload).length > 0) {
+        ({ error } = await supabase.from('profumi').insert([fullPayload]));
+      }
 
       if (error) {
         const { error: fallbackErr } = await supabase.from('profumi').insert([
@@ -767,7 +780,7 @@ export default function ScannerPage() {
             </button>
           </div>
 
-          {/* Collegamenti rapidi cliccabili per verifica su Sito Ufficiale, Parfumo e Fragrantica */}
+          {/* Collegamenti rapidi cliccabili per verifica su Ricerca web, Parfumo e Fragrantica */}
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#140D1C]/85 px-4 py-2.5">
             <span className="font-mono text-[10px] uppercase tracking-wider text-[#B8A9C9]">
               Verifica fonte:
@@ -777,14 +790,14 @@ export default function ScannerPage() {
                 href={
                   sourceLinks.official ||
                   `https://www.google.com/search?q=${encodeURIComponent(
-                    `${draft.brand || ''} ${draft.nome || ''} official website`
+                    `${draft.brand || ''} ${draft.nome || ''} profumo`
                   )}`
                 }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1E1428] px-3 py-1 font-mono text-[10px] font-semibold text-[#F6EFE4] transition hover:border-white/40"
               >
-                <span>Sito Ufficiale</span>
+                <span>Ricerca web</span>
                 <ExternalLink className="h-2.5 w-2.5 opacity-75" />
               </a>
               <a
