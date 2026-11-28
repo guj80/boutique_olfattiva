@@ -65,9 +65,9 @@ export default function UltranicchiaImporter({ onImportComplete }: { onImportCom
         if (remaining > 0) await new Promise(r => setTimeout(r, 1000));
       }
       
-      showToast(`Importazione completata! Vai alle Bozze per approvare.`, 'success');
+      showToast(`Importazione completata! Vai alle Bozze per approvare.`);
       setBrandQuery(''); setBrandCandidates([]); setImportProgress(null);
-      onImportComplete(); // Passa alla tab delle bozze
+      onImportComplete();
     } catch (err: any) {
       showToast(err.message, 'error');
       setImportProgress(null);
