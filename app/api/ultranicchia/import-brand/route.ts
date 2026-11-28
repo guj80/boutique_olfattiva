@@ -1,4 +1,4 @@
-// app/api/ultranicicchia/import-brand/route.ts
+// app/api/ultranicchia/import-brand/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireUser } from '@/lib/api-auth';
@@ -41,7 +41,10 @@ export async function POST(req: Request) {
     const { brand } = await req.json();
     const rawInput = typeof brand === 'string' ? brand.trim() : '';
     if (!rawInput) {
-      return NextResponse.json({ error: 'Inserisci un brand o un link catalogo.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Inserisci un brand o un link catalogo.' },
+        { status: 400 }
+      );
     }
 
     const inputIsUrl = isHttpUrl(rawInput);
@@ -63,22 +66,28 @@ export async function POST(req: Request) {
       const supabaseKey =
         process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      const dbJob =
+      const dbJob: Promise<Array<{ nome: string; concentrazione: string | null }>> =
         supabaseUrl && supabaseKey
-          ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
-              .from('perfumes')
-              .select('name, concentration')
-              .ilike('brand', `%${rawInput}%`)
-              .limit(80)
-              .then((res) =>
-                (res.data || [])
+          ? (async () => {
+              try {
+                const res = await createClient(supabaseUrl, supabaseKey, {
+                  auth: { persistSession: false },
+                })
+                  .from('perfumes')
+                  .select('name, concentration')
+                  .ilike('brand', `%${rawInput}%`)
+                  .limit(80);
+
+                return (res.data || [])
                   .filter((r: any) => typeof r?.name === 'string' && r.name.trim().length > 1)
                   .map((r: any) => ({
                     nome: stripBrandPrefix(r.name, rawInput),
                     concentrazione: r.concentration ? String(r.concentration).trim() : null,
-                  }))
-              )
-              .catch(() => [])
+                  }));
+              } catch {
+                return [];
+              }
+            })()
           : Promise.resolve([]);
 
       const webJob = withTimeout(
@@ -157,7 +166,6 @@ REGOLE:
           if (firstArray) aiCandidates = firstArray as any[];
         }
       } catch (aiErr) {
-        // Se l'AI fallisce ma il DB locale ha trovato risultati, non buttiamo via tutto
         if (dbCandidates.length === 0) throw aiErr;
       }
     }
