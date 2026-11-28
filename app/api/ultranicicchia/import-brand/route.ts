@@ -1,10 +1,9 @@
 // app/api/ultranicchia/import-brand/route.ts
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api-auth';
-import { callAIWithFallback } from '@/lib/gemini-engine';
-import { tavilySearch } from '@/lib/web-search';
+import { callAIWithFallback, extractJsonFromAiText } from '@/lib/gemini-engine';
 
-export const maxDuration = 10; // Limite Vercel Hobby
+export const maxDuration = 15; // Se il tuo piano Vercel lo permette, altrimenti si adatta
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
@@ -17,55 +16,61 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Brand mancante o non valido' }, { status: 400 });
     }
 
-    // 1. Ricerca Web più mirata e veloce
-    const searchQuery = `"${brand}" perfume site:fragrantica.com OR site:parfumo.com OR site:basenotes.com`;
-    const webData = await tavilySearch(searchQuery, { maxResults: 3, timeoutMs: 4000 });
-
-    // Limitiamo il testo a 3000 caratteri per non far perdere tempo all'AI
-    const contextText = (webData?.contextText || '').slice(0, 3000);
-
-    // 2. Prompt stringato
+    // Usiamo Google Search Grounding nativo di Gemini (come fai nel tuo extract)
+    // Bypassiamo Tavily per evitare latenze inutili
     const prompt = `
-      Estrai l'elenco dei profumi del brand "${brand}".
-      Testo di riferimento:
-      ---
-      ${contextText || 'Nessun testo.'}
-      ---
-      REGOLE:
-      1. Estrai solo i nomi dei profumi del brand.
-      2. NON INVENTARE NULLA. Se non trovi nomi, restituisci [].
-      3. Formato: [ { "nome": "Nome", "concentrazione": "Extrait" } ]
+      Trova l'elenco di TUTTI i profumi del brand "${brand}".
+      Restituisci solo un array JSON con questa struttura:
+      [ { "nome": "Nome del profumo", "concentrazione": "Extrait de Parfum" } ]
+      Se non trovi nessun profumo per questo brand, restituisci un array vuoto: [].
+      NON INVENTARE NULLA. Usa solo i dati reali che trovi sul web.
     `;
 
-    // 3. Chiamata AI con timeout di sicurezza stretto (max 4s per modello, 7s totali)
-    const aiResult = await callAIWithFallback<Array<{ nome: string; concentrazione: string | null }>>(
+    // Chiamiamo il tuo motore con i tempi ristretti per evitare il timeout di Vercel
+    const aiResult = await callAIWithFallback(
       [{ text: prompt }],
       { 
-        jsonMode: true, 
-        validator: (data): data is Array<{ nome: string; concentrazione: string | null }> => {
-          if (!Array.isArray(data)) return false;
-          return data.every((d: any) => d && typeof d === 'object' && typeof d.nome === 'string');
-        },
+        useGoogleSearch: true, // <--- IL SEGRETO È QUI
         onlyGemini: true,
         temperature: 0.1,
-        timeoutMs: 4000, 
-        deadline: Date.now() + 7000 // Muore prima che Vercel lo uccida a 10s
+        timeoutMs: 5000, 
+        deadline: Date.now() + 8500 // Ci fermiamo prima che Vercel ci uccida a 10s
       }
     );
 
-    if (!aiResult.data || aiResult.data.length === 0) {
+    let parsed: any = [];
+    try {
+      parsed = extractJsonFromAiText(aiResult.text);
+    } catch {
+      return NextResponse.json({ error: 'L\'AI non ha restituito un elenco valido. Riprova.' }, { status: 500 });
+    }
+
+    // Pulizia e validazione del risultato
+    let candidates: any[] = [];
+    
+    if (Array.isArray(parsed)) {
+      candidates = parsed.filter(c => c && typeof c.nome === 'string');
+    } else if (parsed && typeof parsed === 'object') {
+      // Se l'AI ha restituito un oggetto (es. { "profumi": [...] })
+      const firstArray = Object.values(parsed).find(Array.isArray);
+      if (firstArray) {
+        candidates = firstArray.filter((c: any) => c && typeof c.nome === 'string');
+      }
+    }
+
+    if (candidates.length === 0) {
       return NextResponse.json({ 
-        error: 'Nessun profumo trovato. Prova a cercare un altro brand.',
+        error: 'Nessun profumo trovato. Prova con un brand più noto o controlla il nome.',
         candidates: [] 
       }, { status: 404 });
     }
 
-    return NextResponse.json({ brand, candidates: aiResult.data });
+    return NextResponse.json({ brand, candidates });
 
   } catch (error: any) {
     console.error('[AtelierLG:ImportBrand]', error);
     return NextResponse.json(
-      { error: error.message || 'Errore o timeout durante la ricerca del brand. Riprova.' },
+      { error: error.message || 'Errore o timeout durante la ricerca. Riprova.' },
       { status: 500 }
     );
   }
