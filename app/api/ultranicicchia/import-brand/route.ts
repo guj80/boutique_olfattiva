@@ -4,9 +4,11 @@ import { requireUser } from '@/lib/api-auth';
 import { callAIWithFallback } from '@/lib/gemini-engine';
 import { tavilySearch } from '@/lib/web-search';
 
+export const maxDuration = 10; // Limite Vercel Hobby
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
-    // 1. Controllo autenticazione
     const auth = await requireUser(req);
     if (auth.error) return auth.error;
 
@@ -15,65 +17,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Brand mancante o non valido' }, { status: 400 });
     }
 
-    // 2. Ricerca Web (Tavily) per trovare il sito ufficiale o pagine di elenco
-    const searchQuery = `site:${brand.replace(/\s+/g, '')}.com OR "catalogo profumi ${brand}" OR "perfumes ${brand}"`;
-    const webData = await tavilySearch(searchQuery, { maxResults: 3 });
+    // 1. Ricerca Web più mirata e veloce
+    const searchQuery = `"${brand}" perfume site:fragrantica.com OR site:parfumo.com OR site:basenotes.com`;
+    const webData = await tavilySearch(searchQuery, { maxResults: 3, timeoutMs: 4000 });
 
-    // Se non trova nulla, proviamo una ricerca più generica
-    const finalWebData = webData || await tavilySearch(`profumi ${brand} fragranze`, { maxResults: 3 });
-    const contextText = finalWebData?.contextText || 'Nessun risultato web trovato.';
+    // Limitiamo il testo a 3000 caratteri per non far perdere tempo all'AI
+    const contextText = (webData?.contextText || '').slice(0, 3000);
 
-    // 3. Estrazione AI
+    // 2. Prompt stringato
     const prompt = `
-      Sei un esperto di profumeria. Il tuo compito è estrarre l'elenco dei profumi del brand "${brand}".
-      
-      Ecco il testo estratto dalla ricerca web:
+      Estrai l'elenco dei profumi del brand "${brand}".
+      Testo di riferimento:
       ---
-      ${contextText}
+      ${contextText || 'Nessun testo.'}
       ---
-
-      ISTRUZIONI TASSATIVE:
-      1. Estrai TUTTI i nomi dei profumi che riesci a trovare associati a questo brand.
-      2. Se trovi la concentrazione (es. Extrait, EDP) o il formato, includili.
-      3. NON INVENTARE NULLA. Se un profumo non è menzionato nel testo, non scriverlo.
-      4. Restituisci un JSON array di oggetti con questa struttura esatta:
-         [ { "nome": "Nome Profumo", "concentrazione": "Extrait de Parfum" } ]
+      REGOLE:
+      1. Estrai solo i nomi dei profumi del brand.
+      2. NON INVENTARE NULLA. Se non trovi nomi, restituisci [].
+      3. Formato: [ { "nome": "Nome", "concentrazione": "Extrait" } ]
     `;
 
+    // 3. Chiamata AI con timeout di sicurezza stretto (max 4s per modello, 7s totali)
     const aiResult = await callAIWithFallback<Array<{ nome: string; concentrazione: string | null }>>(
       [{ text: prompt }],
       { 
         jsonMode: true, 
-        // FIX TYPESCRIPT: Type Guard esplicito
         validator: (data): data is Array<{ nome: string; concentrazione: string | null }> => {
           if (!Array.isArray(data)) return false;
-          return data.every((d: any) => 
-            d && typeof d === 'object' && typeof d.nome === 'string'
-          );
+          return data.every((d: any) => d && typeof d === 'object' && typeof d.nome === 'string');
         },
-        onlyGemini: true, 
-        temperature: 0.1 
+        onlyGemini: true,
+        temperature: 0.1,
+        timeoutMs: 4000, 
+        deadline: Date.now() + 7000 // Muore prima che Vercel lo uccida a 10s
       }
     );
 
     if (!aiResult.data || aiResult.data.length === 0) {
       return NextResponse.json({ 
-        error: 'Nessun profumo trovato per questo brand nelle fonti online.',
+        error: 'Nessun profumo trovato. Prova a cercare un altro brand.',
         candidates: [] 
       }, { status: 404 });
     }
 
-    // 4. Restituiamo i candidati al frontend per la selezione
-    return NextResponse.json({
-      brand,
-      candidates: aiResult.data,
-      providerUsed: aiResult.providerUsed
-    });
+    return NextResponse.json({ brand, candidates: aiResult.data });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[AtelierLG:ImportBrand]', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Errore durante la ricerca del brand' },
+      { error: error.message || 'Errore o timeout durante la ricerca del brand. Riprova.' },
       { status: 500 }
     );
   }
