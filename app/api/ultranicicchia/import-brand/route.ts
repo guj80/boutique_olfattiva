@@ -1,8 +1,9 @@
 // app/api/ultranicicchia/import-brand/route.ts
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { requireUser } from '@/lib/api-auth';
 import { callGeminiWithFallback, extractJsonFromAiText } from '@/lib/gemini-engine';
-import { tavilySearch } from '@/lib/web-search';
+import { tavilySearch, tavilyExtract } from '@/lib/web-search';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -17,96 +18,157 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 }
 
+function isHttpUrl(str: string): boolean {
+  return /^https?:\/\/[^\s]+$/i.test(str.trim());
+}
+
 function stripBrandPrefix(nome: string, brand: string): string {
   const cleanName = nome.trim();
   const cleanBrand = brand.trim();
-  if (!cleanBrand) return cleanName;
+  if (!cleanBrand || isHttpUrl(cleanBrand)) return cleanName;
   const escaped = cleanBrand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return cleanName.replace(new RegExp(`^${escaped}[\\s\\-–—:]+`, 'i'), '').trim() || cleanName;
 }
 
 export async function POST(req: Request) {
   const t0 = Date.now();
-  const remaining = () => Math.max(1500, t0 + BUDGET_MS - Date.now());
+  const remaining = () => Math.max(2000, t0 + BUDGET_MS - Date.now());
 
   try {
     const auth = await requireUser(req);
     if (auth.error) return auth.error;
 
     const { brand } = await req.json();
-    const cleanBrand = typeof brand === 'string' ? brand.trim() : '';
-    if (!cleanBrand) {
-      return NextResponse.json({ error: 'Brand mancante o non valido.' }, { status: 400 });
+    const rawInput = typeof brand === 'string' ? brand.trim() : '';
+    if (!rawInput) {
+      return NextResponse.json({ error: 'Inserisci un brand o un link catalogo.' }, { status: 400 });
     }
 
-    // 1. Ricerca Web singola e pulita (niente catene OR/site: che rallentano Tavily)
-    const webData = await withTimeout(
-      tavilySearch(`"${cleanBrand}" perfume fragrances collection list fragrantica parfumo`, {
-        maxResults: 6,
-        timeoutMs: 5500,
-      }).catch(() => null),
-      6000,
-      null
-    );
+    const inputIsUrl = isHttpUrl(rawInput);
+    let resolvedBrand = rawInput;
+    let webContext = '';
+    let dbCandidates: Array<{ nome: string; concentrazione: string | null }> = [];
 
-    const webContext = webData?.contextText?.trim() || '';
-    const hasWebContext = webContext.length > 120;
+    if (inputIsUrl) {
+      // MODALITÀ 1: Link diretto (sito ufficiale, Parfumo, Fragrantica, shop)
+      const extracted = await withTimeout(
+        tavilyExtract(rawInput, 7000).catch(() => null),
+        7500,
+        null
+      );
+      webContext = extracted?.trim() || '';
+    } else {
+      // MODALITÀ 2: Nome brand -> Ricerca parallela su DB locale + Tavily
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey =
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    // 2. Estrazione AI:
-    // - Se Tavily ha trovato testo: niente Google Search, consentiamo anche Groq/fallback (veloce)
-    // - Se Tavily è vuoto: Gemini con Google Search grounding e budget ampio
-    const prompt = `Sei un esperto di profumeria di nicchia e ultra-nicchia.
-Estrai l'elenco COMPLETO e REALE dei profumi del brand "${cleanBrand}".
+      const dbJob =
+        supabaseUrl && supabaseKey
+          ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+              .from('perfumes')
+              .select('name, concentration')
+              .ilike('brand', `%${rawInput}%`)
+              .limit(80)
+              .then((res) =>
+                (res.data || [])
+                  .filter((r: any) => typeof r?.name === 'string' && r.name.trim().length > 1)
+                  .map((r: any) => ({
+                    nome: stripBrandPrefix(r.name, rawInput),
+                    concentrazione: r.concentration ? String(r.concentration).trim() : null,
+                  }))
+              )
+              .catch(() => [])
+          : Promise.resolve([]);
+
+      const webJob = withTimeout(
+        tavilySearch(`"${rawInput}" perfume fragrances list collection`, {
+          maxResults: 6,
+          timeoutMs: 5500,
+        }).catch(() => null),
+        6000,
+        null
+      );
+
+      const [dbRes, webRes] = await Promise.all([dbJob, webJob]);
+      dbCandidates = dbRes;
+      webContext = webRes?.contextText?.trim() || '';
+    }
+
+    const hasWebContext = webContext.length > 100;
+    let aiCandidates: Array<{ nome: string; concentrazione: string | null }> = [];
+
+    // Chiama l'AI se abbiamo testo web, oppure se anche il DB locale è vuoto
+    if (hasWebContext || dbCandidates.length === 0) {
+      const prompt = inputIsUrl
+        ? `Sei un catalogatore di profumeria di nicchia.
+Analizza questa pagina web (${rawInput}) ed estrai:
+1. Il nome esatto del brand ("brand").
+2. L'elenco di TUTTE le fragranze prodotte da quel brand presenti nella pagina ("profumi").
+
+Testo della pagina:
+---
+${webContext.slice(0, 6500)}
+---
+
+REGOLE:
+- Non inventare nulla e ignora prodotti di altri brand.
+- Nel campo "nome" metti solo il nome della creazione (senza ripetere il brand).
+- In "concentrazione" metti la concentrazione solo se scritta, altrimenti null.
+- Rispondi SOLO con JSON valido:
+{"brand": "Nome Brand", "profumi": [{"nome": "Creazione", "concentrazione": "Extrait de Parfum"}]}`
+        : `Sei un catalogatore di profumeria di nicchia e ultra-nicchia.
+Estrai l'elenco COMPLETO e REALE delle fragranze prodotte dal brand "${rawInput}".
 
 ${
   hasWebContext
     ? `Testo estratto dal web:\n---\n${webContext.slice(0, 6000)}\n---`
-    : 'Nessun testo web fornito: usa la ricerca Google per trovare il catalogo ufficiale (Fragrantica, Parfumo, Basenotes, rivenditori ufficiali).'
+    : 'Nessun testo web trovato: usa Google Search per trovare il catalogo ufficiale.'
 }
 
-REGOLE TASSATIVE:
-1. Estrai SOLO fragranze realmente prodotte da "${cleanBrand}". Ignora prodotti correlati di altri brand.
-2. Nel campo "nome" metti solo il nome della creazione, senza ripetere "${cleanBrand}".
-3. In "concentrazione" metti la concentrazione solo se esplicitamente documentata (es. "Extrait de Parfum", "Eau de Parfum"), altrimenti null.
-4. NON inventare nulla. Se non trovi nessun profumo documentato, restituisci [].
-5. Restituisci ESCLUSIVAMENTE un array JSON valido:
-[{"nome": "Nome Creazione", "concentrazione": "Extrait de Parfum"}]`;
+REGOLE:
+- Estrai SOLO fragranze realmente prodotte da "${rawInput}".
+- Nel campo "nome" metti solo il nome della creazione (senza ripetere "${rawInput}").
+- In "concentrazione" metti la concentrazione solo se documentata, altrimenti null.
+- Non inventare nulla. Se non trovi nulla, restituisci [].
+- Rispondi SOLO con JSON valido:
+[{"nome": "Creazione", "concentrazione": "Extrait de Parfum"}]`;
 
-    const aiTimeout = hasWebContext
-      ? Math.min(10000, remaining())
-      : Math.min(15000, remaining());
+      try {
+        const aiResult = await callGeminiWithFallback([{ text: prompt }], {
+          temperature: 0.1,
+          jsonMode: hasWebContext,
+          useGoogleSearch: !hasWebContext && !inputIsUrl,
+          onlyGemini: !hasWebContext && !inputIsUrl,
+          timeoutMs: Math.min(7000, remaining()),
+          deadline: t0 + BUDGET_MS,
+        });
 
-    const aiResult = await callGeminiWithFallback([{ text: prompt }], {
-      temperature: 0.1,
-      jsonMode: !hasWebContext ? false : true, // Google Search su alcuni modelli Gemini è più stabile senza jsonMode rigido
-      useGoogleSearch: !hasWebContext,
-      onlyGemini: !hasWebContext,
-      timeoutMs: aiTimeout,
-      deadline: t0 + BUDGET_MS,
-    });
-
-    let parsed: unknown = [];
-    try {
-      parsed = extractJsonFromAiText(aiResult.text);
-    } catch {
-      parsed = [];
+        const parsed: any = extractJsonFromAiText(aiResult.text);
+        if (inputIsUrl && parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          if (typeof parsed.brand === 'string' && parsed.brand.trim()) {
+            resolvedBrand = parsed.brand.trim();
+          }
+          if (Array.isArray(parsed.profumi)) aiCandidates = parsed.profumi;
+        } else if (Array.isArray(parsed)) {
+          aiCandidates = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+          const firstArray = Object.values(parsed).find(Array.isArray);
+          if (firstArray) aiCandidates = firstArray as any[];
+        }
+      } catch (aiErr) {
+        // Se l'AI fallisce ma il DB locale ha trovato risultati, non buttiamo via tutto
+        if (dbCandidates.length === 0) throw aiErr;
+      }
     }
 
-    // 3. Normalizzazione e deduplica
-    let rawList: any[] = [];
-    if (Array.isArray(parsed)) {
-      rawList = parsed;
-    } else if (parsed && typeof parsed === 'object') {
-      const firstArray = Object.values(parsed).find(Array.isArray);
-      if (firstArray) rawList = firstArray as any[];
-    }
-
+    // Unisce e deduplica risultati DB + AI
     const seen = new Set<string>();
-    const uniqueCandidates: Array<{ nome: string; concentrazione: string | null }> = [];
+    const merged: Array<{ nome: string; concentrazione: string | null }> = [];
 
-    for (const item of rawList) {
+    for (const item of [...dbCandidates, ...aiCandidates]) {
       if (!item || typeof item.nome !== 'string') continue;
-      const nome = stripBrandPrefix(item.nome, cleanBrand);
+      const nome = stripBrandPrefix(item.nome, resolvedBrand);
       if (nome.length < 2) continue;
 
       const conc =
@@ -117,14 +179,15 @@ REGOLE TASSATIVE:
       const key = `${nome.toLowerCase()}::${(conc || '').toLowerCase()}`;
       if (seen.has(key)) continue;
       seen.add(key);
-
-      uniqueCandidates.push({ nome, concentrazione: conc });
+      merged.push({ nome, concentrazione: conc });
     }
 
-    if (uniqueCandidates.length === 0) {
+    if (merged.length === 0) {
       return NextResponse.json(
         {
-          error: `Nessun profumo documentato trovato per "${cleanBrand}".`,
+          error: inputIsUrl
+            ? 'Nessun profumo leggibile da questo link. Prova con la pagina catalogo del sito ufficiale o Parfumo.'
+            : `Nessun profumo trovato per "${rawInput}". Prova a incollare direttamente il link del sito ufficiale o di Parfumo.`,
           candidates: [],
         },
         { status: 404 }
@@ -132,21 +195,14 @@ REGOLE TASSATIVE:
     }
 
     return NextResponse.json({
-      brand: cleanBrand,
-      candidates: uniqueCandidates,
+      brand: resolvedBrand,
+      candidates: merged,
     });
   } catch (error: any) {
     console.error('[AtelierLG:ImportBrand]', error);
-    const isTimeout =
-      error?.name === 'AbortError' ||
-      /timeout|deadline/i.test(String(error?.message || ''));
     return NextResponse.json(
-      {
-        error: isTimeout
-          ? 'Il server ha impiegato troppo tempo (Timeout). Riprova tra qualche secondo.'
-          : 'Errore durante la ricerca del brand. Riprova.',
-      },
-      { status: isTimeout ? 504 : 500 }
+      { error: 'Errore durante la ricerca. Prova a incollare il link diretto del brand.' },
+      { status: 500 }
     );
   }
 }
