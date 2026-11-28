@@ -358,7 +358,7 @@ export default function CollezionePage() {
               </div>
               <UltranicchiaDrafts onRefresh={() => {
                 fetchProfumi(); // Ricarica il radar
-                showToast('Archivio aggiornato.', 'success');
+                showToast('Archivio aggiornato.');
               }} />
             </section>
           )}
