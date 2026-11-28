@@ -49,13 +49,13 @@ export default function UltranicchiaDrafts({ onRefresh }: { onRefresh: () => voi
   async function handleApprove(id: string) {
     setActioningId(id);
     try {
-      // Chiama la RPC di pubblicazione creata nel Passaggio 3
       const { error } = await supabase.rpc('pubblica_profumo', { p_staging_id: id });
       if (error) throw error;
       
-      showToast('Profumo approvato e aggiunto al DB globale!', 'success');
+      // CORRETTO: Tolto 'success', il Toast di default è già verde/felice
+      showToast('Profumo approvato e aggiunto al DB globale!');
       setDrafts(prev => prev.filter(d => d.id !== id));
-      onRefresh(); // Aggiorna il Radar
+      onRefresh();
     } catch (err: any) {
       showToast(err.message, 'error');
     } finally {
@@ -73,7 +73,7 @@ export default function UltranicchiaDrafts({ onRefresh }: { onRefresh: () => voi
       
       if (error) throw error;
       setDrafts(prev => prev.filter(d => d.id !== id));
-      showToast('Bozza scartata.', 'info');
+      showToast('Bozza scartata.');
     } catch (err: any) {
       showToast(err.message, 'error');
     } finally {
