@@ -1,3 +1,4 @@
+// components/UltranicchiaImporter.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -25,8 +26,18 @@ export default function UltranicchiaImporter({ onImportComplete }: { onImportCom
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brand: brandQuery.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      
+      const textResponse = await res.text();
+      let data;
+      
+      try {
+        data = JSON.parse(textResponse);
+      } catch {
+        // Se Vercel va in timeout, restituisce HTML. Lo intercettiamo qui.
+        throw new Error('Il server ha impiegato troppo tempo (Timeout). Riprova o usa un brand più noto.');
+      }
+
+      if (!res.ok) throw new Error(data?.error || 'Errore durante la ricerca.');
       
       const mapped = (data.candidates || []).map((c: any) => ({ ...c, selected: true }));
       setBrandCandidates(mapped);
@@ -46,7 +57,11 @@ export default function UltranicchiaImporter({ onImportComplete }: { onImportCom
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ brand: brandQuery.trim(), candidates: selected }),
       });
-      const saveData = await saveRes.json();
+      
+      const saveText = await saveRes.text();
+      let saveData;
+      try { saveData = JSON.parse(saveText); } catch { throw new Error('Errore di comunicazione col server.'); }
+      
       if (!saveRes.ok) throw new Error(saveData.error);
       
       const batchId = saveData.batchId;
@@ -57,7 +72,11 @@ export default function UltranicchiaImporter({ onImportComplete }: { onImportCom
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ batchId, limit: 2 }),
         });
-        const enrichData = await enrichRes.json();
+        
+        const enrichText = await enrichRes.text();
+        let enrichData;
+        try { enrichData = JSON.parse(enrichText); } catch { throw new Error('Errore di comunicazione col server.'); }
+        
         if (!enrichRes.ok) throw new Error(enrichData.error);
         
         remaining = enrichData.remaining;
@@ -90,7 +109,7 @@ export default function UltranicchiaImporter({ onImportComplete }: { onImportCom
           className="flex items-center justify-center gap-2 rounded-[16px] px-6 py-3 text-xs font-bold text-[#08060C] transition disabled:opacity-40"
         >
           {searchingBrand ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          <span>Cerca Brand</span>
+          <span>{searchingBrand ? 'Ricerca...' : 'Cerca Brand'}</span>
         </button>
       </div>
 
