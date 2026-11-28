@@ -8,6 +8,7 @@ export interface EnrichedPerfumeData {
   note_testa: string | null;
   note_cuore: string | null;
   note_fondo: string | null;
+  note_lineari?: string | null;
   naso: string | null;
   famiglia_originale: string | null;
 }
@@ -15,11 +16,12 @@ export interface EnrichedPerfumeData {
 function isEnrichedData(data: unknown): data is EnrichedPerfumeData {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
-  const ok = (v: unknown) => v === null || typeof v === 'string';
+  const ok = (v: unknown) => v === undefined || v === null || typeof v === 'string';
   return (
     ok(d.note_testa) &&
     ok(d.note_cuore) &&
     ok(d.note_fondo) &&
+    ok(d.note_lineari) &&
     ok(d.naso) &&
     ok(d.famiglia_originale)
   );
@@ -42,19 +44,28 @@ export async function enrichStagingPerfume(
   data?: EnrichedPerfumeData;
   fonteUrl?: string;
 }> {
-  // 1. Ricerca mirata sui database principali
-  let webData = await tavilySearch(`"${brand}" "${nome}" perfume notes pyramid`, {
-    maxResults: 3,
+  // 1. Ricerca mirata sui database principali (incluso fragrantica.it)
+  let webData = await tavilySearch(`"${brand}" "${nome}" perfume notes OR "contiene note di"`, {
+    maxResults: 4,
     timeoutMs: 5000,
-    includeDomains: ['fragrantica.com', 'parfumo.com', 'parfumo.net', 'basenotes.com'],
+    includeDomains: [
+      'fragrantica.it',
+      'fragrantica.com',
+      'parfumo.com',
+      'parfumo.net',
+      'basenotes.com',
+    ],
   }).catch(() => null);
 
-  // 2. Fallback su web aperto (fondamentale per brand ultra-nicchia/artigianali)
+  // 2. Fallback su web aperto per brand ultra-nicchia/artigianali
   if (!webData || webData.results.length === 0) {
-    webData = await tavilySearch(`"${brand}" "${nome}" perfume notes OR "top notes" OR "note di testa"`, {
-      maxResults: 4,
-      timeoutMs: 5500,
-    }).catch(() => null);
+    webData = await tavilySearch(
+      `"${brand}" "${nome}" perfume notes OR "note di" OR "top notes"`,
+      {
+        maxResults: 4,
+        timeoutMs: 5500,
+      }
+    ).catch(() => null);
   }
 
   if (!webData || webData.results.length === 0 || !webData.contextText?.trim()) {
@@ -75,20 +86,21 @@ Nome: "${nome}"
 
 Testo web:
 ---
-${webData.contextText.slice(0, 5000)}
+${webData.contextText.slice(0, 5500)}
 ---
 
 REGOLE TASSATIVE:
-1. Estrai note_testa, note_cuore, note_fondo in italiano, separate da virgola. Se non presenti nel testo, metti null.
-2. Estrai naso (profumiere) e famiglia_originale (es. Legnosa, Ambrata, Cuoiata). Se assenti, metti null.
-3. NON inventare nulla e ignora note di altri profumi correlati presenti nella pagina.
-4. Rispondi SOLO con JSON valido:
-{"note_testa": null, "note_cuore": null, "note_fondo": null, "naso": null, "famiglia_originale": null}`;
+1. PIRAMIDE DIVISA: se il testo divide le note in Testa, Cuore e Fondo, compilali in "note_testa", "note_cuore", "note_fondo" (in italiano, separate da virgola) e lascia "note_lineari": null.
+2. PIRAMIDE LINEARE (IMPORTANTE): se il testo elenca le note senza dividerle in strati (es. "La fragranza contiene note di Miele, Tabacco, Oud..." o "Notes include..."), estraile TUTTE in "note_lineari" (in italiano, separate da virgola) e lascia null i 3 strati.
+3. Estrai "naso" (profumiere, es. "Pedro García") e "famiglia_originale" (es. "Orientale Speziato", "Legnosa", "Ambrata"). Se assenti, metti null.
+4. NON inventare nulla e ignora note di altri profumi correlati presenti nella pagina.
+5. Rispondi SOLO con JSON valido:
+{"note_testa": null, "note_cuore": null, "note_fondo": null, "note_lineari": null, "naso": null, "famiglia_originale": null}`;
 
   const aiResult = await callAIWithFallback<EnrichedPerfumeData>([{ text: prompt }], {
     jsonMode: true,
     validator: isEnrichedData,
-    onlyGemini: false, // Consente Groq/fallback veloce avendo già il contesto web
+    onlyGemini: false,
     temperature: 0.1,
     timeoutMs: 9000,
   });
@@ -106,10 +118,15 @@ REGOLE TASSATIVE:
   const noteTesta = cleanField(aiResult.data.note_testa);
   const noteCuore = cleanField(aiResult.data.note_cuore);
   const noteFondo = cleanField(aiResult.data.note_fondo);
+  const noteLineari = cleanField(aiResult.data.note_lineari);
+
+  // Se la fragranza ha una composizione lineare (senza piramide), salva l'elenco in note_cuore
+  const hasPyramid = Boolean(noteTesta || noteCuore || noteFondo);
+  const finalCuore = noteCuore || (!hasPyramid && noteLineari ? noteLineari : null);
 
   const normalized: EnrichedPerfumeData = {
     note_testa: noteTesta ? formatPerfumeNote(noteTesta) : null,
-    note_cuore: noteCuore ? formatPerfumeNote(noteCuore) : null,
+    note_cuore: finalCuore ? formatPerfumeNote(finalCuore) : null,
     note_fondo: noteFondo ? formatPerfumeNote(noteFondo) : null,
     naso: cleanField(aiResult.data.naso),
     famiglia_originale:
@@ -117,10 +134,16 @@ REGOLE TASSATIVE:
       cleanField(aiResult.data.famiglia_originale),
   };
 
-  const hasAnyNote = Boolean(normalized.note_testa || normalized.note_cuore || normalized.note_fondo);
+  const hasAnyNote = Boolean(
+    normalized.note_testa || normalized.note_cuore || normalized.note_fondo
+  );
 
   const updatePayload: Record<string, any> = {
-    ...normalized,
+    note_testa: normalized.note_testa,
+    note_cuore: normalized.note_cuore,
+    note_fondo: normalized.note_fondo,
+    naso: normalized.naso,
+    famiglia_originale: normalized.famiglia_originale,
     dati_completi: hasAnyNote,
     stato: hasAnyNote ? 'ready' : 'needs_review',
     motivo_review: hasAnyNote ? [] : ['note_non_trovate_in_fonte'],
